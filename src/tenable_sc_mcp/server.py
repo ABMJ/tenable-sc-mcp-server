@@ -10,6 +10,10 @@ from mcp.server.fastmcp.server import TransportSecuritySettings
 from .catalog import API_RESOURCES, RESOURCE_BY_PATH, catalog_as_dict
 from .client import TenableScApiError, TenableScClient, TenableScConfigError
 
+
+_CLIENT_ENV_PREFIX = "TSC_"
+_CLIENT_ENV_FILE: str | None = None
+
 mcp = FastMCP(
     "tenable-sc-mcp",
     instructions=(
@@ -21,7 +25,14 @@ mcp = FastMCP(
 
 
 def _client() -> TenableScClient:
-    return TenableScClient()
+    return TenableScClient(env_prefix=_CLIENT_ENV_PREFIX, env_file=_CLIENT_ENV_FILE)
+
+
+def configure_client_env(*, env_prefix: str, env_file: str | None) -> None:
+    global _CLIENT_ENV_PREFIX
+    global _CLIENT_ENV_FILE
+    _CLIENT_ENV_PREFIX = env_prefix
+    _CLIENT_ENV_FILE = env_file
 
 
 def _query_params(
@@ -288,11 +299,22 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind for sse or streamable-http transports")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind for sse or streamable-http transports")
     parser.add_argument(
+        "--env-file",
+        default=None,
+        help="Path to env file with Tenable.sc credentials (example: ~/.tenable-sc-mcp.env)",
+    )
+    parser.add_argument(
+        "--env-prefix",
+        default="TSC_",
+        help="Environment variable prefix for Tenable.sc settings, default TSC_",
+    )
+    parser.add_argument(
         "--allow-remote-hosts",
         action="store_true",
         help="Disable MCP DNS rebinding protection for lab/VPN HTTP access. Use only on trusted networks.",
     )
     args = parser.parse_args()
+    configure_client_env(env_prefix=args.env_prefix, env_file=args.env_file)
     mcp.settings.host = args.host
     mcp.settings.port = args.port
     if args.allow_remote_hosts:
