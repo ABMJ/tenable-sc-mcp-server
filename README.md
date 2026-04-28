@@ -1,0 +1,323 @@
+# Tenable.sc MCP Server
+
+Container-ready MCP server for Tenable Security Center Plus using direct REST API calls. It does not use `pyTenable`; the server talks to Tenable.sc over HTTP with the documented `x-apikey` header.
+
+## What It Exposes
+
+The server exposes documented Tenable.sc resources through generic MCP tools:
+
+- `tsc_catalog`: lists the built-in API resource catalog with REST paths and documentation links.
+- `tsc_resource_docs`: returns docs metadata for one resource.
+- `tsc_current_user`: returns the configured API user's Tenable.sc identity details.
+- `tsc_list`: `GET /rest/{resource}` for any catalog resource.
+- `tsc_get`: `GET /rest/{resource}/{id}` for any catalog resource.
+- `tsc_create`: `POST /rest/{resource}` for resources that support create.
+- `tsc_update`: `PUT /rest/{resource}/{id}` for resources that support update.
+- `tsc_delete`: `DELETE /rest/{resource}/{id}` for resources that support delete.
+- `tsc_analyze`: convenience wrapper for `POST /rest/analysis`.
+- `tsc_download`: binary/text download helper for endpoints such as `POST /scanResult/{id}/download`.
+- `tsc_upload_file`: multipart upload helper for `POST /file/upload`.
+- `tsc_request`: direct escape hatch for any Tenable.sc endpoint, sub-action, or method.
+
+Tenable.sc has many resource-specific actions, such as scan launch/import/export style operations. Use `tsc_request` for those documented paths, for example `POST /scan/{id}/launch` if supported by your Tenable.sc version.
+
+## RBAC Model
+
+The MCP server does not bypass or reimplement Tenable.sc RBAC. Tenable.sc remains the source of truth:
+
+- The configured `TSC_ACCESS_KEY` and `TSC_SECRET_KEY` identify the API user.
+- Tenable.sc roles, organization membership, repository access, object sharing, and administrator/director permissions determine what each tool can see or change.
+- Unauthorized calls return Tenable.sc API errors through the MCP response.
+- Run `tsc_current_user` first to verify which identity the server is using.
+
+Use a dedicated least-privilege Tenable.sc service account for deployment.
+
+## Supported API Resources
+
+The built-in catalog follows the Tenable.sc API index at <https://docs.tenable.com/security-center/api/index.htm> and includes these resource paths:
+
+`acceptRiskRule`, `agentGroup`, `agentResultsSync`, `agentScan`, `alert`, `analysis`, `arc`, `arcTemplate`, `asset`, `assetTemplate`, `attributeSet`, `auditFile`, `auditFileTemplate`, `bulk`, `configuration`, `configurationSection`, `credential`, `currentOrganization`, `currentUser`, `customPlugins`, `dashboardComponent`, `dashboardTab`, `dashboardTemplate`, `deviceInformation`, `directorInsights`, `directorOrganization`, `directorRepository`, `directorScan`, `directorScanner`, `directorScanPolicy`, `directorScanResult`, `directorScanZone`, `directorSystem`, `directorUser`, `feed`, `file`, `freezeWindow`, `group`, `hosts`, `job`, `lce`, `lceClient`, `lcePolicy`, `ldap`, `licenseInfo`, `lumin`, `mdm`, `notification`, `organization`, `organizationSecurityManager`, `organizationUser`, `passiveScanner`, `plugin`, `pluginFamily`, `publishingSite`, `query`, `recastRiskRule`, `report`, `reportDefinition`, `reportImage`, `reportTemplate`, `repository`, `role`, `saml`, `scanner`, `scan`, `scanPolicy`, `scanPolicyTemplate`, `scanResult`, `scanZone`, `sensorProxy`, `solutions`, `sshKey`, `status`, `style`, `styleFamily`, `system`, `tenableScInstance`, `tesAdminRoles`, `tesUserPermissions`, `ticket`, `token`, `user`, `wasScan`, and `wasScanner`.
+
+Use `tsc_catalog` for the full catalog with documentation URLs.
+
+## Configuration
+
+Set these environment variables:
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `TSC_URL` | Yes | None | Base URL for Tenable.sc, for example `https://securitycenter.example.com`. |
+| `TSC_ACCESS_KEY` | Yes | None | Tenable.sc API access key. |
+| `TSC_SECRET_KEY` | Yes | None | Tenable.sc API secret key. |
+| `TSC_VERIFY_SSL` | No | `true` | Set to `false` for lab systems with untrusted certificates. Prefer `true` in production. |
+| `TSC_TIMEOUT_SECONDS` | No | `300` | HTTP timeout per request. |
+| `TSC_MAX_RETRIES` | No | `3` | Retries for network failures and HTTP 429 responses. |
+| `TSC_BACKOFF_SECONDS` | No | `1` | Base retry backoff in seconds. |
+
+Do not include `/rest` in `TSC_URL`. Use the same base URL you use to reach Tenable.sc in a browser, for example `https://192.168.40.75:8443` or `https://securitycenter.example.com`.
+
+### Save Tenable.sc Details
+
+For container deployments, keep Tenable.sc details in an env file on the machine that runs the MCP server:
+
+```bash
+nano ~/.tenable-sc-mcp.env
+```
+
+Example lab configuration:
+
+```bash
+TSC_URL=https://192.168.40.75:8443
+TSC_ACCESS_KEY=your-access-key
+TSC_SECRET_KEY=your-secret-key
+TSC_VERIFY_SSL=false
+```
+
+Use `TSC_VERIFY_SSL=true` when Tenable.sc has a trusted certificate. Use `false` only for lab systems with self-signed or untrusted certificates.
+
+You can verify the Tenable.sc URL is reachable before starting the MCP server:
+
+```bash
+curl -k https://192.168.40.75:8443/rest/currentUser
+```
+
+An `invalid token` response means the Tenable.sc API endpoint is reachable; the MCP server will authenticate with the configured API keys.
+
+## Local Install
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install .
+export TSC_URL="https://securitycenter.example.com"
+export TSC_ACCESS_KEY="your-access-key"
+export TSC_SECRET_KEY="your-secret-key"
+tenable-sc-mcp --transport stdio
+```
+
+## Docker Install On Ubuntu
+
+Install Docker if it is not already available:
+
+```bash
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+```
+
+Log out and back in after adding your user to the `docker` group.
+
+## Container Build
+
+From the project directory on the machine that will run the MCP server:
+
+```bash
+docker build -t tenable-sc-mcp:latest .
+```
+
+## Run As A Background Service
+
+Run the MCP server as a background Docker container using Streamable HTTP:
+
+```bash
+docker run -d \
+  --name tenable-sc-mcp \
+  --restart unless-stopped \
+  -p 0.0.0.0:8000:8000 \
+  --env-file ~/.tenable-sc-mcp.env \
+  tenable-sc-mcp:latest \
+  --transport streamable-http \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --allow-remote-hosts
+```
+
+The remote MCP URL is:
+
+```text
+http://<mcp-server-ip>:8000/mcp
+```
+
+For example:
+
+```text
+http://192.168.40.75:8000/mcp
+```
+
+Check that the container is running and listening on all interfaces:
+
+```bash
+docker ps
+```
+
+The `PORTS` column should include:
+
+```text
+0.0.0.0:8000->8000/tcp
+```
+
+Opening `/mcp` in a browser may show a protocol error such as `Client must accept text/event-stream`. That still means the MCP server is reachable; connect with an MCP client such as OpenCode.
+
+Useful maintenance commands:
+
+```bash
+docker logs tenable-sc-mcp
+docker rm -f tenable-sc-mcp
+```
+
+## Local Stdio Container Run
+
+For an MCP client that starts containers over stdio, configure the client to run:
+
+```bash
+docker run --rm -i \
+  -e TSC_URL="https://securitycenter.example.com" \
+  -e TSC_ACCESS_KEY="your-access-key" \
+  -e TSC_SECRET_KEY="your-secret-key" \
+  -e TSC_VERIFY_SSL="true" \
+  tenable-sc-mcp:latest
+```
+
+## OpenCode Remote MCP Example
+
+Add this to `opencode.json` or `opencode.jsonc` on the machine running OpenCode:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "tenable-sc": {
+      "type": "remote",
+      "url": "http://192.168.40.75:8000/mcp",
+      "enabled": true,
+      "oauth": false,
+      "timeout": 30000
+    }
+  }
+}
+```
+
+If you already have an OpenCode config, merge only the `mcp` block. Restart OpenCode after changing the config.
+
+You can then ask OpenCode to use Tenable.sc, for example:
+
+```text
+use tenable-sc to call tsc_current_user
+```
+
+or:
+
+```text
+use tenable-sc to list repositories
+```
+
+## Claude Desktop Stdio Example
+
+Add an MCP server entry similar to this:
+
+```json
+{
+  "mcpServers": {
+    "tenable-sc": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "TSC_URL=https://securitycenter.example.com",
+        "-e",
+        "TSC_ACCESS_KEY=your-access-key",
+        "-e",
+        "TSC_SECRET_KEY=your-secret-key",
+        "tenable-sc-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+## Example Tool Calls
+
+List repositories:
+
+```json
+{
+  "resource": "repository"
+}
+```
+
+Get scan ID `12`:
+
+```json
+{
+  "resource": "scan",
+  "object_id": "12"
+}
+```
+
+Run an analysis query:
+
+```json
+{
+  "query": {
+    "type": "vuln",
+    "sourceType": "cumulative",
+    "query": {
+      "tool": "vulndetails",
+      "filters": []
+    },
+    "startOffset": 0,
+    "endOffset": 50
+  }
+}
+```
+
+Call a resource-specific action with `tsc_request`:
+
+```json
+{
+  "method": "POST",
+  "path": "/scan/12/launch",
+  "body": {}
+}
+```
+
+Request only selected fields:
+
+```json
+{
+  "resource": "asset",
+  "fields": ["id", "name", "description"]
+}
+```
+
+Request expansions:
+
+```json
+{
+  "resource": "scan",
+  "object_id": "12",
+  "expand": ["credentials", "assets"]
+}
+```
+
+## API Documentation Sources
+
+- Tenable.sc API reference: <https://docs.tenable.com/security-center/api/index.htm>
+- Tenable.sc API best practices guide: <https://docs.tenable.com/security-center/best-practices/api/Content/PDF/Tenablesc_API_BestPracticesGuide.pdf>
+- pyTenable SDK reference: <https://pytenable.readthedocs.io/en/stable/api/sc/index.html>
+
+## Security Notes
+
+- Do not bake API keys into the image.
+- Prefer container/orchestrator secrets for `TSC_ACCESS_KEY` and `TSC_SECRET_KEY`.
+- Use `TSC_VERIFY_SSL=true` in production.
+- Use a dedicated least-privilege Tenable.sc API user.
+- Be careful with `tsc_delete`, `tsc_update`, and `tsc_request` calls using mutating methods.
+- The remote MCP HTTP endpoint does not add its own user authentication. Anyone who can reach it can use the configured Tenable.sc API identity through MCP tools. Bind it only to trusted networks, restrict it with firewall rules, or expose it through an SSH tunnel/VPN.
+
+## Design Notes
+
+This server intentionally uses direct HTTP instead of `pyTenable` to keep startup and call paths small. The generic resource tools avoid maintaining hundreds of brittle wrappers while still exposing the entire documented API catalog. When Tenable adds a new action under an existing resource, `tsc_request` can call it immediately.
