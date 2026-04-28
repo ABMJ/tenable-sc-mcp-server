@@ -137,6 +137,8 @@ docker run -d \
   --allow-remote-hosts
 ```
 
+`--allow-remote-hosts` is required for remote MCP clients. Without it, the server can return `421 Misdirected Request` with `Invalid Host header` for non-local requests.
+
 The remote MCP URL is:
 
 ```text
