@@ -5,7 +5,7 @@ import base64
 from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.server import TransportSecuritySettings
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .catalog import API_RESOURCES, RESOURCE_BY_PATH, catalog_as_dict
 from .client import TenableScApiError, TenableScClient, TenableScConfigError
