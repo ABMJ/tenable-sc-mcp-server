@@ -42,7 +42,7 @@ Use `tsc_catalog` for the full catalog with documentation URLs.
 
 ## Configuration
 
-Set these environment variables:
+Set these environment variables (or place them in an env file and pass `--env-file`):
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -53,6 +53,9 @@ Set these environment variables:
 | `TSC_TIMEOUT_SECONDS` | No | `300` | HTTP timeout per request. |
 | `TSC_MAX_RETRIES` | No | `3` | Retries for network failures and HTTP 429 responses. |
 | `TSC_BACKOFF_SECONDS` | No | `1` | Base retry backoff in seconds. |
+
+You can also run with a custom prefix using `--env-prefix` (for example `LAB1_TSC_`).
+With `--env-prefix LAB1_TSC_`, the server reads `LAB1_TSC_URL`, `LAB1_TSC_ACCESS_KEY`, and so on.
 
 Do not include `/rest` in `TSC_URL`. Use the same base URL you use to reach Tenable.sc in a browser, for example `https://192.168.40.75:8443` or `https://securitycenter.example.com`.
 
@@ -125,11 +128,12 @@ docker run -d \
   --name tenable-sc-mcp \
   --restart unless-stopped \
   -p 0.0.0.0:8000:8000 \
-  --env-file ~/.tenable-sc-mcp.env \
+  -v ~/.tenable-sc-mcp.env:/config/tsc.env:ro \
   tenable-sc-mcp:latest \
   --transport streamable-http \
   --host 0.0.0.0 \
   --port 8000 \
+  --env-file /config/tsc.env \
   --allow-remote-hosts
 ```
 
@@ -165,6 +169,49 @@ Useful maintenance commands:
 docker logs tenable-sc-mcp
 docker rm -f tenable-sc-mcp
 ```
+
+## Run Multiple MCP Instances On One Machine
+
+You can run multiple instances, each connected to a different Tenable.sc, without editing code.
+
+Use one env file per instance and a different container name/host port:
+
+```bash
+# Instance A
+cat > ~/.tenable-sc-mcp-a.env <<'EOF'
+TSC_URL=https://sc-a.example.com
+TSC_ACCESS_KEY=access-key-a
+TSC_SECRET_KEY=secret-key-a
+TSC_VERIFY_SSL=true
+EOF
+
+# Instance B
+cat > ~/.tenable-sc-mcp-b.env <<'EOF'
+TSC_URL=https://sc-b.example.com
+TSC_ACCESS_KEY=access-key-b
+TSC_SECRET_KEY=secret-key-b
+TSC_VERIFY_SSL=true
+EOF
+
+docker run -d --name tenable-sc-mcp-a --restart unless-stopped \
+  -p 0.0.0.0:8001:8000 \
+  -v ~/.tenable-sc-mcp-a.env:/config/tsc.env:ro \
+  tenable-sc-mcp:latest \
+  --transport streamable-http --host 0.0.0.0 --port 8000 \
+  --env-file /config/tsc.env --allow-remote-hosts
+
+docker run -d --name tenable-sc-mcp-b --restart unless-stopped \
+  -p 0.0.0.0:8002:8000 \
+  -v ~/.tenable-sc-mcp-b.env:/config/tsc.env:ro \
+  tenable-sc-mcp:latest \
+  --transport streamable-http --host 0.0.0.0 --port 8000 \
+  --env-file /config/tsc.env --allow-remote-hosts
+```
+
+Then connect MCP clients to:
+
+- `http://<host>:8001/mcp` (Tenable.sc A)
+- `http://<host>:8002/mcp` (Tenable.sc B)
 
 ## Local Stdio Container Run
 

@@ -31,27 +31,72 @@ class TenableScConfig:
     max_retries: int = 3
     backoff_seconds: float = 1.0
 
+    @staticmethod
+    def _read_env_file(env_file: str | None) -> dict[str, str]:
+        if not env_file:
+            return {}
+        path = Path(env_file).expanduser()
+        if not path.is_file():
+            raise TenableScConfigError(f"Config file not found: {env_file}")
+
+        values: dict[str, str] = {}
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[7:].strip()
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                values[key] = value
+        return values
+
+    @staticmethod
+    def _pick(name: str, env_file_values: dict[str, str]) -> str:
+        value = os.getenv(name)
+        if value is not None:
+            return value
+        return env_file_values.get(name, "")
+
     @classmethod
-    def from_env(cls) -> "TenableScConfig":
-        base_url = os.getenv("TSC_URL", "").strip().rstrip("/")
-        access_key = os.getenv("TSC_ACCESS_KEY", "").strip()
-        secret_key = os.getenv("TSC_SECRET_KEY", "").strip()
-        verify_ssl = os.getenv("TSC_VERIFY_SSL", "true").strip().lower() not in {"0", "false", "no"}
-        timeout_seconds = float(os.getenv("TSC_TIMEOUT_SECONDS", "300"))
-        max_retries = int(os.getenv("TSC_MAX_RETRIES", "3"))
-        backoff_seconds = float(os.getenv("TSC_BACKOFF_SECONDS", "1"))
+    def from_env(cls, *, env_prefix: str = "TSC_", env_file: str | None = None) -> "TenableScConfig":
+        env_file_values = cls._read_env_file(env_file)
+
+        def prefixed(name: str) -> str:
+            return f"{env_prefix}{name}"
+
+        base_url = cls._pick(prefixed("URL"), env_file_values).strip().rstrip("/")
+        access_key = cls._pick(prefixed("ACCESS_KEY"), env_file_values).strip()
+        secret_key = cls._pick(prefixed("SECRET_KEY"), env_file_values).strip()
+        verify_ssl_raw = cls._pick(prefixed("VERIFY_SSL"), env_file_values).strip() or "true"
+        timeout_raw = cls._pick(prefixed("TIMEOUT_SECONDS"), env_file_values).strip() or "300"
+        retries_raw = cls._pick(prefixed("MAX_RETRIES"), env_file_values).strip() or "3"
+        backoff_raw = cls._pick(prefixed("BACKOFF_SECONDS"), env_file_values).strip() or "1"
+
+        verify_ssl = verify_ssl_raw.lower() not in {"0", "false", "no"}
+        timeout_seconds = float(timeout_raw)
+        max_retries = int(retries_raw)
+        backoff_seconds = float(backoff_raw)
 
         missing = [
             name
             for name, value in (
-                ("TSC_URL", base_url),
-                ("TSC_ACCESS_KEY", access_key),
-                ("TSC_SECRET_KEY", secret_key),
+                (prefixed("URL"), base_url),
+                (prefixed("ACCESS_KEY"), access_key),
+                (prefixed("SECRET_KEY"), secret_key),
             )
             if not value
         ]
         if missing:
-            raise TenableScConfigError(f"Missing required environment variables: {', '.join(missing)}")
+            prefix_hint = f" (prefix: {env_prefix})" if env_prefix != "TSC_" else ""
+            file_hint = f" in {env_file}" if env_file else ""
+            raise TenableScConfigError(
+                f"Missing required environment variables{prefix_hint}{file_hint}: {', '.join(missing)}"
+            )
 
         if not base_url.startswith(("https://", "http://")):
             raise TenableScConfigError("TSC_URL must start with https:// or http://")
@@ -68,8 +113,14 @@ class TenableScConfig:
 
 
 class TenableScClient:
-    def __init__(self, config: TenableScConfig | None = None) -> None:
-        self.config = config or TenableScConfig.from_env()
+    def __init__(
+        self,
+        config: TenableScConfig | None = None,
+        *,
+        env_prefix: str = "TSC_",
+        env_file: str | None = None,
+    ) -> None:
+        self.config = config or TenableScConfig.from_env(env_prefix=env_prefix, env_file=env_file)
 
     @property
     def headers(self) -> dict[str, str]:
@@ -96,34 +147,8 @@ class TenableScClient:
         url = urljoin(f"{self.config.base_url}/", normalized_path.lstrip("/"))
         timeout = timeout_seconds if timeout_seconds is not None else self.config.timeout_seconds
 
-        last_error: Exception | None = None
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                with httpx.Client(verify=self.config.verify_ssl, timeout=timeout, follow_redirects=True) as client:
-                    response = client.request(
-                        method,
-                        url,
-                        headers=self.headers,
-                        params=params,
-                        json=json_body,
-                    )
-                if response.status_code == 429 and attempt < self.config.max_retries:
-                    retry_after = response.headers.get("Retry-After")
-                    sleep_seconds = float(retry_after) if retry_after else self.config.backoff_seconds * (attempt + 1)
-                    time.sleep(sleep_seconds)
-                    continue
-
-                return self._parse_response(response)
-            except (httpx.TimeoutException, httpx.NetworkError) as exc:
-                last_error = exc
-                if attempt < self.config.max_retries:
-                    time.sleep(self.config.backoff_seconds * (attempt + 1))
-                    continue
-                raise
-
-        if last_error:
-            raise last_error
-        raise RuntimeError("request failed without a response")
+        response = self._request_with_retries(method, url, params=params, json_body=json_body, timeout=timeout)
+        return self._parse_response(response)
 
     def _parse_response(self, response: httpx.Response) -> Any:
         content_type = response.headers.get("content-type", "")
@@ -159,8 +184,7 @@ class TenableScClient:
         url = urljoin(f"{self.config.base_url}/", normalized_path.lstrip("/"))
         timeout = timeout_seconds if timeout_seconds is not None else self.config.timeout_seconds
 
-        with httpx.Client(verify=self.config.verify_ssl, timeout=timeout, follow_redirects=True) as client:
-            response = client.request(method, url, headers=self.headers, params=params, json=json_body)
+        response = self._request_with_retries(method, url, params=params, json_body=json_body, timeout=timeout)
         if response.is_error:
             self._parse_response(response)
         return response
@@ -189,9 +213,57 @@ class TenableScClient:
         headers = {"Accept": "application/json", "x-apikey": self.headers["x-apikey"]}
         with path.open("rb") as file_obj:
             files = {"Filedata": (path.name, file_obj)}
-            with httpx.Client(verify=self.config.verify_ssl, timeout=timeout, follow_redirects=True) as client:
-                response = client.post(url, headers=headers, data=data, files=files)
+            response = self._request_with_retries(
+                "POST",
+                url,
+                timeout=timeout,
+                raw_headers=headers,
+                data=data,
+                files=files,
+            )
         return self._parse_response(response)
+
+    def _request_with_retries(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_body: Any | None = None,
+        timeout: float,
+        raw_headers: dict[str, str] | None = None,
+        data: dict[str, str] | None = None,
+        files: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        last_error: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                with httpx.Client(verify=self.config.verify_ssl, timeout=timeout, follow_redirects=True) as client:
+                    response = client.request(
+                        method,
+                        url,
+                        headers=raw_headers or self.headers,
+                        params=params,
+                        json=json_body,
+                        data=data,
+                        files=files,
+                    )
+                if response.status_code == 429 and attempt < self.config.max_retries:
+                    retry_after = response.headers.get("Retry-After")
+                    sleep_seconds = float(retry_after) if retry_after else self.config.backoff_seconds * (attempt + 1)
+                    time.sleep(sleep_seconds)
+                    continue
+                return response
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                last_error = exc
+                if attempt < self.config.max_retries:
+                    time.sleep(self.config.backoff_seconds * (attempt + 1))
+                    continue
+                raise
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("request failed without a response")
 
     @staticmethod
     def _normalize_path(path: str) -> str:
