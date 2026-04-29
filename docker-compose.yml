@@ -2,7 +2,7 @@ services:
   tenable-sc-mcp:
     image: tenable-sc-mcp:latest
     container_name: tenable-sc-mcp
-    user: "${UID}:${GID}"
+    user: "${LOCAL_UID}:${LOCAL_GID}"
     restart: unless-stopped
     ports:
       - "0.0.0.0:8000:8000"
