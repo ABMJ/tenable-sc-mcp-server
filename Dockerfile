@@ -10,7 +10,5 @@ COPY src ./src
 
 RUN pip install --no-cache-dir .
 
-USER nobody
-
 ENTRYPOINT ["tenable-sc-mcp"]
 CMD ["--transport", "stdio"]
