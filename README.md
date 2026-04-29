@@ -1,5 +1,9 @@
 # Tenable.sc MCP Server
 
+This tool is not an officially supported Tenable project.
+
+Use of this tool is subject to the terms and conditions identified below, and is not subject to any license agreement you may have with Tenable.
+
 Container-ready MCP server for Tenable Security Center Plus using direct REST API calls. It does not use `pyTenable`; the server talks to Tenable.sc over HTTP with the documented `x-apikey` header.
 
 ## What It Exposes
@@ -423,3 +427,9 @@ Request expansions:
 ## Design Notes
 
 This server intentionally uses direct HTTP instead of `pyTenable` to keep startup and call paths small. The generic resource tools avoid maintaining hundreds of brittle wrappers while still exposing the entire documented API catalog. When Tenable adds a new action under an existing resource, `tsc_request` can call it immediately.
+
+## License
+
+- GNU GPL v3.0: <https://choosealicense.com/licenses/gpl-3.0/>
+
+## Todo:
