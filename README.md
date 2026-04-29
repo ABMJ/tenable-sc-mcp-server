@@ -7,7 +7,7 @@ Container-ready MCP server for Tenable Security Center Plus using direct REST AP
 The server exposes documented Tenable.sc resources through generic MCP tools:
 
 - `tsc_catalog`: lists the built-in API resource catalog with REST paths and documentation links.
-- `tsc_resource_docs`: returns docs metadata for one resource.
+- `tsc_resource_docs`: returns docs metadata for one resource (`compact=true` for `{name,path,docs}` only).
 - `tsc_current_user`: returns the configured API user's Tenable.sc identity details.
 - `tsc_resource_action`: unified CRUD-style helper for resources (`list`, `get`, `create`, `update`, `delete`).
 - `tsc_list`: `GET /rest/{resource}` for any catalog resource.
@@ -18,7 +18,7 @@ The server exposes documented Tenable.sc resources through generic MCP tools:
 - `tsc_analyze`: convenience wrapper for `POST /rest/analysis`.
 - `tsc_download`: binary/text download helper for endpoints such as `POST /scanResult/{id}/download`.
 - `tsc_upload_file`: multipart upload helper for `POST /file/upload`.
-- `tsc_request`: direct escape hatch for any Tenable.sc endpoint, sub-action, or method.
+- `tsc_request`: direct escape hatch for any Tenable.sc endpoint, sub-action, or method (`response_path`, `max_items`, `keys_only` for token-efficient shaping).
 
 `tsc_list`, `tsc_get`, `tsc_create`, `tsc_update`, and `tsc_delete` remain available as compatibility aliases, but new clients should use `tsc_resource_action`.
 

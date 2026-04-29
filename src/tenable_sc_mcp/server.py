@@ -59,6 +59,25 @@ def _handle_error(exc: Exception) -> dict[str, Any]:
     return {"ok": False, "error": str(exc)}
 
 
+def _select_response_path(value: Any, path: str) -> Any:
+    current: Any = value
+    for part in path.split("."):
+        part = part.strip()
+        if not part:
+            continue
+        if isinstance(current, dict):
+            if part not in current:
+                raise KeyError(part)
+            current = current[part]
+            continue
+        if isinstance(current, list):
+            index = int(part)
+            current = current[index]
+            continue
+        raise KeyError(part)
+    return current
+
+
 @mcp.tool()
 def tsc_catalog(
     include_admin_or_director: bool = True,
@@ -94,6 +113,9 @@ def tsc_request(
     expand: list[str] | None = None,
     editable: bool = False,
     timeout_seconds: float | None = None,
+    response_path: str | None = None,
+    max_items: int | None = None,
+    keys_only: list[str] | None = None,
 ) -> dict[str, Any]:
     """Calls any Tenable.sc endpoint; use as advanced escape hatch."""
     try:
@@ -104,6 +126,20 @@ def tsc_request(
             json_body=body,
             timeout_seconds=timeout_seconds,
         )
+        if response_path:
+            try:
+                response = _select_response_path(response, response_path)
+            except (KeyError, IndexError, ValueError) as exc:
+                return {"ok": False, "error": f"invalid response_path: {response_path}", "details": str(exc)}
+        if max_items is not None and isinstance(response, list):
+            response = response[: max(max_items, 0)]
+        if keys_only and isinstance(response, dict):
+            response = {key: response[key] for key in keys_only if key in response}
+        if keys_only and isinstance(response, list):
+            response = [
+                {key: item[key] for key in keys_only if isinstance(item, dict) and key in item}
+                for item in response
+            ]
         return {"ok": True, "response": response}
     except Exception as exc:
         return _handle_error(exc)
@@ -214,12 +250,14 @@ def tsc_current_user() -> dict[str, Any]:
 
 
 @mcp.tool()
-def tsc_resource_docs(resource: str) -> dict[str, Any]:
+def tsc_resource_docs(resource: str, compact: bool = False) -> dict[str, Any]:
     """Returns docs metadata for one Tenable.sc resource path."""
     item = RESOURCE_BY_PATH.get(resource)
     if not item:
         matches = [entry for entry in catalog_as_dict() if resource.lower() in str(entry["name"]).lower()]
         return {"ok": False, "error": f"Unknown resource: {resource}", "possible_matches": matches}
+    if compact:
+        return {"ok": True, "resource": {"name": item.name, "path": item.path, "docs": item.docs}}
     return {
         "ok": True,
         "resource": {
