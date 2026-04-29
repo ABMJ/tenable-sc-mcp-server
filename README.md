@@ -166,53 +166,27 @@ This repo includes `docker-compose.yml` with:
 - `restart: unless-stopped` so it survives host/container restarts
 - the same port, env-file mount, and MCP arguments as the `docker run` example
 
-From the project directory:
+Use detached mode (`up -d`) to start the container and return to your shell. Running `up` without `-d` attaches logs in the foreground.
+
+If you are using Docker Compose v2 (`docker compose`), run:
 
 ```bash
 export LOCAL_UID=$(id -u)
 export LOCAL_GID=$(id -g)
 docker compose up -d
-```
-
-If your Docker installation does not include the Compose v2 plugin, use legacy Compose commands instead:
-
-```bash
-docker-compose up -d
-```
-
-Check status:
-
-```bash
 docker compose ps
-```
-
-Legacy equivalent:
-
-```bash
-docker-compose ps
-```
-
-View logs:
-
-```bash
 docker compose logs -f
-```
-
-Legacy equivalent:
-
-```bash
-docker-compose logs -f
-```
-
-Stop and remove:
-
-```bash
 docker compose down
 ```
 
-Legacy equivalent:
+If you are using legacy Docker Compose (`docker-compose`), run:
 
 ```bash
+export LOCAL_UID=$(id -u)
+export LOCAL_GID=$(id -g)
+docker-compose up -d
+docker-compose ps
+docker-compose logs -f
 docker-compose down
 ```
 
