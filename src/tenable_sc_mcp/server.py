@@ -60,16 +60,27 @@ def _handle_error(exc: Exception) -> dict[str, Any]:
 
 
 @mcp.tool()
-def tsc_catalog(include_admin_or_director: bool = True) -> dict[str, Any]:
-    """Return the built-in Tenable.sc API resource catalog with REST paths and documentation links.
-
-    Set include_admin_or_director=false to hide resources that commonly require administrator,
-    director, or system-level Tenable.sc permissions. This is only a documentation filter;
-    Tenable.sc remains the source of truth for RBAC enforcement.
-    """
+def tsc_catalog(
+    include_admin_or_director: bool = True,
+    query: str | None = None,
+    limit: int | None = None,
+    compact: bool = True,
+) -> dict[str, Any]:
+    """Returns Tenable.sc resource catalog; supports filtering and compact output."""
     resources = catalog_as_dict()
     if not include_admin_or_director:
         resources = [resource for resource in resources if not resource["admin_or_director"]]
+    if query:
+        q = query.lower()
+        resources = [
+            resource
+            for resource in resources
+            if q in str(resource["name"]).lower() or q in str(resource["path"]).lower()
+        ]
+    if limit is not None:
+        resources = resources[: max(limit, 0)]
+    if compact:
+        resources = [{"name": resource["name"], "path": resource["path"]} for resource in resources]
     return {"ok": True, "count": len(resources), "resources": resources}
 
 
@@ -84,14 +95,7 @@ def tsc_request(
     editable: bool = False,
     timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """Call any Tenable.sc REST API endpoint using direct HTTP.
-
-    The path can be either a documented resource path such as /scan, /scan/123,
-    /analysis, /scan/123/launch, or a full /rest/... path. Use params for query
-    parameters, body for JSON request payloads, fields for ?fields=..., expand for
-    ?expand=..., and editable=true for ?editable. This tool is the escape hatch for
-    all documented Tenable.sc API actions beyond simple CRUD.
-    """
+    """Calls any Tenable.sc endpoint; use as advanced escape hatch."""
     try:
         response = _client().request(
             method,
@@ -106,6 +110,46 @@ def tsc_request(
 
 
 @mcp.tool()
+def tsc_resource_action(
+    action: Literal["list", "get", "create", "update", "delete"],
+    resource: str,
+    object_id: str | None = None,
+    body: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
+    fields: list[str] | None = None,
+    expand: list[str] | None = None,
+    editable: bool = False,
+) -> dict[str, Any]:
+    """Performs CRUD-like actions on a Tenable.sc resource path."""
+    if action == "list":
+        return tsc_request("GET", f"/{resource}", params=params, fields=fields, expand=expand, editable=editable)
+    if action == "get":
+        if not object_id:
+            return {"ok": False, "error": "object_id is required for action=get"}
+        return tsc_request(
+            "GET",
+            f"/{resource}/{object_id}",
+            params=params,
+            fields=fields,
+            expand=expand,
+            editable=editable,
+        )
+    if action == "create":
+        if body is None:
+            return {"ok": False, "error": "body is required for action=create"}
+        return tsc_request("POST", f"/{resource}", body=body)
+    if action == "update":
+        if not object_id:
+            return {"ok": False, "error": "object_id is required for action=update"}
+        if body is None:
+            return {"ok": False, "error": "body is required for action=update"}
+        return tsc_request("PUT", f"/{resource}/{object_id}", body=body)
+    if not object_id:
+        return {"ok": False, "error": "object_id is required for action=delete"}
+    return tsc_request("DELETE", f"/{resource}/{object_id}")
+
+
+@mcp.tool()
 def tsc_list(
     resource: str,
     params: dict[str, Any] | None = None,
@@ -113,12 +157,15 @@ def tsc_list(
     expand: list[str] | None = None,
     editable: bool = False,
 ) -> dict[str, Any]:
-    """List objects for any documented Tenable.sc resource.
-
-    resource is the catalog path, for example scan, repository, asset, user,
-    organizationUser, plugin, role, or currentUser. RBAC is enforced by Tenable.sc.
-    """
-    return tsc_request("GET", f"/{resource}", params=params, fields=fields, expand=expand, editable=editable)
+    """Deprecated alias for tsc_resource_action(action='list')."""
+    return tsc_resource_action(
+        "list",
+        resource,
+        params=params,
+        fields=fields,
+        expand=expand,
+        editable=editable,
+    )
 
 
 @mcp.tool()
@@ -130,59 +177,45 @@ def tsc_get(
     expand: list[str] | None = None,
     editable: bool = False,
 ) -> dict[str, Any]:
-    """Get one object from any documented Tenable.sc resource by ID.
-
-    Supports fields, expand, editable, and custom query parameters where the
-    underlying Tenable.sc endpoint accepts them.
-    """
-    return tsc_request("GET", f"/{resource}/{object_id}", params=params, fields=fields, expand=expand, editable=editable)
+    """Deprecated alias for tsc_resource_action(action='get')."""
+    return tsc_resource_action(
+        "get",
+        resource,
+        object_id=object_id,
+        params=params,
+        fields=fields,
+        expand=expand,
+        editable=editable,
+    )
 
 
 @mcp.tool()
 def tsc_create(resource: str, body: dict[str, Any]) -> dict[str, Any]:
-    """Create an object in any Tenable.sc resource that supports POST.
-
-    The body must match Tenable.sc's documented JSON payload for the target resource.
-    Tenable.sc rejects calls that the API identity is not permitted to perform.
-    """
-    return tsc_request("POST", f"/{resource}", body=body)
+    """Deprecated alias for tsc_resource_action(action='create')."""
+    return tsc_resource_action("create", resource, body=body)
 
 
 @mcp.tool()
 def tsc_update(resource: str, object_id: str, body: dict[str, Any]) -> dict[str, Any]:
-    """Update an object in any Tenable.sc resource that supports PUT.
-
-    The body must match Tenable.sc's documented JSON payload for the target resource.
-    """
-    return tsc_request("PUT", f"/{resource}/{object_id}", body=body)
+    """Deprecated alias for tsc_resource_action(action='update')."""
+    return tsc_resource_action("update", resource, object_id=object_id, body=body)
 
 
 @mcp.tool()
 def tsc_delete(resource: str, object_id: str) -> dict[str, Any]:
-    """Delete an object from any Tenable.sc resource that supports DELETE.
-
-    Destructive operations are still subject to Tenable.sc RBAC and API validation.
-    """
-    return tsc_request("DELETE", f"/{resource}/{object_id}")
+    """Deprecated alias for tsc_resource_action(action='delete')."""
+    return tsc_resource_action("delete", resource, object_id=object_id)
 
 
 @mcp.tool()
 def tsc_current_user() -> dict[str, Any]:
-    """Return the current Tenable.sc API user's details.
-
-    Use this first when validating RBAC, role membership, and what the configured
-    API identity can see in Tenable.sc.
-    """
+    """Returns the current Tenable.sc API user details."""
     return tsc_request("GET", "/currentUser")
 
 
 @mcp.tool()
 def tsc_resource_docs(resource: str) -> dict[str, Any]:
-    """Return documentation metadata for a Tenable.sc resource path.
-
-    Example resource values: analysis, scan, scanResult, repository, asset,
-    credential, user, role, currentUser.
-    """
+    """Returns docs metadata for one Tenable.sc resource path."""
     item = RESOURCE_BY_PATH.get(resource)
     if not item:
         matches = [entry for entry in catalog_as_dict() if resource.lower() in str(entry["name"]).lower()]
@@ -206,12 +239,7 @@ def tsc_analyze(
     fields: list[str] | None = None,
     timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """Run a Tenable.sc analysis query.
-
-    Pass the Analysis API payload in query. This commonly includes type, sourceType,
-    query filters, sort, and pagination fields as documented by Tenable.sc. This helper
-    uses POST /analysis and exists because analysis is one of the highest-use APIs.
-    """
+    """Runs a Tenable.sc analysis query via POST /analysis."""
     return tsc_request("POST", "/analysis", body=query, fields=fields, timeout_seconds=timeout_seconds)
 
 
@@ -224,12 +252,7 @@ def tsc_download(
     timeout_seconds: float | None = None,
     max_bytes: int = 10_000_000,
 ) -> dict[str, Any]:
-    """Download a binary or text response from a Tenable.sc endpoint.
-
-    Use this for documented download endpoints such as /scanResult/{id}/download
-    or /scanResult/{id}/attachment/{attachmentID}. The response body is returned
-    as base64 because MCP tool responses are JSON. Tenable.sc still enforces RBAC.
-    """
+    """Downloads binary/text content and returns base64 payload."""
     try:
         response = _client().download(
             method,
@@ -265,12 +288,7 @@ def tsc_upload_file(
     max_file_size: int | None = None,
     timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """Upload a local file to Tenable.sc using POST /file/upload.
-
-    file_path is resolved on the machine/container running this MCP server. The
-    returned filename can be passed to APIs such as scanResult import or audit
-    file creation. Tenable.sc still enforces RBAC.
-    """
+    """Uploads a local file to Tenable.sc via /file/upload."""
     try:
         response = _client().upload_file(
             file_path,

@@ -9,6 +9,7 @@ The server exposes documented Tenable.sc resources through generic MCP tools:
 - `tsc_catalog`: lists the built-in API resource catalog with REST paths and documentation links.
 - `tsc_resource_docs`: returns docs metadata for one resource.
 - `tsc_current_user`: returns the configured API user's Tenable.sc identity details.
+- `tsc_resource_action`: unified CRUD-style helper for resources (`list`, `get`, `create`, `update`, `delete`).
 - `tsc_list`: `GET /rest/{resource}` for any catalog resource.
 - `tsc_get`: `GET /rest/{resource}/{id}` for any catalog resource.
 - `tsc_create`: `POST /rest/{resource}` for resources that support create.
@@ -18,6 +19,8 @@ The server exposes documented Tenable.sc resources through generic MCP tools:
 - `tsc_download`: binary/text download helper for endpoints such as `POST /scanResult/{id}/download`.
 - `tsc_upload_file`: multipart upload helper for `POST /file/upload`.
 - `tsc_request`: direct escape hatch for any Tenable.sc endpoint, sub-action, or method.
+
+`tsc_list`, `tsc_get`, `tsc_create`, `tsc_update`, and `tsc_delete` remain available as compatibility aliases, but new clients should use `tsc_resource_action`.
 
 Tenable.sc has many resource-specific actions, such as scan launch/import/export style operations. Use `tsc_request` for those documented paths, for example `POST /scan/{id}/launch` if supported by your Tenable.sc version.
 
@@ -38,7 +41,7 @@ The built-in catalog follows the Tenable.sc API index at <https://docs.tenable.c
 
 `acceptRiskRule`, `agentGroup`, `agentResultsSync`, `agentScan`, `alert`, `analysis`, `arc`, `arcTemplate`, `asset`, `assetTemplate`, `attributeSet`, `auditFile`, `auditFileTemplate`, `bulk`, `configuration`, `configurationSection`, `credential`, `currentOrganization`, `currentUser`, `customPlugins`, `dashboardComponent`, `dashboardTab`, `dashboardTemplate`, `deviceInformation`, `directorInsights`, `directorOrganization`, `directorRepository`, `directorScan`, `directorScanner`, `directorScanPolicy`, `directorScanResult`, `directorScanZone`, `directorSystem`, `directorUser`, `feed`, `file`, `freezeWindow`, `group`, `hosts`, `job`, `lce`, `lceClient`, `lcePolicy`, `ldap`, `licenseInfo`, `lumin`, `mdm`, `notification`, `organization`, `organizationSecurityManager`, `organizationUser`, `passiveScanner`, `plugin`, `pluginFamily`, `publishingSite`, `query`, `recastRiskRule`, `report`, `reportDefinition`, `reportImage`, `reportTemplate`, `repository`, `role`, `saml`, `scanner`, `scan`, `scanPolicy`, `scanPolicyTemplate`, `scanResult`, `scanZone`, `sensorProxy`, `solutions`, `sshKey`, `status`, `style`, `styleFamily`, `system`, `tenableScInstance`, `tesAdminRoles`, `tesUserPermissions`, `ticket`, `token`, `user`, `wasScan`, and `wasScanner`.
 
-Use `tsc_catalog` for the full catalog with documentation URLs.
+Use `tsc_catalog` for the catalog. It returns compact results by default; use `compact=false` for full metadata. You can also use `query` and `limit`.
 
 ## Configuration
 
