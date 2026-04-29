@@ -127,8 +127,12 @@ docker build -t tenable-sc-mcp:latest .
 Run the MCP server as a background Docker container using Streamable HTTP:
 
 ```bash
+export UID=$(id -u)
+export GID=$(id -g)
+
 docker run -d \
   --name tenable-sc-mcp \
+  --user "${UID}:${GID}" \
   --restart unless-stopped \
   -p 0.0.0.0:8000:8000 \
   -v ~/.tenable-sc-mcp.env:/config/tsc.env:ro \
@@ -138,6 +142,42 @@ docker run -d \
   --port 8000 \
   --env-file /config/tsc.env \
   --allow-remote-hosts
+```
+
+Using `--user "${UID}:${GID}"` runs the container process as the same UID/GID that launched the command. This is useful for bind-mounted file permissions.
+
+## Run With Docker Compose
+
+This repo includes `docker-compose.yml` with:
+
+- `user: "${UID}:${GID}"` so it runs as the invoking user
+- `restart: unless-stopped` so it survives host/container restarts
+- the same port, env-file mount, and MCP arguments as the `docker run` example
+
+From the project directory:
+
+```bash
+export UID=$(id -u)
+export GID=$(id -g)
+docker compose up -d
+```
+
+Check status:
+
+```bash
+docker compose ps
+```
+
+View logs:
+
+```bash
+docker compose logs -f
+```
+
+Stop and remove:
+
+```bash
+docker compose down
 ```
 
 `--allow-remote-hosts` is required for remote MCP clients. Without it, the server can return `421 Misdirected Request` with `Invalid Host header` for non-local requests.
