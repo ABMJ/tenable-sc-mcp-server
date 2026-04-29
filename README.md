@@ -114,6 +114,21 @@ sudo usermod -aG docker "$USER"
 
 Log out and back in after adding your user to the `docker` group.
 
+Install Docker Compose (recommended v2 plugin):
+
+```bash
+sudo apt update
+sudo apt install -y docker-compose-plugin
+docker compose version
+```
+
+If `docker compose` is unavailable on your host, install legacy Compose and use `docker-compose` commands:
+
+```bash
+sudo apt install -y docker-compose
+docker-compose version
+```
+
 ## Container Build
 
 From the project directory on the machine that will run the MCP server:
