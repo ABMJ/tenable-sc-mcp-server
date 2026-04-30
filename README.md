@@ -409,6 +409,14 @@ Request expansions:
 }
 ```
 
+## Feedback And Support
+
+- Bug reports: <https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=bug_report.yml>
+- Feature requests: <https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=feature_request.yml>
+- General issues list: <https://github.com/ABMJ/tenable-sc-mcp-server/issues>
+
+When opening an issue, include the release version (for example `v0.1.0`), deployment mode (`stdio` or `streamable-http`), and the exact request or tool call that failed.
+
 ## API Documentation Sources
 
 - Tenable.sc API reference: <https://docs.tenable.com/security-center/api/index.htm>

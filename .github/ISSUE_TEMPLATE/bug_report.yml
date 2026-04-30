@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible problem in the MCP server.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this issue. Please provide as much detail as possible.
+  - type: input
+    id: version
+    attributes:
+      label: MCP version
+      description: Release tag or commit hash (for example v0.1.0)
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport mode
+      options:
+        - stdio
+        - streamable-http
+        - other
+    validations:
+      required: true
+  - type: input
+    id: tsc-version
+    attributes:
+      label: Tenable.sc version
+      description: If known
+      placeholder: 6.x.x
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start server with...
+        2. Call tool with...
+        3. Observe error...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      description: Redact secrets, keys, tokens, and private hostnames.
+      render: shell

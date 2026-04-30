@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: General questions
+    url: https://github.com/ABMJ/tenable-sc-mcp-server/issues
+    about: Use existing issues or open a feature request for ideas and questions.
