@@ -1,5 +1,7 @@
 # Security Policy
 
+This repository is community-maintained and is not an officially supported Tenable project.
+
 ## Supported Versions
 
 Security fixes are prioritized for the latest released version.

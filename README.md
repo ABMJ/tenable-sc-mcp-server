@@ -18,6 +18,22 @@ Container-ready MCP server for Tenable Security Center Plus using direct REST AP
 - Support model: community-maintained, best-effort triage and fixes.
 - Security fixes: prioritized for the latest release.
 
+## Architecture
+
+```text
+MCP Client (OpenCode / Claude Desktop / others)
+                    |
+                    v
+      tenable-sc-mcp server (stdio or streamable-http)
+                    |
+                    v
+         Tenable.sc REST API (/rest/* over HTTPS)
+```
+
+- The MCP server is a thin adapter around Tenable.sc REST endpoints.
+- Authorization and RBAC are enforced by the configured Tenable.sc API keys.
+- The server does not store scan data; it forwards requests and returns API responses.
+
 ## What It Exposes
 
 The server exposes documented Tenable.sc resources through generic MCP tools:
@@ -429,6 +445,7 @@ Request expansions:
 - Contribution guide: `CONTRIBUTING.md`
 - Security policy: `SECURITY.md`
 - Support policy: `SUPPORT.md`
+- Roadmap: `docs/roadmap.md`
 
 When opening an issue, include the release version (for example `v0.1.0`), deployment mode (`stdio` or `streamable-http`), and the exact request or tool call that failed.
 

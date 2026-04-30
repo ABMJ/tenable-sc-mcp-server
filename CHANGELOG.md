@@ -4,6 +4,9 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- Added explicit "not officially supported by Tenable" disclaimers across governance and support docs.
+- Added architecture overview section to README.
+- Added milestone-aligned roadmap in `docs/roadmap.md`.
 - Added CI workflow for linting, type checks, and tests on push/PR.
 - Added community and governance docs: `SECURITY.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, and PR template.
 - Added Dependabot configuration for Python and GitHub Actions updates.

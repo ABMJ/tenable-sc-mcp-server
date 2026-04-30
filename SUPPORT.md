@@ -1,5 +1,7 @@
 # Support
 
+This repository is community-maintained and is not an officially supported Tenable project.
+
 ## Where To Get Help
 
 - Bug: <https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=bug_report.yml>

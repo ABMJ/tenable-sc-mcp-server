@@ -1,5 +1,7 @@
 # Code of Conduct
 
+This repository is community-maintained and is not an officially supported Tenable project.
+
 ## Our Standards
 
 This project aims to be welcoming, respectful, and practical.

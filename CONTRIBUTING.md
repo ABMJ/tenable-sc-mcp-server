@@ -2,6 +2,8 @@
 
 Thanks for using and improving this MCP server.
 
+This repository is community-maintained and is not an officially supported Tenable project.
+
 ## Reporting Bugs
 
 Use the bug report template:

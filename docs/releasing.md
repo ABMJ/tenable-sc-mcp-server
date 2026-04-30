@@ -2,6 +2,8 @@
 
 Use this lightweight checklist for each release.
 
+This repository is community-maintained and is not an officially supported Tenable project.
+
 ## 1) Prepare
 
 - Ensure `main` is green in CI.
