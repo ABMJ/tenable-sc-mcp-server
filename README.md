@@ -64,7 +64,7 @@ Set these environment variables (or place them in an env file and pass `--env-fi
 You can also run with a custom prefix using `--env-prefix` (for example `LAB1_TSC_`).
 With `--env-prefix LAB1_TSC_`, the server reads `LAB1_TSC_URL`, `LAB1_TSC_ACCESS_KEY`, and so on.
 
-Do not include `/rest` in `TSC_URL`. Use the same base URL you use to reach Tenable.sc in a browser, for example `https://192.168.40.75:8443` or `https://securitycenter.example.com`.
+Do not include `/rest` in `TSC_URL`. Use the same base URL you use to reach Tenable.sc in a browser, for example `https://sc.example.internal:8443` or `https://securitycenter.example.com`.
 
 ### Save Tenable.sc Details
 
@@ -77,7 +77,7 @@ nano ~/.tenable-sc-mcp.env
 Example lab configuration:
 
 ```bash
-TSC_URL=https://192.168.40.75:8443
+TSC_URL=https://sc.example.internal:8443
 TSC_ACCESS_KEY=your-access-key
 TSC_SECRET_KEY=your-secret-key
 TSC_VERIFY_SSL=false
@@ -88,7 +88,7 @@ Use `TSC_VERIFY_SSL=true` when Tenable.sc has a trusted certificate. Use `false`
 You can verify the Tenable.sc URL is reachable before starting the MCP server:
 
 ```bash
-curl -k https://192.168.40.75:8443/rest/currentUser
+curl -k https://sc.example.internal:8443/rest/currentUser
 ```
 
 An `invalid token` response means the Tenable.sc API endpoint is reachable; the MCP server will authenticate with the configured API keys.
@@ -205,7 +205,7 @@ http://<mcp-server-ip>:8000/mcp
 For example:
 
 ```text
-http://192.168.40.75:8000/mcp
+http://sc-mcp-host.example.internal:8000/mcp
 ```
 
 Check that the container is running and listening on all interfaces:
@@ -295,7 +295,7 @@ Add this to `opencode.json` or `opencode.jsonc` on the machine running OpenCode:
   "mcp": {
     "tenable-sc": {
       "type": "remote",
-      "url": "http://192.168.40.75:8000/mcp",
+      "url": "http://sc-mcp-host.example.internal:8000/mcp",
       "enabled": true,
       "oauth": false,
       "timeout": 30000
@@ -431,5 +431,3 @@ This server intentionally uses direct HTTP instead of `pyTenable` to keep startu
 ## License
 
 - GNU GPL v3.0: <https://choosealicense.com/licenses/gpl-3.0/>
-
-## Todo:
