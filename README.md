@@ -1,10 +1,22 @@
 # Tenable.sc MCP Server
 
+[![Release](https://img.shields.io/github/v/release/ABMJ/tenable-sc-mcp-server)](https://github.com/ABMJ/tenable-sc-mcp-server/releases)
+[![CI](https://github.com/ABMJ/tenable-sc-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/ABMJ/tenable-sc-mcp-server/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://choosealicense.com/licenses/gpl-3.0/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+
 **This tool is not an officially supported Tenable project.**
 
 **Use of this tool is subject to the terms and conditions identified below, and is not subject to any license agreement you may have with Tenable.**
 
 Container-ready MCP server for Tenable Security Center Plus using direct REST API calls. It does not use `pyTenable`; the server talks to Tenable.sc over HTTP with the documented `x-apikey` header.
+
+## Compatibility And Support Policy
+
+- Python versions: tested on `3.11` and `3.12`.
+- Tenable.sc versions: intended for current supported Tenable.sc API versions; behavior can vary across older deployments.
+- Support model: community-maintained, best-effort triage and fixes.
+- Security fixes: prioritized for the latest release.
 
 ## What It Exposes
 
@@ -414,6 +426,9 @@ Request expansions:
 - Bug reports: <https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=bug_report.yml>
 - Feature requests: <https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=feature_request.yml>
 - General issues list: <https://github.com/ABMJ/tenable-sc-mcp-server/issues>
+- Contribution guide: `CONTRIBUTING.md`
+- Security policy: `SECURITY.md`
+- Support policy: `SUPPORT.md`
 
 When opening an issue, include the release version (for example `v0.1.0`), deployment mode (`stdio` or `streamable-http`), and the exact request or tool call that failed.
 
