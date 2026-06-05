@@ -1,13 +1,37 @@
 services:
+  # Redis cache for production deployments
+  redis:
+    image: redis:7-alpine
+    container_name: tenable-sc-mcp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   tenable-sc-mcp:
     image: tenable-sc-mcp:latest
     container_name: tenable-sc-mcp
     user: "${LOCAL_UID}:${LOCAL_GID}"
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "0.0.0.0:8000:8000"
     volumes:
       - ${HOME}/.tenable-sc-mcp.env:/config/tsc.env:ro
+    environment:
+      # Cache configuration (override with .env file)
+      - TSC_CACHE_BACKEND=redis
+      - TSC_CACHE_REDIS_HOST=redis
+      - TSC_CACHE_REDIS_PORT=6379
     command:
       - --transport
       - streamable-http
@@ -18,3 +42,7 @@ services:
       - --env-file
       - /config/tsc.env
       - --allow-remote-hosts
+
+volumes:
+  redis-data:
+    driver: local
