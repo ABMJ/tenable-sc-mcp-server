@@ -30,6 +30,13 @@ class TenableScConfig:
     timeout_seconds: float = 300.0
     max_retries: int = 3
     backoff_seconds: float = 1.0
+    # Cache configuration
+    cache_enabled: bool = True
+    cache_backend: str = "memory"  # "memory" or "redis"
+    cache_redis_host: str = "localhost"
+    cache_redis_port: int = 6379
+    cache_redis_db: int = 0
+    cache_redis_password: str | None = None
 
     @staticmethod
     def _read_env_file(env_file: str | None) -> dict[str, str]:
@@ -76,11 +83,22 @@ class TenableScConfig:
         timeout_raw = cls._pick(prefixed("TIMEOUT_SECONDS"), env_file_values).strip() or "300"
         retries_raw = cls._pick(prefixed("MAX_RETRIES"), env_file_values).strip() or "3"
         backoff_raw = cls._pick(prefixed("BACKOFF_SECONDS"), env_file_values).strip() or "1"
+        
+        # Cache configuration
+        cache_enabled_raw = cls._pick(prefixed("CACHE_ENABLED"), env_file_values).strip() or "true"
+        cache_backend_raw = cls._pick(prefixed("CACHE_BACKEND"), env_file_values).strip() or "memory"
+        cache_redis_host = cls._pick(prefixed("CACHE_REDIS_HOST"), env_file_values).strip() or "localhost"
+        cache_redis_port_raw = cls._pick(prefixed("CACHE_REDIS_PORT"), env_file_values).strip() or "6379"
+        cache_redis_db_raw = cls._pick(prefixed("CACHE_REDIS_DB"), env_file_values).strip() or "0"
+        cache_redis_password = cls._pick(prefixed("CACHE_REDIS_PASSWORD"), env_file_values).strip() or None
 
         verify_ssl = verify_ssl_raw.lower() not in {"0", "false", "no"}
         timeout_seconds = float(timeout_raw)
         max_retries = int(retries_raw)
         backoff_seconds = float(backoff_raw)
+        cache_enabled = cache_enabled_raw.lower() not in {"0", "false", "no"}
+        cache_redis_port = int(cache_redis_port_raw)
+        cache_redis_db = int(cache_redis_db_raw)
 
         missing = [
             name
@@ -109,6 +127,12 @@ class TenableScConfig:
             timeout_seconds=timeout_seconds,
             max_retries=max_retries,
             backoff_seconds=backoff_seconds,
+            cache_enabled=cache_enabled,
+            cache_backend=cache_backend_raw,
+            cache_redis_host=cache_redis_host,
+            cache_redis_port=cache_redis_port,
+            cache_redis_db=cache_redis_db,
+            cache_redis_password=cache_redis_password,
         )
 
 

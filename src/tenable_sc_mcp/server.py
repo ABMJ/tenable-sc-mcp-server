@@ -8,11 +8,21 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .catalog import API_RESOURCES, RESOURCE_BY_PATH, catalog_as_dict
-from .client import TenableScApiError, TenableScClient, TenableScConfigError
+from .client import TenableScApiError, TenableScClient, TenableScConfigError, TenableScConfig
+from .cache import (
+    Cache,
+    InMemoryCache,
+    RedisCache,
+    generate_cache_key,
+    get_ttl_for_resource,
+    initialize_cache,
+    get_cache,
+)
 
 
 _CLIENT_ENV_PREFIX = "TSC_"
 _CLIENT_ENV_FILE: str | None = None
+_CACHE: Cache | None = None
 
 mcp = FastMCP(
     "tenable-sc-mcp",
@@ -28,11 +38,47 @@ def _client() -> TenableScClient:
     return TenableScClient(env_prefix=_CLIENT_ENV_PREFIX, env_file=_CLIENT_ENV_FILE)
 
 
+def _get_cache() -> Cache | None:
+    """Get cache instance if enabled."""
+    return _CACHE
+
+
+def _init_cache() -> None:
+    """Initialize cache based on configuration."""
+    global _CACHE
+    
+    config = TenableScConfig.from_env(env_prefix=_CLIENT_ENV_PREFIX, env_file=_CLIENT_ENV_FILE)
+    
+    if not config.cache_enabled:
+        _CACHE = None
+        return
+    
+    if config.cache_backend == "redis":
+        try:
+            backend = RedisCache(
+                host=config.cache_redis_host,
+                port=config.cache_redis_port,
+                db=config.cache_redis_db,
+                password=config.cache_redis_password,
+            )
+            _CACHE = initialize_cache(backend)
+            print(f"Cache initialized: Redis ({config.cache_redis_host}:{config.cache_redis_port})")
+        except Exception as e:
+            print(f"Failed to initialize Redis cache: {e}")
+            print("Falling back to in-memory cache")
+            _CACHE = initialize_cache(InMemoryCache())
+    else:
+        _CACHE = initialize_cache(InMemoryCache())
+        print("Cache initialized: In-Memory")
+
+
 def configure_client_env(*, env_prefix: str, env_file: str | None) -> None:
     global _CLIENT_ENV_PREFIX
     global _CLIENT_ENV_FILE
     _CLIENT_ENV_PREFIX = env_prefix
     _CLIENT_ENV_FILE = env_file
+    # Reinitialize cache with new config
+    _init_cache()
 
 
 def _query_params(
@@ -86,6 +132,23 @@ def tsc_catalog(
     compact: bool = True,
 ) -> dict[str, Any]:
     """Returns Tenable.sc resource catalog; supports filtering and compact output."""
+    # Check cache first
+    cache = _get_cache()
+    if cache:
+        cache_key = generate_cache_key(
+            "catalog",
+            params={
+                "include_admin_or_director": include_admin_or_director,
+                "query": query,
+                "limit": limit,
+                "compact": compact,
+            },
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+    
+    # Generate result
     resources = catalog_as_dict()
     if not include_admin_or_director:
         resources = [resource for resource in resources if not resource["admin_or_director"]]
@@ -100,7 +163,14 @@ def tsc_catalog(
         resources = resources[: max(limit, 0)]
     if compact:
         resources = [{"name": resource["name"], "path": resource["path"]} for resource in resources]
-    return {"ok": True, "count": len(resources), "resources": resources}
+    
+    result = {"ok": True, "count": len(resources), "resources": resources}
+    
+    # Cache result (24 hours for catalog)
+    if cache:
+        cache.set(cache_key, result, get_ttl_for_resource("catalog"))
+    
+    return result
 
 
 @mcp.tool()
@@ -118,6 +188,30 @@ def tsc_request(
     keys_only: list[str] | None = None,
 ) -> dict[str, Any]:
     """Calls any Tenable.sc endpoint; use as advanced escape hatch."""
+    # Check cache for GET requests
+    cache = _get_cache()
+    cache_key = None
+    if cache and method == "GET":
+        # Extract resource name from path
+        resource_name = path.strip("/").split("/")[0]
+        cache_key = generate_cache_key(
+            resource_name,
+            object_id=None,
+            params={
+                "path": path,
+                "params": params,
+                "fields": fields,
+                "expand": expand,
+                "editable": editable,
+                "response_path": response_path,
+                "max_items": max_items,
+                "keys_only": keys_only,
+            },
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+    
     try:
         response = _client().request(
             method,
@@ -140,7 +234,21 @@ def tsc_request(
                 {key: item[key] for key in keys_only if isinstance(item, dict) and key in item}
                 for item in response
             ]
-        return {"ok": True, "response": response}
+        
+        result = {"ok": True, "response": response}
+        
+        # Cache GET requests
+        if cache and method == "GET" and cache_key:
+            resource_name = path.strip("/").split("/")[0]
+            ttl = get_ttl_for_resource(resource_name)
+            cache.set(cache_key, result, ttl)
+        
+        # Invalidate cache on write operations
+        if cache and method in ("POST", "PUT", "PATCH", "DELETE"):
+            resource_name = path.strip("/").split("/")[0]
+            cache.delete_pattern(resource_name)
+        
+        return result
     except Exception as exc:
         return _handle_error(exc)
 
@@ -340,6 +448,60 @@ def tsc_upload_file(
         return _handle_error(exc)
 
 
+@mcp.tool()
+def tsc_cache_stats() -> dict[str, Any]:
+    """Returns cache performance metrics and statistics."""
+    cache = _get_cache()
+    if not cache:
+        return {"ok": True, "enabled": False, "message": "Cache is disabled"}
+    
+    metrics = cache.metrics.to_dict()
+    return {
+        "ok": True,
+        "enabled": True,
+        "backend": "redis" if isinstance(cache.backend, RedisCache) else "memory",
+        "key_count": cache.key_count(),
+        "metrics": metrics,
+    }
+
+
+@mcp.tool()
+def tsc_cache_clear(pattern: str | None = None) -> dict[str, Any]:
+    """Clear cache entries matching pattern or all entries.
+    
+    Args:
+        pattern: Pattern to match (e.g., 'scan:*' or 'repository'). 
+                 If None, clears all cache.
+    
+    Returns:
+        Status and number of keys deleted
+    
+    Examples:
+        Clear all plugins: pattern="plugin"
+        Clear specific scan: pattern="scan:10"
+        Clear everything: pattern=None
+    """
+    cache = _get_cache()
+    if not cache:
+        return {"ok": True, "enabled": False, "message": "Cache is disabled"}
+    
+    if pattern:
+        deleted = cache.delete_pattern(pattern)
+        return {
+            "ok": True,
+            "action": "pattern_clear",
+            "pattern": pattern,
+            "keys_deleted": deleted,
+        }
+    else:
+        cache.clear()
+        return {
+            "ok": True,
+            "action": "clear_all",
+            "message": "All cache entries cleared",
+        }
+
+
 @mcp.resource("tenable-sc://catalog")
 def catalog_resource() -> str:
     """Human-readable Tenable.sc API catalog."""
@@ -371,6 +533,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     configure_client_env(env_prefix=args.env_prefix, env_file=args.env_file)
+    
+    # Initialize cache (already done in configure_client_env, but ensure it's set up)
+    if _CACHE is None:
+        _init_cache()
+    
     mcp.settings.host = args.host
     mcp.settings.port = args.port
     if args.allow_remote_hosts:
