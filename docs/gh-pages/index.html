@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenable.sc MCP Server - Enterprise-Grade API Integration</title>
+    <meta name="description" content="Container-ready MCP server for Tenable Security Center Plus with caching, multi-tenancy, and enterprise features">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .header p {
+            font-size: 1.3rem;
+            opacity: 0.9;
+        }
+        
+        .badges {
+            margin-top: 1.5rem;
+        }
+        
+        .badges img {
+            margin: 0 0.5rem;
+        }
+        
+        .nav {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 0.5rem 1.5rem;
+            transition: all 0.3s;
+            border-radius: 4px;
+        }
+        
+        .nav a:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .section {
+            background: white;
+            padding: 3rem;
+            margin: 2rem 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #667eea;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .feature-card {
+            padding: 2rem;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        
+        .cta {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem;
+            text-align: center;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        
+        .cta h2 {
+            color: white;
+            border: none;
+            margin-bottom: 1rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 0.5rem;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 1.5rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .roadmap-phases {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .phase {
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .phase h3 {
+            margin-bottom: 1rem;
+        }
+        
+        .phase ul {
+            list-style: none;
+            text-align: left;
+        }
+        
+        .phase li:before {
+            content: "✓ ";
+            font-weight: bold;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 2rem;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        
+        .metric-value {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .metric-label {
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        
+        footer {
+            background: #2d2d2d;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            margin-top: 4rem;
+        }
+        
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Tenable.sc MCP Server</h1>
+        <p>Enterprise-Grade MCP Interface for Tenable Security Center Plus</p>
+        <div class="badges">
+            <img src="https://img.shields.io/github/v/release/ABMJ/tenable-sc-mcp-server" alt="Release">
+            <img src="https://img.shields.io/github/actions/workflow/status/ABMJ/tenable-sc-mcp-server/ci.yml" alt="CI">
+            <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License">
+            <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
+        </div>
+    </div>
+    
+    <nav class="nav">
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#roadmap">Roadmap</a></li>
+            <li><a href="#quickstart">Quick Start</a></li>
+            <li><a href="#documentation">Documentation</a></li>
+            <li><a href="https://github.com/ABMJ/tenable-sc-mcp-server">GitHub</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <section id="overview" class="section">
+            <h2>Overview</h2>
+            <p>The Tenable.sc MCP Server is a production-ready Model Context Protocol (MCP) server that provides a thin, efficient adapter layer for the Tenable Security Center Plus REST API. Built with enterprise needs in mind, it offers advanced caching, multi-tenancy support, and comprehensive observability.</p>
+            
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-value">40-70%</div>
+                    <div class="metric-label">Token Usage Reduction</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">10x</div>
+                    <div class="metric-label">Faster Batch Operations</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">110+</div>
+                    <div class="metric-label">API Resources</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">99.9%</div>
+                    <div class="metric-label">Target Uptime</div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="features" class="section">
+            <h2>Key Features</h2>
+            <div class="features">
+                <div class="feature-card">
+                    <h3>⚡ High Performance</h3>
+                    <p>Multi-tier caching with Redis support, async operations, and connection pooling for maximum throughput.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔒 Enterprise Security</h3>
+                    <p>API key authentication, OAuth 2.0, RBAC, audit logging, and comprehensive compliance features.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🏢 Multi-Tenancy</h3>
+                    <p>Connect to multiple Tenable.sc instances with isolated caching, metrics, and configuration.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📊 Observability</h3>
+                    <p>Structured logging, OpenTelemetry integration, real-time metrics, and performance monitoring.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🛡️ Reliability</h3>
+                    <p>Circuit breakers, rate limiting, retry logic, and graceful degradation for production resilience.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🐳 Container-Ready</h3>
+                    <p>Docker, Docker Compose, and Kubernetes support with Helm charts for easy deployment.</p>
+                </div>
+            </div>
+        </section>
+        
+        <section id="roadmap" class="section">
+            <h2>Development Roadmap</h2>
+            <p>Our comprehensive roadmap transforms this server from a solid foundation into an enterprise-grade platform. <a href="../../FINAL_ULTIMATE_ROADMAP.md">View Full Roadmap →</a></p>
+            
+            <div class="roadmap-phases">
+                <div class="phase">
+                    <h3>Phase 1: v0.2.0</h3>
+                    <p><strong>Foundation & Caching</strong></p>
+                    <p>4-6 weeks</p>
+                    <ul>
+                        <li>Multi-tier caching</li>
+                        <li>Redis integration</li>
+                        <li>Test framework</li>
+                        <li>Structured logging</li>
+                    </ul>
+                </div>
+                
+                <div class="phase">
+                    <h3>Phase 2: v0.3.0</h3>
+                    <p><strong>Performance</strong></p>
+                    <p>4-6 weeks</p>
+                    <ul>
+                        <li>Async operations</li>
+                        <li>Rate limiting</li>
+                        <li>Circuit breakers</li>
+                        <li>Connection pooling</li>
+                    </ul>
+                </div>
+                
+                <div class="phase">
+                    <h3>Phase 3: v0.4.0</h3>
+                    <p><strong>Enterprise</strong></p>
+                    <p>6-8 weeks</p>
+                    <ul>
+                        <li>Multi-tenancy</li>
+                        <li>Authentication</li>
+                        <li>RBAC</li>
+                        <li>Audit logging</li>
+                    </ul>
+                </div>
+                
+                <div class="phase">
+                    <h3>Phase 4: v1.0.0</h3>
+                    <p><strong>Advanced</strong></p>
+                    <p>8-10 weeks</p>
+                    <ul>
+                        <li>GraphQL API</li>
+                        <li>Webhooks</li>
+                        <li>SIEM integration</li>
+                        <li>ML features</li>
+                    </ul>
+                </div>
+                
+                <div class="phase">
+                    <h3>Phase 5: v2.0.0</h3>
+                    <p><strong>Scale</strong></p>
+                    <p>10-12 weeks</p>
+                    <ul>
+                        <li>Distributed arch</li>
+                        <li>Kubernetes</li>
+                        <li>AI assistant</li>
+                        <li>1000+ req/s</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        
+        <div class="cta">
+            <h2>Ready to Get Started?</h2>
+            <p>Deploy in minutes with Docker, or explore our comprehensive documentation</p>
+            <a href="#quickstart" class="btn">Quick Start Guide</a>
+            <a href="https://github.com/ABMJ/tenable-sc-mcp-server" class="btn">View on GitHub</a>
+        </div>
+        
+        <section id="quickstart" class="section">
+            <h2>Quick Start</h2>
+            
+            <h3>Docker Deployment</h3>
+            <div class="code-block">
+<pre># Build the image
+docker build -t tenable-sc-mcp:latest .
+
+# Create config file
+cat > ~/.tenable-sc-mcp.env <<'EOF'
+TSC_URL=https://sc.example.com
+TSC_ACCESS_KEY=your-access-key
+TSC_SECRET_KEY=your-secret-key
+TSC_VERIFY_SSL=true
+EOF
+
+# Run the server
+docker run -d \
+  --name tenable-sc-mcp \
+  --restart unless-stopped \
+  -p 0.0.0.0:8000:8000 \
+  -v ~/.tenable-sc-mcp.env:/config/tsc.env:ro \
+  tenable-sc-mcp:latest \
+  --transport streamable-http \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --env-file /config/tsc.env \
+  --allow-remote-hosts</pre>
+            </div>
+            
+            <h3>Docker Compose</h3>
+            <div class="code-block">
+<pre># Set user permissions
+export LOCAL_UID=$(id -u)
+export LOCAL_GID=$(id -g)
+
+# Start services
+docker compose up -d
+
+# View logs
+docker compose logs -f</pre>
+            </div>
+            
+            <h3>OpenCode Integration</h3>
+            <div class="code-block">
+<pre>{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "tenable-sc": {
+      "type": "remote",
+      "url": "http://sc-mcp-host.example.com:8000/mcp",
+      "enabled": true,
+      "oauth": false,
+      "timeout": 30000
+    }
+  }
+}</pre>
+            </div>
+        </section>
+        
+        <section id="documentation" class="section">
+            <h2>Documentation</h2>
+            <div class="features">
+                <div class="feature-card">
+                    <h3>📖 User Guide</h3>
+                    <p><a href="../../README.md">Installation, configuration, and usage examples</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>🗺️ Roadmap</h3>
+                    <p><a href="../../FINAL_ULTIMATE_ROADMAP.md">Complete development roadmap with timelines</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔧 Configuration</h3>
+                    <p><a href="../../docs/configuration.md">Environment variables and advanced settings</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>🚀 Deployment</h3>
+                    <p><a href="../../docs/deployment.md">Docker, Kubernetes, and production guides</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>🤝 Contributing</h3>
+                    <p><a href="../../CONTRIBUTING.md">How to contribute to the project</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔐 Security</h3>
+                    <p><a href="../../SECURITY.md">Security policy and vulnerability reporting</a></p>
+                </div>
+            </div>
+        </section>
+        
+        <section class="section">
+            <h2>Architecture</h2>
+            <div class="code-block">
+<pre>
+MCP Client (OpenCode / Claude Desktop / others)
+                    |
+                    v
+      tenable-sc-mcp server (stdio or streamable-http)
+                    |
+          ┌─────────┴─────────┐
+          |                   |
+      Cache Layer        Rate Limiter
+      (Redis/Memory)    (Token Bucket)
+          |                   |
+          └─────────┬─────────┘
+                    |
+                    v
+          Circuit Breaker
+                    |
+                    v
+          Tenable.sc REST API (/rest/* over HTTPS)
+</pre>
+            </div>
+        </section>
+        
+        <section class="section">
+            <h2>Community & Support</h2>
+            <p>This is a community-maintained project. We welcome contributions, bug reports, and feature requests!</p>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <h3>🐛 Report Issues</h3>
+                    <p><a href="https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=bug_report.yml">Submit a bug report</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>💡 Request Features</h3>
+                    <p><a href="https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=feature_request.yml">Suggest new features</a></p>
+                </div>
+                <div class="feature-card">
+                    <h3>💬 Discussions</h3>
+                    <p><a href="https://github.com/ABMJ/tenable-sc-mcp-server/discussions">Join the community</a></p>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <footer>
+        <p>&copy; 2026 Tenable.sc MCP Server Community</p>
+        <p>Licensed under <a href="https://choosealicense.com/licenses/gpl-3.0/">GNU GPL v3.0</a></p>
+        <p>Not an officially supported Tenable project</p>
+        <p><a href="https://github.com/ABMJ/tenable-sc-mcp-server">GitHub</a> | <a href="../../FINAL_ULTIMATE_ROADMAP.md">Roadmap</a> | <a href="../../CONTRIBUTING.md">Contributing</a></p>
+    </footer>
+</body>
+</html>
