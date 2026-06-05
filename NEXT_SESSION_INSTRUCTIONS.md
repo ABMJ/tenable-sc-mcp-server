@@ -6,6 +6,27 @@
 
 ---
 
+## 🚨 CRITICAL BUG DISCOVERED
+
+**CACHING IS NOT WORKING IN PRODUCTION!**
+
+User testing revealed that caching only works for GET requests, but **real-world usage primarily uses POST /analysis** queries. This means:
+
+- ❌ Token savings claim (90%) is **invalid** for production
+- ❌ Analysis queries (most common) are **NOT cached**
+- ✅ Cache works for: `tsc_catalog`, `tsc_list`, `tsc_get` (GET only)
+- ❌ Cache fails for: `tsc_analyze`, custom POST queries
+
+**Root Cause**: `server.py:194` only caches `if method == "GET"`
+
+**Fix Required**: Add caching for read-only POST requests (especially /analysis)
+
+**See**: `CACHE_BUG_REPORT.md` for detailed analysis and fix implementation
+
+**Priority**: P0 - Fix in next session (1 hour)
+
+---
+
 ## 🎯 What Was Accomplished This Session
 
 ✅ **Complete test suite execution** (30 minutes)
