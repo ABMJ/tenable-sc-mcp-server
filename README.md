@@ -15,13 +15,13 @@ Production-ready MCP server for Tenable Security Center Plus with intelligent ca
 
 | Component | Status | Performance | Tests |
 |-----------|--------|-------------|-------|
-| **Tool 1: IP Profile** | ✅ Production | 83-90% token savings | 79 passing |
-| **Tool 2: Vulnerability Lists** | ✅ Production | 58-92% token savings | 19 passing |
-| **Core API Tools** | ✅ Stable | 50-70% token savings | ✓ |
-| **Redis Cache** | ✅ Production | <1ms cached responses | ✓ |
-| **Docker Deployment** | ✅ Ready | Single `.env` config | ✓ |
+| **Tool 1: IP Profile** | ✅ Production | 83-90% token savings | ✅ Passing |
+| **Tool 2: Vulnerability Lists** | ✅ Production | 58-92% token savings | ✅ Passing |
+| **Core API Tools** | ✅ Stable | Cached responses | ✅ Passing |
+| **Redis Cache** | ✅ Production | <1ms cached, 57%+ hit rate | ✅ Passing |
+| **Docker Deployment** | ✅ Ready | Single `.env` config | ✅ Passing |
 
-**Latest**: Fixed 403 authentication errors • Consolidated config • Added timestamps • All tools operational
+**Latest**: Tool 2 bug fixed (2026-06-06) • All convenience tools operational • Cache performance validated
 
 ---
 
@@ -587,14 +587,12 @@ The MCP server **does not bypass Tenable.sc permissions**:
 
 ## Documentation
 
-- **🌟 Tools Documentation:** [docs/TOOLS.md](docs/TOOLS.md) - Complete guide to all MCP tools
-- **🧪 Tool 2 Test Queries:** [TOOL2_TEST_QUERIES.md](TOOL2_TEST_QUERIES.md) - 30+ example queries
-- **📊 Tool Implementations:** 
-  - [Tool 1: IP Profiling](src/tenable_sc_mcp/server.py#L548)
-  - [Tool 2: Vulnerability Listing](docs/TOOL2_IMPLEMENTATION.md)
+- **🚀 Tools User Guide:** [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) - Available tools, usage examples, performance expectations
+- **🧪 Test Prompts:** [TEST_PROMPTS.md](TEST_PROMPTS.md) - Ready-to-use test queries with cache monitoring
+- **📊 Caching Guide:** [CACHING_DEEP_DIVE.md](CASHING_DEEP_DIVE.md) - How caching works and performance metrics
+- **📝 Session Notes:** [week1_session_3_2026-06-06_1415.md](week1_session_3_2026-06-06_1415.md) - Latest development session
+- **🌟 All Tools Documentation:** [docs/TOOLS.md](docs/TOOLS.md) - Complete MCP tool reference
 - **API Reference:** <https://docs.tenable.com/security-center/api/index.htm>
-- **Caching Guide:** [CACHING_DEEP_DIVE.md](CACHING_DEEP_DIVE.md)
-- **Roadmap:** [CONVENIENCE_TOOLS_ROADMAP.md](CONVENIENCE_TOOLS_ROADMAP.md) - 24 tools planned
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Security Policy:** [SECURITY.md](SECURITY.md)
 - **Support:** [SUPPORT.md](SUPPORT.md)

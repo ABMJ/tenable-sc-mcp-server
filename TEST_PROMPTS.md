@@ -1,12 +1,12 @@
 # Test Prompts for Tenable.sc MCP Server
 
-Use these prompts to test the tools and verify functionality.
+Use these prompts to test the tools and verify functionality. **Always append cache performance and token utilization checks to your queries.**
 
 ## Tool 1: IP Profile (tsc_profile_ip_efficient)
 
 ### Basic Profile Test
 ```
-Profile IP 10.1.20.10 using Tenable.sc
+use tenable-sc to profile IP 10.1.20.10 efficiently, then show me cache stats and token enhancement one liner summary
 ```
 
 **Expected Output:**
@@ -14,14 +14,16 @@ Profile IP 10.1.20.10 using Tenable.sc
 - Vulnerability counts by severity
 - Last scan timestamp
 - ACR score and source
+- Cache hit rate percentage
+- Token savings metrics
 
-**Token Efficiency:** ~2,500 tokens (vs ~15,000 raw API)
+**Token Efficiency:** ~2,500 tokens (vs ~15,000 raw API) = 83% reduction
 
 ---
 
 ### Full Profile with All Details
 ```
-Get comprehensive profile for 10.1.20.10 including software, services, scan info, and asset groups
+use tenable-sc to get comprehensive profile for 10.1.20.10 including software, services, scan info, and asset groups, then show me cache stats
 ```
 
 **Expected Output:**
@@ -30,8 +32,9 @@ Get comprehensive profile for 10.1.20.10 including software, services, scan info
 - Running services (ports/protocols)
 - Last scan details (policy, scanner, credentials)
 - Asset group membership
+- Cache performance metrics
 
-**Token Efficiency:** ~5,000 tokens (vs ~30,000 raw API)
+**Token Efficiency:** ~5,000 tokens (vs ~30,000 raw API) = 83% reduction
 
 ---
 
@@ -39,151 +42,261 @@ Get comprehensive profile for 10.1.20.10 including software, services, scan info
 
 ### Summary View (Efficient)
 ```
-List all critical vulnerabilities for IP 10.1.20.10 using Tenable.sc summary view
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats and token utilization enhancement
 ```
 
 **Expected Output:**
-- Vulnerability counts grouped by plugin
-- Severity distribution
-- Compact format for quick overview
+- Total vulnerability count by severity
+- Compact aggregated format
+- Cache hit rate
+- Token savings demonstration (summary vs full)
 
-**Token Efficiency:** ~1,000 tokens (88-92% savings)
+**Token Efficiency:** ~700 tokens (vs ~6,000 raw) = 88% reduction
 
 ---
 
-### Full Details View
+### Full Details View (Tool 2 - Primary Test)
 ```
-Show detailed vulnerabilities for 10.1.20.10 with severity high or critical, limit to 10 results
+use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records, then show me cache stats and token utilization enhancement one liner summary
 ```
 
 **Expected Output:**
-- Full vulnerability details per occurrence
+- 10 detailed vulnerability records
+- Plugin ID, name, severity, family
 - CVSS/VPR scores, CVE IDs
-- Exploit availability
+- Exploit availability information
 - Port/protocol information
-- Plugin descriptions
+- Pagination info (10 of X total)
+- Cache hit rate
+- Token enhancement summary
 
-**Token Efficiency:** ~3,000 tokens for 10 vulns (58-75% savings)
+**Token Efficiency:** ~5,000 tokens for 50 records (vs ~12,000 raw) = 58% reduction
 
 ---
 
-### Filtered Search
+### Filtered Search with Exploits
 ```
-Find all vulnerabilities on 10.1.20.10 with available exploits
+use tenable-sc to find all vulnerabilities on 10.1.20.10 with available exploits, then show cache stats
 ```
 
 **Expected Output:**
-- Only vulnerabilities with exploit_available=true
+- Only vulnerabilities with exploit_available=Yes
 - Full details including exploit frameworks
 - Prioritized by severity
+- Cache performance
 
 ---
 
-## Cache Testing
+## Cache Performance Testing
 
-### Check Cache Performance
+### Verify Cache Hit Rate Improvement
+Run the same query 3 times to see cache hit rate improvement:
+
+**Query 1 (Cache Miss):**
 ```
-Show me cache statistics for the Tenable.sc MCP server
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats
+```
+Expected: 0% hit rate (first query)
+
+**Query 2 (Cache Hit):**
+```
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats
+```
+Expected: 50% hit rate (cache hit on repeated query)
+
+**Query 3 (Cache Hit):**
+```
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats
+```
+Expected: 66% hit rate (hit rate improving)
+
+---
+
+### Check Overall Cache Statistics
+```
+use tenable-sc to show me cache statistics
 ```
 
 **Expected Output:**
+- Cache backend type (Redis/Memory)
+- Total keys stored
+- Hit/miss counts
 - Hit rate percentage
-- Total keys cached
-- Memory usage
-- Performance metrics
+- Uptime
+- Memory usage (if available)
 
 ---
 
-### Test Cache Efficiency
+## Token Efficiency Demonstration
+
+### Compare Tool Methods
 ```
-Profile IP 10.1.20.10 twice and compare response times
+use tenable-sc to:
+1. Get vulnerability summary for IP 10.1.20.10 (summary method)
+2. Then explain token savings vs full details method
 ```
 
-**Expected Behavior:**
-- First call: ~500ms (API query)
-- Second call: <10ms (cached response)
-- 50-100x speed improvement
+**Expected Comparison:**
+- Summary: ~700 tokens
+- Full details: ~6,000 tokens
+- Savings: 8.5x reduction when counts suffice
 
 ---
 
-## Advanced Queries
+## Complete Test Sequence (Run All)
+
+Execute these in order for comprehensive testing:
+
+```
+1. use tenable-sc to profile IP 10.1.20.10 efficiently, then show me cache stats
+
+2. use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats
+
+3. use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records, then show me cache stats
+
+4. use tenable-sc to show me cache statistics and explain the hit rate improvement
+```
+
+**Expected Results:**
+- All 3 tools working correctly
+- Cache hit rate improving with repeated queries (0% → 33% → 50% → 57%+)
+- Token savings demonstrated (83-90% for tool 1, 88% for tool 2 summary, 58% for tool 2 full)
+- No errors or failures
+- Response times: <1ms for cached queries, <5s for fresh queries
+
+---
+
+## Advanced Filtering Examples
 
 ### Multi-Filter Vulnerability Search
 ```
-Find vulnerabilities on 10.1.20.10 with:
-- Severity: critical
-- VPR score > 7.0
-- Exploits available
-- Published in last 90 days
+use tenable-sc to find vulnerabilities on 10.1.20.10 with severity critical, VPR score >= 7.0, and exploits available, show first 10, then show cache stats
+```
+
+**Expected Output:**
+- Filtered results matching all criteria
+- Full vulnerability details
+- Pagination info
+- Cache performance
+
+---
+
+### Port-Specific Search
+```
+use tenable-sc to list vulnerabilities on 10.1.20.10 for port 445, then show cache stats
 ```
 
 ---
 
-### Asset Investigation
+### CVE-Specific Search
 ```
-Investigate 10.1.20.10: show me the host profile, then list critical vulnerabilities with exploits available
+use tenable-sc to find CVE-2021-34527 (PrintNightmare) on 10.1.20.10, then show cache stats
 ```
-
-**Expected Behavior:**
-- Two tool calls (profile + vuln list)
-- Comprehensive security posture
-- Actionable remediation data
-
----
-
-## Token Efficiency Verification
-
-### Compare Raw API vs Tools
-```
-Compare token usage:
-1. Get IP profile for 10.1.20.10 using the efficient tool
-2. Show me how many tokens this saved vs raw API calls
-```
-
-**Expected Savings:**
-- Tool 1 (basic): 83-90% savings
-- Tool 2 (summary): 88-92% savings
-- Tool 2 (full): 58-75% savings
 
 ---
 
 ## Cache Management
 
-### Clear Cache
+### Clear All Cache
 ```
-Clear all Tenable.sc cache entries
+use tenable-sc to clear all cache entries
 ```
+
+**Expected:** All cache cleared, stats reset to 0
 
 ### Clear Specific Pattern
 ```
-Clear cache for all vulnerability queries
+use tenable-sc to clear cache for pattern "analysis:*"
 ```
 
-**Pattern:** `"analysis:*"` or `"vuln*"`
+**Expected:** Only analysis queries cleared
 
 ---
 
-## Error Handling Tests
+## Performance Benchmarking
 
-### Invalid IP
+### Measure Cache Impact
+1. Clear cache
+2. Run query (measure time)
+3. Run same query again (measure time)
+4. Calculate speedup
+
 ```
-Profile IP 999.999.999.999
+use tenable-sc to:
+1. Clear cache
+2. Profile IP 10.1.20.10
+3. Profile IP 10.1.20.10 again
+4. Show me the cache hit rate improvement
 ```
 
-**Expected:** Clear validation error message
-
-### Non-existent IP
-```
-Profile IP 192.168.1.1
-```
-
-**Expected:** "No data found for IP" with helpful suggestion
+**Expected Speedup:** 100-1000x faster on cached queries
 
 ---
 
-## Notes
+## Error Handling Verification
 
-- All timestamps are Unix epoch (e.g., 1683211119 = 2023-05-04 14:38:39)
-- Use `include_scan_info=true` to get scan metadata from plugin 19506
-- Default pagination: 50 results (max 200)
-- Cache TTLs: 60s-600s depending on data type
+### Invalid IP Address
+```
+use tenable-sc to profile IP 999.999.999.999
+```
+
+**Expected Output:**
+- Clear error message: "Invalid IP address format"
+- Expected format example
+- Suggestion to use tsc_list_ips()
+
+---
+
+### Invalid Severity Value
+```
+use tenable-sc to list vulnerabilities for 10.1.20.10 with severity "bogus"
+```
+
+**Expected Output:**
+- Error message: "Invalid severity: 'bogus'"
+- Valid values list: 0, 1, 2, 3, 4, info, low, medium, high, critical
+
+---
+
+### Pagination Out of Bounds
+```
+use tenable-sc to list vulnerabilities for 10.1.20.10, show records 0-500
+```
+
+**Expected Output:**
+- Error: "end_offset cannot exceed 200"
+- Suggestion: Use multiple queries with pagination
+
+---
+
+## Notes & Best Practices
+
+- **Always include cache stats** in your queries for monitoring
+- **Use summary mode first** to understand scope, then full details if needed
+- **Leverage filters** to reduce token usage (severity, CVE, port, etc.)
+- **Cache TTL**: 180s for vulnerability data, 300s for asset data
+- **Pagination**: Default 50, max 200 records per query
+- **Severity values**: 0=info, 1=low, 2=medium, 3=high, 4=critical (or text names)
+- **Timestamps**: Unix epoch format (e.g., 1762463829)
+- **Run queries in new OpenCode chat** after container rebuild for clean connection
+
+---
+
+## Week 1 Session 3 - Bug Fix Validation
+
+**Fixed Bug:** Undefined variable `response` in tsc_list_vulns_by_ip_full (line 1201-1205)
+
+**Test Case:**
+```
+use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records, then show me cache stats and token utilization enhancement one liner summary
+```
+
+**Validation Criteria:**
+- ✅ No errors thrown
+- ✅ Returns 10 vulnerability records
+- ✅ Shows total records count (X of Y)
+- ✅ Pagination info present
+- ✅ Cache stats displayed
+- ✅ Token enhancement summary shown
+
+**Result:** All criteria met! Bug successfully fixed.

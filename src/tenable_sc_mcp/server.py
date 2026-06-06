@@ -1168,8 +1168,10 @@ def tsc_list_vulns_by_ip_full(
         if isinstance(api_response, dict) and "response" in api_response:
             inner_response = api_response.get("response", {})
             vuln_data = inner_response.get("results", [])
+            response_data = inner_response
         else:
             vuln_data = api_response.get("results", [])
+            response_data = api_response
         
         # Format vulnerabilities for cleaner output
         formatted_vulns = []
@@ -1198,11 +1200,11 @@ def tsc_list_vulns_by_ip_full(
             "ok": True,
             "ip": ip,
             "summary": {
-                "total_records": response.get("totalRecords"),
-                "returned_records": response.get("returnedRecords"),
+                "total_records": response_data.get("totalRecords"),
+                "returned_records": response_data.get("returnedRecords"),
                 "start_offset": start_offset,
                 "end_offset": end_offset,
-                "has_more": int(response.get("totalRecords", 0)) > end_offset,
+                "has_more": int(response_data.get("totalRecords", 0)) > end_offset,
             },
             "vulnerabilities": formatted_vulns,
             "filters_applied": {
