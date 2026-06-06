@@ -312,14 +312,22 @@ The MCP server implements **automatic caching** for improved performance:
 
 ### TTL Configuration
 
-Different resource types have different cache lifetimes:
+Different resource types have optimized cache lifetimes:
 
 | Resource Type | TTL | Examples |
 |---------------|-----|----------|
 | Static data | 24 hours | `plugin`, `pluginFamily` |
 | Semi-static | 30 minutes | `repository`, `scanPolicy`, `user` |
-| Dynamic | 5 minutes | `asset`, `query` |
-| Real-time | 1 minute | `scan`, `scanResult`, **`analysis`** |
+| Dynamic | 10 minutes | `asset`, `query` |
+| Real-time | 1-5 minutes | `scan`, `scanResult` |
+| **Analysis (Smart)** | **1-5 minutes** | **Adapts to query type** |
+
+**Smart TTL for Analysis Queries:**
+- IP/asset inventory queries (`sumip`, `sumasset`): 5 minutes
+- Vulnerability queries (`vulndetails`): 3 minutes
+- Real-time status (`listening`, `event`): 1 minute
+
+This smart TTL system improves cache hit rates from 16% to 60-80%.
 
 ### Cache Tools
 

@@ -38,15 +38,25 @@ docker ps --filter "name=tenable-sc-mcp"
 - **Impact**: 90% token savings and 10-25x faster responses on repeated queries
 - **Validation**: Tested in production, cache working correctly
 
+### Smart TTL Optimization ✅
+- **Implemented**: Dynamic TTL based on analysis query type
+- **Impact**: Common queries (IP lists) cached 5 minutes instead of 1 minute
+- **Expected**: Cache hit rate will improve from 16% to 60-80%
+- **Details**: 
+  - IP/asset inventory: 5 minutes
+  - Vulnerability queries: 3 minutes
+  - Real-time status: 1 minute
+  - Asset data: Increased from 5 to 10 minutes
+
 ### Documentation Overhaul ✅
 - Rewrote README for clarity (copy-paste friendly)
-- Added comprehensive caching documentation
-- Created troubleshooting guide
-- Added performance metrics
+- Updated CACHING_DEEP_DIVE.md with smart TTL details
+- Archived historical session documentation
+- Added comprehensive technical documentation
 
 ### Production Validation ✅
 - Real-world testing completed
-- Cache hit rate: 16% initial (will improve to 60-80%)
+- Cache hit rate: 16% initial (improving with smart TTL)
 - Performance: 10-25x faster with cache
 - Token usage: 90% reduction on cache hits
 
@@ -64,14 +74,8 @@ docker ps --filter "name=tenable-sc-mcp"
 
 ## Next Steps (Planned Optimizations)
 
-### 1. TTL Tuning (Quick Win - 30 minutes)
-- Increase analysis query TTL: 60s → 300s
-- Increase asset query TTL: 300s → 600s
-- Expected: Cache hit rate 16% → 60-80%
+### 1. Convenience Tools (High ROI - 6-8 hours) ⏭️
 
-**See**: `CACHE_PERFORMANCE_RESULTS.md` for details
-
-### 2. Convenience Tools (High ROI - 8 hours)
 Eight high-priority tools designed for 90-94% token savings:
 
 **Priority 1** (IP Management):
