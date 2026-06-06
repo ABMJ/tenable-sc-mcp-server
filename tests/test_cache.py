@@ -7,6 +7,7 @@ from tenable_sc_mcp.cache import (
     CacheMetrics,
     generate_cache_key,
     get_ttl_for_resource,
+    get_ttl_for_analysis,
     DEFAULT_TTL_SECONDS,
 )
 
@@ -194,16 +195,41 @@ def test_get_ttl_for_resource():
     assert get_ttl_for_resource("repository") == 1800
     assert get_ttl_for_resource("scanPolicy") == 1800
     
-    # Dynamic resources (5 minutes)
-    assert get_ttl_for_resource("asset") == 300
+    # Dynamic resources (10 minutes) - updated for better cache hit rate
+    assert get_ttl_for_resource("asset") == 600
     
-    # Real-time resources (1 minute)
+    # Real-time resources (1-5 minutes)
     assert get_ttl_for_resource("scan") == 60
-    assert get_ttl_for_resource("scanResult") == 60
+    assert get_ttl_for_resource("scanResult") == 300  # Historical results - 5 minutes
     
     # Unknown resource uses default
     assert get_ttl_for_resource("unknown") == 300
     assert get_ttl_for_resource("unknown", default=120) == 120
+
+
+def test_get_ttl_for_analysis():
+    """Test smart TTL for analysis queries based on query type."""
+    # IP/asset inventory queries - 5 minutes
+    assert get_ttl_for_analysis({"tool": "sumip"}) == 300
+    assert get_ttl_for_analysis({"tool": "sumasset"}) == 300
+    assert get_ttl_for_analysis({"tool": "iplist"}) == 300
+    
+    # Vulnerability queries - 3 minutes
+    assert get_ttl_for_analysis({"tool": "vulndetails"}) == 180
+    assert get_ttl_for_analysis({"tool": "vulnipdetail"}) == 180
+    assert get_ttl_for_analysis({"tool": "vulnsummary"}) == 180
+    
+    # Scan result queries - 4 minutes
+    assert get_ttl_for_analysis({"tool": "listvuln"}) == 240
+    assert get_ttl_for_analysis({"tool": "sumsvc"}) == 240
+    
+    # Real-time queries - 1 minute
+    assert get_ttl_for_analysis({"tool": "listening"}) == 60
+    assert get_ttl_for_analysis({"tool": "event"}) == 60
+    
+    # Unknown query type - 2 minutes default
+    assert get_ttl_for_analysis({"tool": "unknown_query"}) == 120
+    assert get_ttl_for_analysis({}) == 120  # No tool specified
 
 
 def test_cache_thread_safety():

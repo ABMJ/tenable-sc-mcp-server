@@ -15,6 +15,7 @@ from .cache import (
     RedisCache,
     generate_cache_key,
     get_ttl_for_resource,
+    get_ttl_for_analysis,
     initialize_cache,
     get_cache,
 )
@@ -409,9 +410,9 @@ def tsc_analyze(
     # Call API if not cached
     result = tsc_request("POST", "/analysis", body=query, fields=fields, timeout_seconds=timeout_seconds)
     
-    # Cache successful responses
+    # Cache successful responses with smart TTL based on query type
     if cache and cache_key and result.get("ok"):
-        ttl = get_ttl_for_resource("analysis")
+        ttl = get_ttl_for_analysis(query)
         cache.set(cache_key, result, ttl)
     
     return result

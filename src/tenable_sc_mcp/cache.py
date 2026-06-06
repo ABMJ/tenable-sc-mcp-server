@@ -429,14 +429,14 @@ DEFAULT_TTL_SECONDS = {
     "alert": 1800,
     "user": 1800,
     "group": 1800,
-    # Dynamic data (5 minutes)
-    "asset": 300,
-    "assetTemplate": 300,
-    "query": 300,
-    # Real-time data (1 minute)
+    # Dynamic data (10 minutes) - increased from 5 minutes for better cache hit rate
+    "asset": 600,
+    "assetTemplate": 600,
+    "query": 600,
+    # Real-time data (1-5 minutes)
     "scan": 60,
-    "scanResult": 60,
-    "analysis": 60,
+    "scanResult": 300,  # Historical results are static - increased from 60s to 5 minutes
+    "analysis": 120,  # Base TTL - actual TTL determined by get_ttl_for_analysis()
 }
 
 
@@ -493,6 +493,59 @@ def get_ttl_for_resource(resource: str, default: int = 300) -> int:
         TTL in seconds
     """
     return DEFAULT_TTL_SECONDS.get(resource, default)
+
+
+def get_ttl_for_analysis(query: dict[str, Any]) -> int:
+    """Get smart TTL for analysis queries based on query type.
+    
+    Different analysis query tools have different data volatility:
+    - IP/asset inventory: Changes slowly (5 minutes)
+    - Vulnerability details: Semi-dynamic (3 minutes)
+    - Real-time status/events: Changes rapidly (1 minute)
+    
+    Args:
+        query: Analysis query dict containing 'tool' parameter
+    
+    Returns:
+        TTL in seconds optimized for the query type
+    
+    Examples:
+        >>> get_ttl_for_analysis({"tool": "sumip"})
+        300
+        >>> get_ttl_for_analysis({"tool": "vulndetails"})
+        180
+        >>> get_ttl_for_analysis({"tool": "event"})
+        60
+    """
+    tool = query.get("tool", "")
+    
+    # IP/asset inventory queries - data changes slowly
+    # These are common queries that should be cached longer
+    if tool in ("sumip", "sumasset", "iplist", "listmailclients", "listservices"):
+        return 300  # 5 minutes
+    
+    # Vulnerability queries - semi-dynamic data
+    # Vulnerability data updates with new scans but not constantly
+    elif tool in ("vulndetails", "vulnipdetail", "vulnsummary", "cveipdetail", 
+                  "iavmipdetail", "plugindetail", "pluginipdetail"):
+        return 180  # 3 minutes
+    
+    # Scan result queries - relatively stable historical data
+    elif tool in ("listvuln", "sumdns", "sumsvc", "sumport", "sumprotocol"):
+        return 240  # 4 minutes
+    
+    # Compliance and asset tracking - moderate change rate
+    elif tool in ("sumclassa", "sumclassb", "sumclassc", "sumdnsname", "sumos"):
+        return 300  # 5 minutes
+    
+    # Real-time queries - status, listening services, active connections
+    # These should have shorter TTL as they represent current state
+    elif tool in ("listening", "event", "mobile"):
+        return 60   # 1 minute
+    
+    # Default for unknown query types - conservative TTL
+    else:
+        return 120  # 2 minutes
 
 
 # Global cache instance (initialized by server)
