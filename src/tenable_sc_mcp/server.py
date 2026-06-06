@@ -635,15 +635,17 @@ def tsc_profile_ip_efficient(
         
         # Extract ACR (Asset Criticality Rating) details
         acr_score = ip_info.get("acrScore", "0")
-        acr_source = "Unknown"
-        if ip_info.get("acrScore"):
-            # Check if ACR is Tenable-provided or manually adjusted
-            # If tenableAcr field exists and differs from acrScore, it was manually adjusted
-            tenable_acr = ip_info.get("tenableAcr", acr_score)
-            if str(tenable_acr) != str(acr_score):
-                acr_source = "Manually Adjusted"
-            else:
-                acr_source = "Tenable Provided"
+        tenable_acr = ip_info.get("tenableAcr")
+        
+        # Determine ACR source
+        # If tenableAcr exists and differs from acrScore, it was manually adjusted
+        # If tenableAcr doesn't exist or equals acrScore, it's Tenable-provided
+        if tenable_acr is not None and str(tenable_acr) != str(acr_score):
+            acr_source = "Manually Adjusted"
+            acr_details = f"Current: {acr_score}, Original Tenable: {tenable_acr}"
+        else:
+            acr_source = "Tenable Provided"
+            acr_details = f"Tenable Calculated: {acr_score}"
         
         result["data"]["basic_info"] = {
             "ip": ip_info.get("ip"),
@@ -657,10 +659,11 @@ def tsc_profile_ip_efficient(
             "last_seen": ip_info.get("lastSeen", "Unknown"),
             "acr_score": acr_score,
             "acr_source": acr_source,
-            "tenable_acr": ip_info.get("tenableAcr", acr_score),
+            "acr_details": acr_details,
+            "tenable_acr": tenable_acr if tenable_acr is not None else acr_score,
         }
         
-        # Summary info
+        # Summary info with clear ACR information
         result["summary"]["hostname"] = ip_info.get("dnsName") or ip_info.get("netbiosName") or ip
         result["summary"]["os"] = ip_info.get("operatingSystem", "Unknown")
         result["summary"]["repository"] = ip_info.get("repository", {}).get("name", "Unknown")
@@ -668,6 +671,7 @@ def tsc_profile_ip_efficient(
         result["summary"]["last_seen"] = ip_info.get("lastSeen", "Unknown")
         result["summary"]["acr_score"] = acr_score
         result["summary"]["acr_source"] = acr_source
+        result["summary"]["acr_details"] = acr_details
         
         # Query 2: Get vulnerability details for severity counts
         # Token cost: ~800, Cache: 180s
