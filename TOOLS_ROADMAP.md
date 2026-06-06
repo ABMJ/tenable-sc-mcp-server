@@ -143,9 +143,92 @@ Remediation planning, detailed investigation, compliance reporting
 
 ---
 
-## 📅 WEEK 1 - CORE FOUNDATION (3 REMAINING TOOLS)
+## 📅 WEEK 1 - CORE FOUNDATION (1 REFACTOR + 3 TOOLS REMAINING)
 
-### ⏳ Session 1.4: Tool 4 - IP Listing (NEXT)
+### ⏳ Session 1.4: Code Refactoring - Modular Structure (NEXT - CRITICAL)
+
+**Status**: ⏳ Must complete before Tool 4 | **Estimated**: 2-3h
+
+**Purpose:**
+Refactor codebase from monolithic `server.py` to modular structure. Current file is 1,227 lines with 3 tools. Projected 10,000+ lines with 25 tools = unmaintainable.
+
+**Refactoring Tasks:**
+1. Create `src/tenable_sc_mcp/tools/` directory structure
+2. Move Tool 1 → `tools/ip_profiling.py`
+3. Move Tools 2a, 2b → `tools/vulnerability_lookup.py`
+4. Create `tools/__init__.py` with tool registry
+5. Update `server.py` to import from modules (reduce to ~200 lines)
+6. **Retest all 3 tools** - validate functionality unchanged
+7. Update test prompts if needed
+8. Document new structure
+
+**New Directory Structure:**
+```
+src/tenable_sc_mcp/
+├── server.py                      # Core MCP server (~200 lines)
+├── convenience_tools.py           # Universal helpers (existing)
+├── tools/
+│   ├── __init__.py               # Tool registry
+│   ├── ip_profiling.py           # Tools 1, 19
+│   ├── vulnerability_lookup.py    # Tools 2a, 2b, 5, 14, 15
+│   ├── asset_discovery.py        # Tools 4, 17, 18, 22, 23
+│   ├── compliance.py             # Tool 8
+│   ├── scanning.py               # Tools 6, 7, 16
+│   ├── network.py                # Tool 10
+│   ├── inventory.py              # Tools 11, 12
+│   ├── authentication.py         # Tool 13
+│   ├── risk_scoring.py           # Tools 20, 21
+│   └── admin/
+│       ├── __init__.py
+│       ├── resources.py          # Tool 9
+│       ├── plugins.py            # Tool 24
+│       ├── licensing.py          # Tool 25
+│       └── repositories.py       # Tool 26
+└── cache.py                       # Caching logic (if needed)
+```
+
+**Module to Tool Mapping:**
+
+| Module | Tools | Description | Est. Lines |
+|--------|-------|-------------|------------|
+| `ip_profiling.py` | 1, 19 | IP profile (efficient, bulk) | ~600 |
+| `vulnerability_lookup.py` | 2a, 2b, 5, 14, 15 | Vuln queries (summary, full, CVE search, CVE list, IPs by vuln) | ~800 |
+| `asset_discovery.py` | 4, 17, 18, 22, 23 | IP lists, OS detection, asset groups, top vulnerable | ~600 |
+| `compliance.py` | 8 | Compliance status | ~200 |
+| `scanning.py` | 6, 7, 16 | Missing patches, scan status, scan results | ~400 |
+| `network.py` | 10 | Open ports | ~200 |
+| `inventory.py` | 11, 12 | Software, services | ~300 |
+| `authentication.py` | 13 | Credential audit | ~200 |
+| `risk_scoring.py` | 20, 21 | ACR scoring | ~300 |
+| `admin/resources.py` | 9 | Scanner/NNM/WAS health | ~200 |
+| `admin/plugins.py` | 24 | Plugin updates | ~150 |
+| `admin/licensing.py` | 25 | License usage | ~150 |
+| `admin/repositories.py` | 26 | Repo status | ~200 |
+
+**Total**: ~4,300 lines across 13 modules vs 10,000+ in single file
+
+**Benefits:**
+- ✅ Maintainable: 200-500 lines per module
+- ✅ Testable: Isolated module testing
+- ✅ Scalable: Add tools without bloating core
+- ✅ Readable: Clear logical grouping
+- ✅ Collaborative: Multiple devs can work in parallel
+- ✅ Debuggable: Easier issue isolation
+
+**Validation Checklist:**
+- [ ] All 3 tools work after refactor
+- [ ] Cache functionality preserved
+- [ ] Token savings unchanged
+- [ ] Error handling works
+- [ ] TEST_PROMPTS.md queries pass
+- [ ] Docker container builds successfully
+- [ ] MCP server starts without errors
+
+**Critical Note:** DO NOT proceed to Tool 4 until this refactoring is complete and validated!
+
+---
+
+### ⏳ Session 1.5: Tool 4 - IP Listing
 
 #### `tsc_list_ips`
 
@@ -185,10 +268,11 @@ List of IPs with:
 - Validate IP format and CIDR ranges
 - Cache TTL: 300s (5 minutes)
 - Token budget: 500-1,000 tokens
+- **Module**: `tools/asset_discovery.py`
 
 ---
 
-### ⏳ Session 1.5: Tool 5 - CVE Search (NEW - HIGH PRIORITY) 🆕
+### ⏳ Session 1.6: Tool 5 - CVE Search (NEW - HIGH PRIORITY) 🆕
 
 #### `tsc_list_vulns_by_cve`
 
@@ -244,10 +328,11 @@ Search for specific CVE across entire infrastructure. Emergency outbreak respons
 - Parse plugin output for remediation section
 - Offer full plugin output via optional parameter `include_full_output=true`
 - No limit on number of affected IPs returned
+- **Module**: `tools/vulnerability_lookup.py`
 
 ---
 
-### ⏳ Session 1.6: Tool 6 - Missing Patches
+### ⏳ Session 1.7: Tool 6 - Missing Patches
 
 #### `tsc_list_missing_patches_windows`
 
@@ -268,10 +353,11 @@ MS bulletin-based patch gap analysis for Windows systems.
 - MS bulletin tracking
 - Windows update verification
 - Remediation prioritization
+- **Module**: `tools/scanning.py`
 
 ---
 
-### ⏳ Session 1.7: Tool 7 - Scan Status
+### ⏳ Session 1.8: Tool 7 - Scan Status
 
 #### `tsc_scan_status`
 
@@ -298,6 +384,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 - Real-time data - short TTL (60s)
 - Use `/scan` endpoint with filters
 - Include scan result UUID for drill-down
+- **Module**: `tools/scanning.py`
 
 ---
 
@@ -307,7 +394,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_compliance_status_by_ip`
 
-**Token Budget**: 3,000-5,000 | **Cache TTL**: 300s | **Estimated**: 3h
+**Token Budget**: 3,000-5,000 | **Cache TTL**: 300s | **Estimated**: 3h | **Module**: `tools/compliance.py`
 
 **Purpose:** Summary + failed compliance checks with remediation guidance
 
@@ -319,7 +406,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_resources_status`
 
-**Token Budget**: 1,500-3,000 | **Cache TTL**: 60s/600s | **Estimated**: 3h | **Admin Only**
+**Token Budget**: 1,500-3,000 | **Cache TTL**: 60s/600s | **Estimated**: 3h | **Admin Only** | **Module**: `tools/admin/resources.py`
 
 **Purpose:** Nessus/NNM/WAS/Proxy status with force_refresh flag
 
@@ -329,7 +416,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_list_ports`
 
-**Token Budget**: 1,500-3,000 | **Cache TTL**: 240s | **Estimated**: 2h
+**Token Budget**: 1,500-3,000 | **Cache TTL**: 240s | **Estimated**: 2h | **Module**: `tools/network.py`
 
 **Purpose:** List open ports with combined scanner + vulnerability data
 
@@ -346,7 +433,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_list_software`
 
-**Token Budget**: 2,000-4,000 | **Cache TTL**: 300s | **Estimated**: 1.5h
+**Token Budget**: 2,000-4,000 | **Cache TTL**: 300s | **Estimated**: 1.5h | **Module**: `tools/inventory.py`
 
 **Purpose:** List installed software with full filtering (kept for performance despite overlap with IP profile)
 
@@ -354,7 +441,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_list_services`
 
-**Token Budget**: 2,000-4,000 | **Cache TTL**: 300s | **Estimated**: 1.5h
+**Token Budget**: 2,000-4,000 | **Cache TTL**: 300s | **Estimated**: 1.5h | **Module**: `tools/inventory.py`
 
 **Purpose:** List running services with full filtering (kept for performance despite overlap with IP profile)
 
@@ -364,7 +451,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_credential_audit`
 
-**Token Budget**: 2,000-3,000 | **Cache TTL**: 240s | **Estimated**: 2h
+**Token Budget**: 2,000-3,000 | **Cache TTL**: 240s | **Estimated**: 2h | **Module**: `tools/authentication.py`
 
 **Purpose:** Credential success/failure audit per IP using plugin 19506 + auth plugins
 
@@ -384,7 +471,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_list_ips_by_vuln`
 
-**Token Budget**: 2,000-4,000 | **Cache TTL**: 240s | **Estimated**: 2h
+**Token Budget**: 2,000-4,000 | **Cache TTL**: 240s | **Estimated**: 2h | **Module**: `tools/vulnerability_lookup.py`
 
 **Purpose:** Reverse lookup - list IPs affected by specific vulnerability (plugin ID or CVE)
 
@@ -394,7 +481,7 @@ Real-time scan monitoring with filters (time, launcher, status).
 
 #### `tsc_list_cves_by_ip`
 
-**Status**: ⏳ Pending | **Token Budget**: 800-1,500 | **Cache TTL**: 180s | **Estimated**: 1.5h
+**Status**: ⏳ Pending | **Token Budget**: 800-1,500 | **Cache TTL**: 180s | **Estimated**: 1.5h | **Module**: `tools/vulnerability_lookup.py`
 
 **Purpose:**
 Lightweight CVE-only listing for an IP. Complements `tsc_list_vulns_by_ip_full` (which shows all fields).
@@ -436,7 +523,7 @@ Lightweight CVE-only listing for an IP. Complements `tsc_list_vulns_by_ip_full` 
 
 #### `tsc_list_scan_results`
 
-**Status**: ⏳ Pending | **Token Budget**: 2,000-3,000 | **Cache TTL**: 180s | **Estimated**: 2h
+**Status**: ⏳ Pending | **Token Budget**: 2,000-3,000 | **Cache TTL**: 180s | **Estimated**: 2h | **Module**: `tools/scanning.py`
 
 **Purpose:**
 Filter scan results by date, status, repository. Better operational visibility.
@@ -482,7 +569,7 @@ Filter scan results by date, status, repository. Better operational visibility.
 
 #### `tsc_list_ips_by_repo`
 
-**Token Budget**: 500-1,000 | **Cache TTL**: 300s | **Estimated**: 1h
+**Token Budget**: 500-1,000 | **Cache TTL**: 300s | **Estimated**: 1h | **Module**: `tools/asset_discovery.py`
 
 **Purpose:** List all IPs in a repository or asset group (kept for performance despite overlap)
 
@@ -490,7 +577,7 @@ Filter scan results by date, status, repository. Better operational visibility.
 
 #### `tsc_get_os_by_ip`
 
-**Token Budget**: 500-1,000 | **Cache TTL**: 300s | **Estimated**: 1h
+**Token Budget**: 500-1,000 | **Cache TTL**: 300s | **Estimated**: 1h | **Module**: `tools/asset_discovery.py`
 
 **Purpose:** Get OS details per IP/asset (kept for performance despite overlap with IP profile)
 
@@ -502,7 +589,7 @@ Filter scan results by date, status, repository. Better operational visibility.
 
 #### `tsc_profile_ips_bulk`
 
-**Status**: ⏳ Pending | **Token Budget**: 5,000-10,000 | **Cache TTL**: 180s | **Estimated**: 2h
+**Status**: ⏳ Pending | **Token Budget**: 5,000-10,000 | **Cache TTL**: 180s | **Estimated**: 2h | **Module**: `tools/ip_profiling.py`
 
 **Purpose:**
 Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced round trips.
@@ -556,7 +643,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_list_acr_by_ip`
 
-**Token Budget**: 1,000-2,000 | **Cache TTL**: 300s | **Estimated**: 1h
+**Token Budget**: 1,000-2,000 | **Cache TTL**: 300s | **Estimated**: 1h | **Module**: `tools/risk_scoring.py`
 
 **Purpose:** ACR (Asset Criticality Rating) scores per IP
 
@@ -564,7 +651,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_list_ips_by_acr_range`
 
-**Token Budget**: 1,000-2,000 | **Cache TTL**: 300s | **Estimated**: 1h
+**Token Budget**: 1,000-2,000 | **Cache TTL**: 300s | **Estimated**: 1h | **Module**: `tools/risk_scoring.py`
 
 **Purpose:** List IPs within ACR value/range (e.g., score >= 8)
 
@@ -574,7 +661,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_asset_group_membership`
 
-**Token Budget**: 500-1,000 | **Cache TTL**: 600s | **Estimated**: 1h
+**Token Budget**: 500-1,000 | **Cache TTL**: 600s | **Estimated**: 1h | **Module**: `tools/asset_discovery.py`
 
 **Purpose:** List all asset groups an IP belongs to (kept for performance despite overlap with IP profile)
 
@@ -582,7 +669,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_top_vulnerable_assets`
 
-**Token Budget**: 1,000-2,000 | **Cache TTL**: 180s | **Estimated**: 1h
+**Token Budget**: 1,000-2,000 | **Cache TTL**: 180s | **Estimated**: 1h | **Module**: `tools/asset_discovery.py`
 
 **Purpose:** Most vulnerable IPs ranked by severity count
 
@@ -592,7 +679,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_plugin_update_status`
 
-**Token Budget**: 500-1,000 | **Cache TTL**: 600s | **Estimated**: 1h | **Admin Only**
+**Token Budget**: 500-1,000 | **Cache TTL**: 600s | **Estimated**: 1h | **Admin Only** | **Module**: `tools/admin/plugins.py`
 
 **Purpose:** Plugin feed status monitoring
 
@@ -600,7 +687,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_license_usage`
 
-**Token Budget**: 500-1,000 | **Cache TTL**: 1800s | **Estimated**: 1h | **Admin Only**
+**Token Budget**: 500-1,000 | **Cache TTL**: 1800s | **Estimated**: 1h | **Admin Only** | **Module**: `tools/admin/licensing.py`
 
 **Purpose:** License usage statistics
 
@@ -610,7 +697,7 @@ Profile multiple IPs (10-50+) in one efficient query. Better caching, reduced ro
 
 #### `tsc_repo_status`
 
-**Token Budget**: 2,000-3,000 | **Cache TTL**: 1800s | **Estimated**: 1.5h | **Admin Only**
+**Token Budget**: 2,000-3,000 | **Cache TTL**: 1800s | **Estimated**: 1.5h | **Admin Only** | **Module**: `tools/admin/repositories.py`
 
 **Purpose:** Combined repository tool - config + utilization + capacity + trending
 

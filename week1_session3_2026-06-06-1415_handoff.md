@@ -18,28 +18,38 @@
 - ✅ Tool 2a: `tsc_list_vulns_by_ip_summary`
 - ✅ Tool 2b: `tsc_list_vulns_by_ip_full`
 
-**Next Tool**: Tool 4 - `tsc_list_ips` (Week 1 Session 1.4)
+**Next Step**: **CRITICAL REFACTORING REQUIRED** (Session 1.4) before any new tools
 
 ---
 
 ## 🚀 NEXT SESSION INSTRUCTIONS
 
-**For OpenCode:**
-1. Review `TOOLS_ROADMAP.md` - Check Tool 4 specifications
-2. Review codebase: `src/tenable_sc_mcp/server.py` (lines 547-1227 = Tools 1-3)
-3. Implement Tool 4: `tsc_list_ips` per roadmap specifications
-4. Follow established patterns from Tools 1-3
+### ⚠️ CRITICAL: REFACTOR FIRST (Session 1.4)
 
-**What to Build:**
-- Tool: `tsc_list_ips`
-- Token Budget: 500-1,000
-- Cache TTL: 300s
-- Time Estimate: 2 hours
+**DO NOT implement Tool 4 yet!** Must refactor codebase from monolithic to modular structure first.
+
+**Current Problem:**
+- `server.py` = 1,227 lines with only 3 tools
+- Projected = 10,000+ lines with 25 tools (unmaintainable)
+
+**Refactoring Tasks (2-3 hours):**
+1. Review `TOOLS_ROADMAP.md` Session 1.4 - Complete refactoring specification
+2. Create `src/tenable_sc_mcp/tools/` directory structure
+3. Move Tool 1 → `tools/ip_profiling.py`
+4. Move Tools 2a, 2b → `tools/vulnerability_lookup.py`
+5. Create `tools/__init__.py` with tool registry
+6. Update `server.py` to import from modules (reduce to ~200 lines)
+7. **RETEST all 3 tools** - validate functionality unchanged
+8. Update TEST_PROMPTS.md if needed
+9. Mark Session 1.4 complete
+
+**After Refactoring:**
+- Proceed to Session 1.5: Implement Tool 4 (`tsc_list_ips`) in `tools/asset_discovery.py`
 
 ---
 
 ## 📚 KEY REFERENCES
-- **Roadmap**: `TOOLS_ROADMAP.md` - Complete tool specifications
+- **Roadmap**: `TOOLS_ROADMAP.md` - Session 1.4 has full refactoring spec + module mapping
 - **Test Queries**: `TEST_PROMPTS.md` - Validation patterns
 - **Caching**: `CACHING_DEEP_DIVE.md` - Technical details
 - **API Docs**: https://docs.tenable.com/security-center/api/index.htm
@@ -48,8 +58,100 @@
 
 ## 🏗️ DESIGN PRINCIPLES
 
-### Code Organization
-- All convenience tools in `server.py` lines 547+
+### ⭐ CRITICAL: Modular Structure (ALWAYS REQUIRED)
+
+**Directory Structure:**
+```
+src/tenable_sc_mcp/
+├── server.py                      # Core MCP server (~200 lines)
+├── convenience_tools.py           # Universal helpers
+├── tools/
+│   ├── __init__.py               # Tool registry
+│   ├── ip_profiling.py           # Tools 1, 19
+│   ├── vulnerability_lookup.py    # Tools 2a, 2b, 5, 14, 15
+│   ├── asset_discovery.py        # Tools 4, 17, 18, 22, 23
+│   ├── compliance.py             # Tool 8
+│   ├── scanning.py               # Tools 6, 7, 16
+│   ├── network.py                # Tool 10
+│   ├── inventory.py              # Tools 11, 12
+│   ├── authentication.py         # Tool 13
+│   ├── risk_scoring.py           # Tools 20, 21
+│   └── admin/
+│       ├── __init__.py
+│       ├── resources.py          # Tool 9
+│       ├── plugins.py            # Tool 24
+│       ├── licensing.py          # Tool 25
+│       └── repositories.py       # Tool 26
+```
+
+**Module Organization Rules:**
+- Each module = 200-500 lines maximum
+- Group tools by logical functionality (see TOOLS_ROADMAP.md Session 1.4 for complete mapping)
+- All new tools MUST go in appropriate module, NEVER in server.py
+- Admin tools go in `tools/admin/` subdirectory
+
+**Module File Pattern:**
+```python
+# tools/vulnerability_lookup.py
+"""Vulnerability lookup and analysis tools."""
+
+from typing import Optional
+from mcp import types
+import json
+
+# Import shared dependencies
+from ..convenience_tools import build_filters, hash_filters
+from ..cache import get_cached, set_cached
+
+async def tsc_list_vulns_by_ip_summary(
+    server_instance,
+    ip: str,
+    severity: Optional[str] = None,
+    # ... other params
+) -> list[types.TextContent]:
+    """Lightweight vulnerability summary."""
+    # Implementation here
+    pass
+
+async def tsc_list_vulns_by_ip_full(
+    server_instance,
+    ip: str,
+    # ... params
+) -> list[types.TextContent]:
+    """Complete vulnerability details."""
+    # Implementation here
+    pass
+
+# Export all tools
+__all__ = [
+    "tsc_list_vulns_by_ip_summary",
+    "tsc_list_vulns_by_ip_full",
+]
+```
+
+**Tool Registry Pattern (tools/__init__.py):**
+```python
+"""Tool registry - imports all tools and registers with MCP server."""
+
+from .ip_profiling import tsc_profile_ip_efficient, tsc_profile_ips_bulk
+from .vulnerability_lookup import (
+    tsc_list_vulns_by_ip_summary,
+    tsc_list_vulns_by_ip_full,
+    tsc_list_vulns_by_cve,
+    tsc_list_cves_by_ip,
+    tsc_list_ips_by_vuln,
+)
+# ... import other modules
+
+def register_all_tools(server):
+    """Register all convenience tools with MCP server."""
+    # Tools are registered via @server.call_tool() decorators
+    pass
+```
+
+### Code Organization (LEGACY - Will be refactored in Session 1.4)
+- Current: All tools in `server.py` lines 547-1227
+- Future: Modular structure (see above)
 - Helper functions in `src/tenable_sc_mcp/convenience_tools.py`
 - Follow dual-mode pattern: `_summary` and `_full` variants where applicable
 
@@ -123,7 +225,19 @@ return [types.TextContent(
 
 ## 📊 VALIDATION CHECKLIST
 
-Before marking tool complete:
+### Refactoring Validation (Session 1.4):
+- [ ] Directory structure created correctly
+- [ ] Tool 1 moved to ip_profiling.py and works
+- [ ] Tools 2a, 2b moved to vulnerability_lookup.py and work
+- [ ] server.py reduced to ~200 lines
+- [ ] All 3 tools pass TEST_PROMPTS.md queries
+- [ ] Cache performance unchanged
+- [ ] Token savings unchanged
+- [ ] Docker container builds successfully
+- [ ] MCP server starts without errors
+
+### Tool Implementation (Session 1.5+):
+- [ ] Tool implemented in correct module per TOOLS_ROADMAP.md
 - [ ] Tool works with valid inputs
 - [ ] Error handling for invalid inputs
 - [ ] Cache hit/miss works correctly
@@ -135,4 +249,4 @@ Before marking tool complete:
 
 ---
 
-**End of Session 3 - Ready for Session 4** 🚀
+**End of Session 3 - Next: Session 1.4 Refactoring** 🚀
