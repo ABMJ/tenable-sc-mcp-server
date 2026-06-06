@@ -6,7 +6,7 @@ Use these prompts to test the tools and verify functionality.
 
 ### Basic Profile Test
 ```
-Profile IP 10.1.20.10 using Tenable.sc
+Profile IP 10.1.20.10 using Tenable.sc show me a summary of cache performance on tenable.sc and token utilization for each query
 ```
 
 **Expected Output:**
