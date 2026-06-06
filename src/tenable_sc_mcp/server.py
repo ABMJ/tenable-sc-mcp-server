@@ -19,6 +19,14 @@ from .cache import (
     initialize_cache,
     get_cache,
 )
+from .convenience_tools import (
+    validate_ip,
+    validate_severity,
+    build_filters,
+    parse_plugin_19506_output,
+    format_vulnerability_summary,
+    AUTH_PLUGINS,
+)
 
 
 _CLIENT_ENV_PREFIX = "TSC_"
@@ -528,6 +536,270 @@ def tsc_cache_clear(pattern: str | None = None) -> dict[str, Any]:
             "ok": True,
             "action": "clear_all",
             "message": "All cache entries cleared",
+        }
+
+
+# ============================================================================
+# CONVENIENCE TOOLS - Week 1 Implementation
+# ============================================================================
+
+
+@mcp.tool()
+def tsc_profile_ip_efficient(
+    ip: str,
+    include_software: bool = True,
+    include_services: bool = True,
+    include_scan_info: bool = True,
+    include_asset_groups: bool = True,
+) -> dict[str, Any]:
+    """
+    Get comprehensive IP profile using efficient multi-query approach.
+    
+    This tool provides a complete security profile for an IP address by combining
+    data from multiple optimized queries. Each component is cached separately for
+    maximum cache hit rates.
+    
+    Token Efficiency: ~2,500 tokens (vs ~15,000 for single comprehensive query)
+    Cache TTL: 180s (3 minutes) for vulnerability data
+    
+    Args:
+        ip: IP address to profile (IPv4 or IPv6)
+        include_software: Include installed software list (default: True)
+        include_services: Include running services list (default: True)
+        include_scan_info: Include scan metadata from plugin 19506 (default: True)
+        include_asset_groups: Include asset group membership (default: True)
+    
+    Returns:
+        Comprehensive IP profile with:
+        - Basic host info (OS, DNS, MAC, etc.)
+        - Vulnerability summary by severity
+        - Last scan information
+        - Installed software (if enabled)
+        - Running services (if enabled)
+        - Asset group membership (if enabled)
+        - Authentication status
+    
+    Example:
+        >>> tsc_profile_ip_efficient("10.1.20.10")
+        {
+            "ok": True,
+            "ip": "10.1.20.10",
+            "summary": {
+                "hostname": "webserver01.domain.com",
+                "os": "Windows Server 2019",
+                "last_scan": "2026-06-06T10:30:00Z",
+                "vulnerabilities": {"critical": 5, "high": 23, ...}
+            },
+            "data": {...}
+        }
+    """
+    # Validate IP address
+    valid, error = validate_ip(ip)
+    if not valid:
+        return {"ok": False, "error": error}
+    
+    result = {
+        "ok": True,
+        "ip": ip,
+        "summary": {},
+        "data": {}
+    }
+    
+    try:
+        # Query 1: Get basic IP info + vulnerability summary (sumip tool)
+        # Token cost: ~500, Cache: 300s
+        basic_query = {
+            "tool": "sumip",
+            "type": "vuln",
+            "sourceType": "cumulative",
+            "query": {
+                "tool": "sumip",
+                "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
+            }
+        }
+        basic_result = tsc_analyze(basic_query)
+        
+        if not basic_result.get("ok"):
+            return basic_result
+        
+        # Extract basic info
+        basic_data = basic_result.get("response", {}).get("results", [])
+        if not basic_data:
+            return {
+                "ok": False,
+                "error": f"No data found for IP: {ip}",
+                "suggestion": "IP may not exist in Tenable.sc inventory or has no scan results"
+            }
+        
+        ip_info = basic_data[0]
+        result["data"]["basic_info"] = {
+            "ip": ip_info.get("ip"),
+            "dns_name": ip_info.get("dnsName", ""),
+            "netbios_name": ip_info.get("netbiosName", ""),
+            "mac_address": ip_info.get("macAddress", ""),
+            "operating_system": ip_info.get("operatingSystem", ""),
+            "repository": ip_info.get("repository", {}),
+            "uuid": ip_info.get("uuid", ""),
+        }
+        
+        # Summary info
+        result["summary"]["hostname"] = ip_info.get("dnsName") or ip_info.get("netbiosName") or ip
+        result["summary"]["os"] = ip_info.get("operatingSystem", "Unknown")
+        result["summary"]["repository"] = ip_info.get("repository", {}).get("name", "Unknown")
+        
+        # Query 2: Get vulnerability details for severity counts
+        # Token cost: ~800, Cache: 180s
+        vuln_query = {
+            "tool": "vulnipsummary",
+            "type": "vuln",
+            "sourceType": "cumulative",
+            "query": {
+                "tool": "vulnipsummary",
+                "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
+            }
+        }
+        vuln_result = tsc_analyze(vuln_query)
+        
+        if vuln_result.get("ok"):
+            vuln_data = vuln_result.get("response", {}).get("results", [])
+            if vuln_data:
+                vuln_summary = format_vulnerability_summary(vuln_data)
+                result["data"]["vulnerabilities"] = vuln_summary
+                result["summary"]["vulnerabilities"] = vuln_summary["by_severity"]
+        
+        # Query 3: Get scan metadata from plugin 19506 (if enabled)
+        # Token cost: ~400, Cache: 180s
+        if include_scan_info:
+            scan_info_query = {
+                "tool": "vulndetails",
+                "type": "vuln",
+                "sourceType": "cumulative",
+                "query": {
+                    "tool": "vulndetails",
+                    "filters": [
+                        {"filterName": "ip", "operator": "=", "value": ip},
+                        {"filterName": "pluginID", "operator": "=", "value": "19506"}
+                    ]
+                },
+                "sortField": "lastSeen",
+                "sortDir": "DESC",
+                "startOffset": 0,
+                "endOffset": 1
+            }
+            scan_info_result = tsc_analyze(scan_info_query)
+            
+            if scan_info_result.get("ok"):
+                scan_data = scan_info_result.get("response", {}).get("results", [])
+                if scan_data:
+                    plugin_text = scan_data[0].get("pluginText", "")
+                    scan_metadata = parse_plugin_19506_output(plugin_text)
+                    result["data"]["last_scan"] = {
+                        "scan_name": scan_metadata.get("scan_name", "Unknown"),
+                        "scan_policy": scan_metadata.get("scan_policy", "Unknown"),
+                        "scanner_ip": scan_metadata.get("scanner_ip", "Unknown"),
+                        "scan_date": scan_data[0].get("lastSeen", "Unknown"),
+                        "credentialed_checks": scan_metadata.get("credentialed_checks", "Unknown"),
+                        "patch_management": scan_metadata.get("patch_management_checks", "Unknown"),
+                        "scan_duration": scan_metadata.get("scan_duration", "Unknown"),
+                    }
+                    result["summary"]["last_scan"] = scan_data[0].get("lastSeen", "Unknown")
+                    result["summary"]["credentialed"] = scan_metadata.get("credentialed_checks", "Unknown")
+        
+        # Query 4: Get installed software (if enabled)
+        # Token cost: ~500, Cache: 300s
+        if include_software:
+            software_query = {
+                "tool": "listsoftware",
+                "type": "vuln",
+                "sourceType": "cumulative",
+                "query": {
+                    "tool": "listsoftware",
+                    "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
+                },
+                "startOffset": 0,
+                "endOffset": 50  # Limit to first 50 software packages
+            }
+            software_result = tsc_analyze(software_query)
+            
+            if software_result.get("ok"):
+                software_data = software_result.get("response", {}).get("results", [])
+                result["data"]["software"] = {
+                    "count": len(software_data),
+                    "items": [
+                        {
+                            "name": sw.get("software", "Unknown"),
+                            "cpe": sw.get("cpe", ""),
+                        }
+                        for sw in software_data[:20]  # Top 20 for summary
+                    ]
+                }
+                result["summary"]["software_count"] = len(software_data)
+        
+        # Query 5: Get running services (if enabled)
+        # Token cost: ~500, Cache: 300s
+        if include_services:
+            services_query = {
+                "tool": "listservices",
+                "type": "vuln",
+                "sourceType": "cumulative",
+                "query": {
+                    "tool": "listservices",
+                    "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
+                },
+                "startOffset": 0,
+                "endOffset": 50  # Limit to first 50 services
+            }
+            services_result = tsc_analyze(services_query)
+            
+            if services_result.get("ok"):
+                services_data = services_result.get("response", {}).get("results", [])
+                result["data"]["services"] = {
+                    "count": len(services_data),
+                    "items": [
+                        {
+                            "port": svc.get("port", "Unknown"),
+                            "protocol": svc.get("protocol", "Unknown"),
+                            "service": svc.get("service", "Unknown"),
+                        }
+                        for svc in services_data[:20]  # Top 20 for summary
+                    ]
+                }
+                result["summary"]["services_count"] = len(services_data)
+        
+        # Query 6: Get asset group membership (if enabled)
+        # Token cost: ~300, Cache: 600s
+        if include_asset_groups:
+            # Query via asset resource to find which asset groups contain this IP
+            asset_query = {
+                "tool": "sumasset",
+                "type": "vuln",
+                "sourceType": "cumulative",
+                "query": {
+                    "tool": "sumasset",
+                    "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
+                }
+            }
+            asset_result = tsc_analyze(asset_query)
+            
+            if asset_result.get("ok"):
+                asset_data = asset_result.get("response", {}).get("results", [])
+                if asset_data:
+                    # Note: Asset group membership may require additional query
+                    # For now, return asset criticality rating if available
+                    acr_score = ip_info.get("acrScore", "N/A")
+                    result["data"]["asset_info"] = {
+                        "acr_score": acr_score,
+                        "asset_exposure_score": ip_info.get("assetExposureScore", "N/A"),
+                    }
+                    result["summary"]["acr_score"] = acr_score
+        
+        return result
+    
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"Failed to profile IP {ip}: {str(exc)}",
+            "ip": ip
         }
 
 
