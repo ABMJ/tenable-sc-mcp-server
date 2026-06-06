@@ -12,16 +12,17 @@ The caching system is **automatically integrated** into the MCP server code. The
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ User calls MCP tool (e.g., tsc_resource_action)                 │
+│ User calls MCP tool (e.g., tsc_resource_action, tsc_analyze)    │
 └────────────────────┬────────────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ MCP Tool Handler (server.py)                                    │
 │                                                                  │
-│ 1. Check if method is GET                                       │
-│ 2. Generate cache key from: resource + params + fields          │
-│ 3. Check cache: cache.get(cache_key)                           │
+│ 1. Check if request is cacheable (GET or read-only POST)        │
+│ 2. Normalize query (remove pagination, timestamps)              │
+│ 3. Generate cache key from: resource + normalized params        │
+│ 4. Check cache: cache.get(cache_key)                           │
 └────────────────────┬────────────────────────────────────────────┘
                      │
         ┌────────────┴────────────┐
@@ -46,6 +47,11 @@ The caching system is **automatically integrated** into the MCP server code. The
                             │ to user              │
                             └──────────────────────┘
 ```
+
+**Cached Operations:**
+- ✅ GET requests (all resources)
+- ✅ POST /analysis queries (read-only despite using POST)
+- ❌ POST/PUT/PATCH/DELETE (write operations - invalidate cache)
 
 ---
 
@@ -84,8 +90,31 @@ if method == "GET":
 
 **Key Point**: The cache key is deterministic and includes:
 - Resource name (e.g., `repository`, `scan`, `user`)
-- All parameters that affect the response (fields, filters, etc.)
-- This ensures different queries get different cache entries
+- **Normalized parameters** (pagination/timestamps removed)
+- Fields, filters, and other parameters that affect the response
+- This ensures queries with different pagination share the same cache
+
+**Query Normalization** (`src/tenable_sc_mcp/cache.py:443-475`):
+
+Before generating the cache key, queries are normalized to remove volatile parameters:
+
+```python
+def _normalize_query_for_cache(params: dict) -> dict:
+    """Remove pagination and volatile params before caching."""
+    exclude_keys = {
+        'startOffset', 'endOffset',          # Pagination
+        'timestamp', 'requestTimestamp',     # Timestamps
+        'requestID', 'sessionID',            # Session IDs
+    }
+    
+    # Remove excluded keys and recursively normalize nested dicts
+    return {k: v for k, v in params.items() if k not in exclude_keys}
+```
+
+**Why Normalization?**
+- Without it: Query with `startOffset=0` and `startOffset=500` get different cache keys → 0% hit rate
+- With it: Both queries share the same cache entry → High hit rate on repeated queries
+- Critical for paginated analysis queries that fetch large datasets
 
 **Example Cache Keys**:
 ```
@@ -186,6 +215,27 @@ if method in ("POST", "PUT", "PATCH", "DELETE"):
     # Example: If you POST to /repository, all "repository:*" keys are deleted
 ```
 
+**Special Case: POST /analysis**
+
+Analysis queries use POST but are **read-only operations** (POST is used for complex query parameters, not data modification):
+
+```python
+# POST /analysis is cached despite using POST method
+@mcp.tool()
+def tsc_analyze(query: dict, fields: list | None = None):
+    cache_key = generate_cache_key("analysis", params={"query": query, "fields": fields})
+    cached = cache.get(cache_key)
+    if cached:
+        return cached  # Cache hit!
+    
+    result = tsc_request("POST", "/analysis", body=query, fields=fields)
+    
+    # Cache with smart TTL based on query type
+    ttl = get_ttl_for_analysis(query)
+    cache.set(cache_key, result, ttl)
+    return result
+```
+
 **Why Pattern-Based Invalidation?**
 - If you create a new repository, the list of repositories has changed
 - If you update repository #123, both the detail view AND list view need refresh
@@ -219,23 +269,28 @@ if method in ("POST", "PUT", "PATCH", "DELETE"):
 ```
 Time 0: Cache is empty {}
 
-Call 1: tsc_resource_action("list", "repository")
+Call 1: tsc_analyze({"tool": "sumip", "startOffset": 0, "endOffset": 500})
   → Cache miss (no key exists)
   → API call to Tenable.sc (250ms)
-  → Store in cache: {"repository:list:{}": [repos...], TTL: 1800s}
+  → Normalize query (remove startOffset/endOffset)
+  → Store in cache: {"analysis:params=abc123": [results...], TTL: 300s}
   → Return to user
 
-Call 2: tsc_resource_action("list", "repository")  [5 seconds later]
-  → Cache HIT (key exists and not expired)
+Call 2: tsc_analyze({"tool": "sumip", "startOffset": 500, "endOffset": 1000})
+  → Normalize query (remove startOffset/endOffset)
+  → Cache HIT! (same normalized key "analysis:params=abc123")
   → Return from cache (0.2ms)
   → No API call, no tokens used!
+  → Pagination params ignored for caching
 
 Call 3: tsc_resource_action("create", "repository", body={...})
   → POST request (write operation)
   → Invalidate: delete pattern "repository:*"
-  → Cache now: {}
-  → Next list call will be cache miss again
+  → Cache: analysis entries remain, repository entries deleted
+  → Next repository list call will be cache miss
 ```
+
+**Key Insight**: Queries with different pagination (startOffset/endOffset) share the same cache entry, dramatically improving cache hit rates.
 
 ### Q2: If TTL expires, does it do full sync or differential?
 
