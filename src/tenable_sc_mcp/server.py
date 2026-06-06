@@ -632,6 +632,19 @@ def tsc_profile_ip_efficient(
             }
         
         ip_info = basic_data[0]
+        
+        # Extract ACR (Asset Criticality Rating) details
+        acr_score = ip_info.get("acrScore", "0")
+        acr_source = "Unknown"
+        if ip_info.get("acrScore"):
+            # Check if ACR is Tenable-provided or manually adjusted
+            # If tenableAcr field exists and differs from acrScore, it was manually adjusted
+            tenable_acr = ip_info.get("tenableAcr", acr_score)
+            if str(tenable_acr) != str(acr_score):
+                acr_source = "Manually Adjusted"
+            else:
+                acr_source = "Tenable Provided"
+        
         result["data"]["basic_info"] = {
             "ip": ip_info.get("ip"),
             "dns_name": ip_info.get("dnsName", ""),
@@ -640,12 +653,21 @@ def tsc_profile_ip_efficient(
             "operating_system": ip_info.get("operatingSystem", ""),
             "repository": ip_info.get("repository", {}),
             "uuid": ip_info.get("uuid", ""),
+            "first_seen": ip_info.get("firstSeen", "Unknown"),
+            "last_seen": ip_info.get("lastSeen", "Unknown"),
+            "acr_score": acr_score,
+            "acr_source": acr_source,
+            "tenable_acr": ip_info.get("tenableAcr", acr_score),
         }
         
         # Summary info
         result["summary"]["hostname"] = ip_info.get("dnsName") or ip_info.get("netbiosName") or ip
         result["summary"]["os"] = ip_info.get("operatingSystem", "Unknown")
         result["summary"]["repository"] = ip_info.get("repository", {}).get("name", "Unknown")
+        result["summary"]["first_seen"] = ip_info.get("firstSeen", "Unknown")
+        result["summary"]["last_seen"] = ip_info.get("lastSeen", "Unknown")
+        result["summary"]["acr_score"] = acr_score
+        result["summary"]["acr_source"] = acr_source
         
         # Query 2: Get vulnerability details for severity counts
         # Token cost: ~800, Cache: 180s
@@ -767,10 +789,11 @@ def tsc_profile_ip_efficient(
                 result["summary"]["services_count"] = len(services_data)
         
         # Query 6: Get asset group membership (if enabled)
-        # Token cost: ~300, Cache: 600s
+        # Token cost: ~400, Cache: 600s
         if include_asset_groups:
-            # Query via asset resource to find which asset groups contain this IP
-            asset_query = {
+            # Query to find asset groups containing this IP
+            # Use sumasset with group by asset to find group membership
+            asset_groups_query = {
                 "tool": "sumasset",
                 "type": "vuln",
                 "sourceType": "cumulative",
@@ -779,19 +802,34 @@ def tsc_profile_ip_efficient(
                     "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
                 }
             }
-            asset_result = tsc_analyze(asset_query)
+            asset_groups_result = tsc_analyze(asset_groups_query)
             
-            if asset_result.get("ok"):
-                asset_data = asset_result.get("response", {}).get("results", [])
-                if asset_data:
-                    # Note: Asset group membership may require additional query
-                    # For now, return asset criticality rating if available
-                    acr_score = ip_info.get("acrScore", "N/A")
-                    result["data"]["asset_info"] = {
-                        "acr_score": acr_score,
-                        "asset_exposure_score": ip_info.get("assetExposureScore", "N/A"),
-                    }
-                    result["summary"]["acr_score"] = acr_score
+            if asset_groups_result.get("ok"):
+                asset_data = asset_groups_result.get("response", {}).get("results", [])
+                asset_groups = []
+                
+                if asset_data and len(asset_data) > 0:
+                    # Extract asset group information from the results
+                    for asset in asset_data:
+                        if "asset" in asset:
+                            asset_info = asset.get("asset", {})
+                            if isinstance(asset_info, dict) and asset_info.get("name"):
+                                asset_groups.append({
+                                    "name": asset_info.get("name", "Unknown"),
+                                    "id": asset_info.get("id", "Unknown"),
+                                })
+                
+                result["data"]["asset_groups"] = {
+                    "count": len(asset_groups),
+                    "groups": asset_groups if asset_groups else []
+                }
+                result["summary"]["asset_groups_count"] = len(asset_groups)
+                
+                # Add AES (Asset Exposure Score) if available
+                if asset_data and len(asset_data) > 0:
+                    aes = asset_data[0].get("assetExposureScore", "N/A")
+                    result["data"]["asset_exposure_score"] = aes
+                    result["summary"]["asset_exposure_score"] = aes
         
         return result
     

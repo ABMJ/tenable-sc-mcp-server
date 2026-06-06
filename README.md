@@ -532,12 +532,17 @@ The MCP server **does not bypass Tenable.sc permissions**:
 
 ## Documentation
 
+- **🌟 Tools Documentation:** [docs/TOOLS.md](docs/TOOLS.md) - Complete guide to all MCP tools
+- **🧪 Tool 2 Test Queries:** [TOOL2_TEST_QUERIES.md](TOOL2_TEST_QUERIES.md) - 30+ example queries
+- **📊 Tool Implementations:** 
+  - [Tool 1: IP Profiling](src/tenable_sc_mcp/server.py#L548)
+  - [Tool 2: Vulnerability Listing](docs/TOOL2_IMPLEMENTATION.md)
 - **API Reference:** <https://docs.tenable.com/security-center/api/index.htm>
 - **Caching Guide:** [CACHING_DEEP_DIVE.md](CACHING_DEEP_DIVE.md)
+- **Roadmap:** [CONVENIENCE_TOOLS_ROADMAP.md](CONVENIENCE_TOOLS_ROADMAP.md) - 24 tools planned
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Security Policy:** [SECURITY.md](SECURITY.md)
 - **Support:** [SUPPORT.md](SUPPORT.md)
-- **Roadmap:** [docs/roadmap.md](docs/roadmap.md)
 
 ---
 
