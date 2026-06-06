@@ -252,8 +252,13 @@ def tsc_request(
             ttl = get_ttl_for_resource(resource_name)
             cache.set(cache_key, result, ttl)
         
-        # Invalidate cache on write operations
-        if cache and method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Invalidate cache on write operations (but NOT for /analysis - it's read-only despite using POST)
+        if cache and method in ("PUT", "PATCH", "DELETE"):
+            resource_name = path.strip("/").split("/")[0]
+            cache.delete_pattern(resource_name)
+        
+        # POST creates should also invalidate cache (except /analysis)
+        if cache and method == "POST" and not path.strip("/").startswith("analysis"):
             resource_name = path.strip("/").split("/")[0]
             cache.delete_pattern(resource_name)
         
