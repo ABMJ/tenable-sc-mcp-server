@@ -40,7 +40,7 @@ Get comprehensive profile for 10.1.20.10 including software, services, scan info
 
 ### Summary View (Efficient)
 ```
-List all critical vulnerabilities for IP 10.1.20.10 using Tenable.sc summary view
+List all critical vulnerabilities for IP 10.1.20.10 using Tenable.sc show me a summary of cache performance on tenable.sc and token utilization for each query
 ```
 
 **Expected Output:**
@@ -54,7 +54,7 @@ List all critical vulnerabilities for IP 10.1.20.10 using Tenable.sc summary vie
 
 ### Full Details View
 ```
-Show detailed vulnerabilities for 10.1.20.10 with severity high or critical, limit to 10 results
+Show detailed vulnerabilities for 10.1.20.10 with severity high or critical, limit to 10 results using Tenable.sc show me a summary of cache performance on tenable.sc and token utilization for each query
 ```
 
 **Expected Output:**
@@ -70,7 +70,7 @@ Show detailed vulnerabilities for 10.1.20.10 with severity high or critical, lim
 
 ### Filtered Search
 ```
-Find all vulnerabilities on 10.1.20.10 with available exploits
+Find all vulnerabilities on 10.1.20.10 with available exploits using Tenable.sc show me a summary of cache performance on tenable.sc and token utilization for each query
 ```
 
 **Expected Output:**
