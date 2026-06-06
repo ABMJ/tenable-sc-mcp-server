@@ -8,6 +8,7 @@ from tenable_sc_mcp.cache import (
     generate_cache_key,
     get_ttl_for_resource,
     get_ttl_for_analysis,
+    _normalize_query_for_cache,
     DEFAULT_TTL_SECONDS,
 )
 
@@ -264,3 +265,100 @@ def test_cache_thread_safety():
     
     # Should have no crashes and reasonable results
     assert len(results) > 0
+
+
+def test_normalize_query_for_cache():
+    """Test query normalization for cache key generation."""
+    # Test removing pagination parameters
+    query_with_pagination = {
+        "tool": "vulnipdetail",
+        "type": "vuln",
+        "startOffset": 0,
+        "endOffset": 500,
+        "filters": [{"field": "severity", "value": "critical"}]
+    }
+    
+    normalized = _normalize_query_for_cache(query_with_pagination)
+    
+    # Pagination params should be removed
+    assert "startOffset" not in normalized
+    assert "endOffset" not in normalized
+    # Other params should remain
+    assert normalized["tool"] == "vulnipdetail"
+    assert normalized["type"] == "vuln"
+    assert "filters" in normalized
+
+
+def test_normalize_query_removes_timestamps():
+    """Test that timestamp parameters are removed from normalized queries."""
+    query_with_timestamp = {
+        "tool": "sumip",
+        "timestamp": 1234567890,
+        "requestTimestamp": 1234567891,
+        "filters": []
+    }
+    
+    normalized = _normalize_query_for_cache(query_with_timestamp)
+    
+    assert "timestamp" not in normalized
+    assert "requestTimestamp" not in normalized
+    assert normalized["tool"] == "sumip"
+
+
+def test_normalize_query_nested_params():
+    """Test normalization of nested query parameters."""
+    query_nested = {
+        "query": {
+            "tool": "vulndetails",
+            "startOffset": 0,
+            "endOffset": 100,
+            "filters": []
+        },
+        "fields": ["ip", "port"]
+    }
+    
+    normalized = _normalize_query_for_cache(query_nested)
+    
+    # Nested startOffset/endOffset should be removed
+    assert "startOffset" not in normalized["query"]
+    assert "endOffset" not in normalized["query"]
+    # Other nested params should remain
+    assert normalized["query"]["tool"] == "vulndetails"
+    assert "fields" in normalized
+
+
+def test_cache_key_pagination_normalization():
+    """Test that queries with different pagination generate the same cache key."""
+    params1 = {
+        "query": {
+            "tool": "sumip",
+            "type": "vuln",
+            "startOffset": 0,
+            "endOffset": 500
+        }
+    }
+    
+    params2 = {
+        "query": {
+            "tool": "sumip",
+            "type": "vuln",
+            "startOffset": 500,
+            "endOffset": 1000
+        }
+    }
+    
+    params3 = {
+        "query": {
+            "tool": "sumip",
+            "type": "vuln",
+            "startOffset": 1000,
+            "endOffset": 1500
+        }
+    }
+    
+    key1 = generate_cache_key("analysis", params=params1)
+    key2 = generate_cache_key("analysis", params=params2)
+    key3 = generate_cache_key("analysis", params=params3)
+    
+    # All three should generate the SAME cache key (pagination normalized)
+    assert key1 == key2 == key3

@@ -440,6 +440,42 @@ DEFAULT_TTL_SECONDS = {
 }
 
 
+def _normalize_query_for_cache(params: dict[str, Any]) -> dict[str, Any]:
+    """Normalize query parameters for cache key generation.
+    
+    Removes pagination and volatile parameters that shouldn't affect caching.
+    This allows queries with different pagination to share the same cache entry.
+    
+    Args:
+        params: Query parameters to normalize
+        
+    Returns:
+        Normalized parameters dict
+    """
+    if not isinstance(params, dict):
+        return params
+    
+    # Parameters to exclude from cache key (pagination, timestamps, volatile data)
+    exclude_keys = {
+        'startOffset', 'endOffset',  # Pagination
+        'timestamp', 'requestTimestamp',  # Timestamps
+        'requestID', 'sessionID',  # Session identifiers
+    }
+    
+    normalized = {}
+    for key, value in params.items():
+        if key in exclude_keys:
+            continue
+        
+        # Recursively normalize nested dicts (like 'query' parameter)
+        if isinstance(value, dict):
+            normalized[key] = _normalize_query_for_cache(value)
+        else:
+            normalized[key] = value
+    
+    return normalized
+
+
 def generate_cache_key(
     resource: str,
     object_id: Optional[str] = None,
@@ -474,8 +510,10 @@ def generate_cache_key(
         parts.append(f"fields={','.join(sorted(fields))}")
 
     if params:
-        # Hash params for deterministic key
-        param_str = json.dumps(params, sort_keys=True)
+        # Normalize params before hashing (remove pagination, timestamps)
+        normalized_params = _normalize_query_for_cache(params)
+        # Hash normalized params for deterministic key
+        param_str = json.dumps(normalized_params, sort_keys=True)
         param_hash = hashlib.md5(param_str.encode()).hexdigest()[:8]
         parts.append(f"params={param_hash}")
 
