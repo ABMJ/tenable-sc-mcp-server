@@ -75,8 +75,11 @@ These are **optimized for AI assistants** with massive token savings, intelligen
 - ✅ Last scan metadata (credentialed, duration, policy)
 - ✅ Installed software (top 50)
 - ✅ Running services (top 50)
-- ✅ Asset groups membership
-- ✅ ACR score (source: Tenable vs Manual)
+- ✅ Asset groups membership (with group names and IDs)
+- ✅ ACR (Asset Criticality Rating) with source detection:
+  - Score value (0-10 scale)
+  - Source: "Tenable Provided" or "Manually Adjusted"
+  - Details: Shows original Tenable score if manually adjusted
 - ✅ Asset Exposure Score (AES)
 - ✅ First/Last seen timestamps
 
@@ -113,6 +116,8 @@ profile = tsc_profile_ip_efficient(
     "last_seen": "1680000000",
     "acr_score": "8",
     "acr_source": "Manually Adjusted",
+    "acr_details": "Current: 8, Original Tenable: 4",
+    "asset_exposure_score": "742",
     "last_scan": "2026-06-06T10:30:00Z",
     "credentialed": "yes",
     "vulnerabilities": {
@@ -124,19 +129,46 @@ profile = tsc_profile_ip_efficient(
     },
     "software_count": 142,
     "services_count": 18,
-    "asset_groups_count": 3,
-    "asset_exposure_score": "742"
+    "asset_groups_count": 3
   },
   "data": {
-    "basic_info": { ... },
+    "basic_info": {
+      "ip": "10.1.20.10",
+      "dns_name": "webserver01.domain.com",
+      "operating_system": "Windows Server 2019",
+      "first_seen": "1640000000",
+      "last_seen": "1680000000",
+      "acr_score": "8",
+      "acr_source": "Manually Adjusted",
+      "acr_details": "Current: 8, Original Tenable: 4",
+      "tenable_acr": "4",
+      ...
+    },
     "vulnerabilities": { ... },
     "last_scan": { ... },
     "software": { ... },
     "services": { ... },
-    "asset_groups": { ... }
+    "asset_groups": {
+      "count": 3,
+      "groups": [
+        {"name": "Production Servers", "id": "12"},
+        {"name": "Web Tier", "id": "45"},
+        {"name": "PCI Assets", "id": "78"}
+      ]
+    }
   }
 }
 ```
+
+**ACR (Asset Criticality Rating) Fields Explained**:
+- `acr_score`: Current ACR value (0-10 scale)
+- `acr_source`: 
+  - **"Tenable Provided"** = Automatically calculated by Tenable based on vulnerability exposure
+  - **"Manually Adjusted"** = Overridden by security team (usually for critical business assets)
+- `acr_details`: Human-readable explanation
+  - Tenable Provided: `"Tenable Calculated: 4"`
+  - Manually Adjusted: `"Current: 8, Original Tenable: 4"` (shows both current and original)
+- `tenable_acr`: Original Tenable-calculated score (useful when manually adjusted)
 
 **Pro Tips**:
 - 🚀 Start here for any IP investigation
