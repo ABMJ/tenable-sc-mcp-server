@@ -609,21 +609,26 @@ def tsc_profile_ip_efficient(
         # Query 1: Get basic IP info + vulnerability summary (sumip tool)
         # Token cost: ~500, Cache: 300s
         basic_query = {
-            "tool": "sumip",
             "type": "vuln",
-            "sourceType": "cumulative",
             "query": {
+                "type": "vuln",
                 "tool": "sumip",
                 "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
-            }
+            },
+            "sourceType": "cumulative"
         }
         basic_result = tsc_analyze(basic_query)
         
         if not basic_result.get("ok"):
             return basic_result
         
-        # Extract basic info
-        basic_data = basic_result.get("response", {}).get("results", [])
+        # Extract basic info - response is nested: result['response']['response']['results']
+        api_response = basic_result.get("response", {})
+        if isinstance(api_response, dict) and "response" in api_response:
+            basic_data = api_response.get("response", {}).get("results", [])
+        else:
+            basic_data = api_response.get("results", [])
+            
         if not basic_data:
             return {
                 "ok": False,
@@ -676,18 +681,22 @@ def tsc_profile_ip_efficient(
         # Query 2: Get vulnerability details for severity counts
         # Token cost: ~800, Cache: 180s
         vuln_query = {
-            "tool": "vulnipsummary",
             "type": "vuln",
-            "sourceType": "cumulative",
             "query": {
+                "type": "vuln",
                 "tool": "vulnipsummary",
                 "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
-            }
+            },
+            "sourceType": "cumulative"
         }
         vuln_result = tsc_analyze(vuln_query)
         
         if vuln_result.get("ok"):
-            vuln_data = vuln_result.get("response", {}).get("results", [])
+            api_response = vuln_result.get("response", {})
+            if isinstance(api_response, dict) and "response" in api_response:
+                vuln_data = api_response.get("response", {}).get("results", [])
+            else:
+                vuln_data = api_response.get("results", [])
             if vuln_data:
                 vuln_summary = format_vulnerability_summary(vuln_data)
                 result["data"]["vulnerabilities"] = vuln_summary
@@ -697,16 +706,16 @@ def tsc_profile_ip_efficient(
         # Token cost: ~400, Cache: 180s
         if include_scan_info:
             scan_info_query = {
-                "tool": "vulndetails",
                 "type": "vuln",
-                "sourceType": "cumulative",
                 "query": {
+                    "type": "vuln",
                     "tool": "vulndetails",
                     "filters": [
                         {"filterName": "ip", "operator": "=", "value": ip},
                         {"filterName": "pluginID", "operator": "=", "value": "19506"}
                     ]
                 },
+                "sourceType": "cumulative",
                 "sortField": "lastSeen",
                 "sortDir": "DESC",
                 "startOffset": 0,
@@ -715,7 +724,11 @@ def tsc_profile_ip_efficient(
             scan_info_result = tsc_analyze(scan_info_query)
             
             if scan_info_result.get("ok"):
-                scan_data = scan_info_result.get("response", {}).get("results", [])
+                api_response = scan_info_result.get("response", {})
+                if isinstance(api_response, dict) and "response" in api_response:
+                    scan_data = api_response.get("response", {}).get("results", [])
+                else:
+                    scan_data = api_response.get("results", [])
                 if scan_data:
                     plugin_text = scan_data[0].get("pluginText", "")
                     scan_metadata = parse_plugin_19506_output(plugin_text)
@@ -735,20 +748,24 @@ def tsc_profile_ip_efficient(
         # Token cost: ~500, Cache: 300s
         if include_software:
             software_query = {
-                "tool": "listsoftware",
                 "type": "vuln",
-                "sourceType": "cumulative",
                 "query": {
+                    "type": "vuln",
                     "tool": "listsoftware",
                     "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
                 },
+                "sourceType": "cumulative",
                 "startOffset": 0,
                 "endOffset": 50  # Limit to first 50 software packages
             }
             software_result = tsc_analyze(software_query)
             
             if software_result.get("ok"):
-                software_data = software_result.get("response", {}).get("results", [])
+                api_response = software_result.get("response", {})
+                if isinstance(api_response, dict) and "response" in api_response:
+                    software_data = api_response.get("response", {}).get("results", [])
+                else:
+                    software_data = api_response.get("results", [])
                 result["data"]["software"] = {
                     "count": len(software_data),
                     "items": [
@@ -765,20 +782,24 @@ def tsc_profile_ip_efficient(
         # Token cost: ~500, Cache: 300s
         if include_services:
             services_query = {
-                "tool": "listservices",
                 "type": "vuln",
-                "sourceType": "cumulative",
                 "query": {
+                    "type": "vuln",
                     "tool": "listservices",
                     "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
                 },
+                "sourceType": "cumulative",
                 "startOffset": 0,
                 "endOffset": 50  # Limit to first 50 services
             }
             services_result = tsc_analyze(services_query)
             
             if services_result.get("ok"):
-                services_data = services_result.get("response", {}).get("results", [])
+                api_response = services_result.get("response", {})
+                if isinstance(api_response, dict) and "response" in api_response:
+                    services_data = api_response.get("response", {}).get("results", [])
+                else:
+                    services_data = api_response.get("results", [])
                 result["data"]["services"] = {
                     "count": len(services_data),
                     "items": [
@@ -798,18 +819,22 @@ def tsc_profile_ip_efficient(
             # Query to find asset groups containing this IP
             # Use sumasset with group by asset to find group membership
             asset_groups_query = {
-                "tool": "sumasset",
                 "type": "vuln",
-                "sourceType": "cumulative",
                 "query": {
+                    "type": "vuln",
                     "tool": "sumasset",
                     "filters": [{"filterName": "ip", "operator": "=", "value": ip}]
-                }
+                },
+                "sourceType": "cumulative"
             }
             asset_groups_result = tsc_analyze(asset_groups_query)
             
             if asset_groups_result.get("ok"):
-                asset_data = asset_groups_result.get("response", {}).get("results", [])
+                api_response = asset_groups_result.get("response", {})
+                if isinstance(api_response, dict) and "response" in api_response:
+                    asset_data = api_response.get("response", {}).get("results", [])
+                else:
+                    asset_data = api_response.get("results", [])
                 asset_groups = []
                 
                 if asset_data and len(asset_data) > 0:
@@ -931,13 +956,13 @@ def tsc_list_vulns_by_ip_summary(
         
         # Query using vulnipsummary tool (efficient aggregation)
         query = {
-            "tool": "vulnipsummary",
             "type": "vuln",
-            "sourceType": "cumulative",
             "query": {
+                "type": "vuln",
                 "tool": "vulnipsummary",
                 "filters": filters
-            }
+            },
+            "sourceType": "cumulative"
         }
         
         result = tsc_analyze(query)
@@ -945,8 +970,12 @@ def tsc_list_vulns_by_ip_summary(
         if not result.get("ok"):
             return result
         
-        # Format summary
-        vuln_data = result.get("response", {}).get("results", [])
+        # Format summary - handle nested response
+        api_response = result.get("response", {})
+        if isinstance(api_response, dict) and "response" in api_response:
+            vuln_data = api_response.get("response", {}).get("results", [])
+        else:
+            vuln_data = api_response.get("results", [])
         summary = format_vulnerability_summary(vuln_data)
         
         return {
@@ -1113,13 +1142,13 @@ def tsc_list_vulns_by_ip_full(
         
         # Query using vulnipdetail tool (full details)
         query = {
-            "tool": "vulnipdetail",
             "type": "vuln",
-            "sourceType": "cumulative",
             "query": {
+                "type": "vuln",
                 "tool": "vulnipdetail",
                 "filters": filters
             },
+            "sourceType": "cumulative",
             "sortField": "severity",
             "sortDir": "DESC",
             "startOffset": start_offset,
@@ -1131,9 +1160,13 @@ def tsc_list_vulns_by_ip_full(
         if not result.get("ok"):
             return result
         
-        # Extract vulnerability data
-        response = result.get("response", {})
-        vuln_data = response.get("results", [])
+        # Extract vulnerability data - handle nested response
+        api_response = result.get("response", {})
+        if isinstance(api_response, dict) and "response" in api_response:
+            inner_response = api_response.get("response", {})
+            vuln_data = inner_response.get("results", [])
+        else:
+            vuln_data = api_response.get("results", [])
         
         # Format vulnerabilities for cleaner output
         formatted_vulns = []
