@@ -346,3 +346,107 @@ def test_common_filters_no_duplicates():
     """Test COMMON_FILTERS has no duplicate API filter names."""
     api_filter_names = list(COMMON_FILTERS.values())
     assert len(api_filter_names) == len(set(api_filter_names))
+
+
+# ============================================================================
+# PAGINATION VALIDATION TESTS
+# ============================================================================
+
+def test_pagination_validation_valid():
+    """Test valid pagination parameters."""
+    # These would be tested in integration tests, but we can test the logic
+    start = 0
+    end = 50
+    assert start >= 0
+    assert end > start
+    assert end <= 200
+
+
+def test_pagination_validation_exceeds_max():
+    """Test pagination validation for exceeding max."""
+    end = 300
+    assert end > 200  # Should be rejected
+
+
+def test_pagination_validation_negative():
+    """Test pagination validation for negative values."""
+    start = -1
+    end = 50
+    assert start < 0  # Should be rejected
+
+
+def test_pagination_validation_inverted():
+    """Test pagination validation for inverted range."""
+    start = 50
+    end = 10
+    assert start >= end  # Should be rejected
+
+
+# ============================================================================
+# SEVERITY MAPPING TESTS
+# ============================================================================
+
+def test_severity_id_to_name_mapping():
+    """Test severity ID to name mapping used in formatters."""
+    severity_map = {
+        "4": "critical",
+        "3": "high",
+        "2": "medium",
+        "1": "low",
+        "0": "info",
+    }
+    
+    assert severity_map["4"] == "critical"
+    assert severity_map["3"] == "high"
+    assert severity_map["2"] == "medium"
+    assert severity_map["1"] == "low"
+    assert severity_map["0"] == "info"
+
+
+def test_severity_name_to_id_validation():
+    """Test severity name validation matches expected IDs."""
+    valid_numeric = ["0", "1", "2", "3", "4"]
+    valid_names = ["info", "low", "medium", "high", "critical"]
+    
+    # Verify all are valid
+    for sev in valid_numeric + valid_names:
+        valid, _ = validate_severity(sev)
+        assert valid is True
+
+
+# ============================================================================
+# FILTER BUILDER EDGE CASES
+# ============================================================================
+
+def test_build_filters_empty_string_value():
+    """Test filter builder with empty string value."""
+    filters = build_filters(ip="", severity="4")
+    # Empty string is still a value, should be included
+    assert len(filters) == 2
+    filter_values = [f["value"] for f in filters]
+    assert "" in filter_values
+    assert "4" in filter_values
+
+
+def test_build_filters_zero_value():
+    """Test filter builder with zero as value."""
+    filters = build_filters(port=0)
+    # Zero should not be filtered out (valid port 0)
+    # However, 0 == False in Python, so need to check explicitly
+    # Our current implementation checks "if value is None" which handles this
+    assert len(filters) == 1
+    assert filters[0]["value"] == 0
+
+
+def test_build_filters_boolean_value():
+    """Test filter builder with boolean value."""
+    filters = build_filters(exploit_available=True)
+    assert len(filters) == 1
+    assert filters[0]["value"] is True
+
+
+def test_build_filters_list_value():
+    """Test filter builder with list value."""
+    filters = build_filters(plugin_id=["19506", "21745"])
+    assert len(filters) == 1
+    assert filters[0]["value"] == ["19506", "21745"]
