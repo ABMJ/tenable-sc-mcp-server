@@ -21,6 +21,19 @@ Production-ready MCP server for Tenable Security Center Plus with intelligent ca
 
 Create a `.env` file in the project directory with your Tenable.sc credentials and Docker settings:
 
+**Option 1: Copy from template (Recommended)**
+```bash
+# Navigate to project directory
+cd tenable-sc-mcp-server
+
+# Copy the example file
+cp .env.example .env
+
+# Edit with your actual credentials
+nano .env  # or use your preferred editor
+```
+
+**Option 2: Create from scratch**
 ```bash
 # Navigate to project directory
 cd tenable-sc-mcp-server
@@ -45,8 +58,8 @@ TSC_CACHE_REDIS_PORT=6379
 EOF
 
 # Set your user IDs automatically
-echo "LOCAL_UID=$(id -u)" >> .env
-echo "LOCAL_GID=$(id -g)" >> .env
+sed -i "s/LOCAL_UID=1000/LOCAL_UID=$(id -u)/" .env
+sed -i "s/LOCAL_GID=1000/LOCAL_GID=$(id -g)/" .env
 ```
 
 **Important:** Replace `your-sc-server.com`, `your-access-key`, and `your-secret-key` with your actual Tenable.sc credentials.
