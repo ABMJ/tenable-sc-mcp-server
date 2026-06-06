@@ -590,3 +590,14 @@ docker-compose ps
 ```
 
 > **Note:** Use `docker compose` if you have Docker Compose v2 plugin.
+
+## Docker Compose Configuration
+
+To avoid warnings about `LOCAL_UID` and `LOCAL_GID`, create a `.env` file in the project root:
+
+```bash
+echo "LOCAL_UID=$(id -u)
+LOCAL_GID=$(id -g)" > .env
+```
+
+This ensures the container runs as your user instead of root, maintaining proper file permissions.
