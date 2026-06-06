@@ -25,13 +25,17 @@ services:
         condition: service_healthy
     ports:
       - "0.0.0.0:8000:8000"
-    volumes:
-      - ${HOME}/.tenable-sc-mcp.env:/config/tsc.env:ro
     environment:
-      # Cache configuration (override with .env file)
-      - TSC_CACHE_BACKEND=redis
-      - TSC_CACHE_REDIS_HOST=redis
-      - TSC_CACHE_REDIS_PORT=6379
+      # Tenable.sc credentials from .env file
+      - TSC_URL=${TSC_URL}
+      - TSC_ACCESS_KEY=${TSC_ACCESS_KEY}
+      - TSC_SECRET_KEY=${TSC_SECRET_KEY}
+      - TSC_VERIFY_SSL=${TSC_VERIFY_SSL:-true}
+      # Cache configuration from .env file
+      - TSC_CACHE_ENABLED=${TSC_CACHE_ENABLED:-true}
+      - TSC_CACHE_BACKEND=${TSC_CACHE_BACKEND:-redis}
+      - TSC_CACHE_REDIS_HOST=${TSC_CACHE_REDIS_HOST:-redis}
+      - TSC_CACHE_REDIS_PORT=${TSC_CACHE_REDIS_PORT:-6379}
     command:
       - --transport
       - streamable-http
@@ -39,8 +43,6 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
-      - --env-file
-      - /config/tsc.env
       - --allow-remote-hosts
 
 volumes:

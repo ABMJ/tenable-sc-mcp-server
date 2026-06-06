@@ -660,8 +660,7 @@ def tsc_profile_ip_efficient(
             "operating_system": ip_info.get("operatingSystem", ""),
             "repository": ip_info.get("repository", {}),
             "uuid": ip_info.get("uuid", ""),
-            "first_seen": ip_info.get("firstSeen", "Unknown"),
-            "last_seen": ip_info.get("lastSeen", "Unknown"),
+            "last_auth_scan": ip_info.get("lastAuthRun", "Unknown"),
             "acr_score": acr_score,
             "acr_source": acr_source,
             "acr_details": acr_details,
@@ -672,8 +671,7 @@ def tsc_profile_ip_efficient(
         result["summary"]["hostname"] = ip_info.get("dnsName") or ip_info.get("netbiosName") or ip
         result["summary"]["os"] = ip_info.get("operatingSystem", "Unknown")
         result["summary"]["repository"] = ip_info.get("repository", {}).get("name", "Unknown")
-        result["summary"]["first_seen"] = ip_info.get("firstSeen", "Unknown")
-        result["summary"]["last_seen"] = ip_info.get("lastSeen", "Unknown")
+        result["summary"]["last_auth_scan"] = ip_info.get("lastAuthRun", "Unknown")
         result["summary"]["acr_score"] = acr_score
         result["summary"]["acr_source"] = acr_source
         result["summary"]["acr_details"] = acr_details

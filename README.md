@@ -15,22 +15,52 @@ Production-ready MCP server for Tenable Security Center Plus with intelligent ca
 
 ## Quick Start (Docker Compose)
 
-**Deploy in 3 commands** - Copy, paste, and run:
+**Deploy in 2 steps** - Configure and run:
+
+### Step 1: Create Configuration
+
+Create a `.env` file in the project directory with your Tenable.sc credentials and Docker settings:
 
 ```bash
-# 1. Create configuration file
-cat > ~/.tenable-sc-mcp.env <<'EOF'
+# Navigate to project directory
+cd tenable-sc-mcp-server
+
+# Create .env file
+cat > .env <<'EOF'
+# Docker Compose Configuration
+LOCAL_UID=1000
+LOCAL_GID=1000
+
+# Tenable Security Center Configuration
 TSC_URL=https://your-sc-server.com
 TSC_ACCESS_KEY=your-access-key
 TSC_SECRET_KEY=your-secret-key
 TSC_VERIFY_SSL=true
+
+# Cache Configuration (Redis)
+TSC_CACHE_ENABLED=true
+TSC_CACHE_BACKEND=redis
+TSC_CACHE_REDIS_HOST=redis
+TSC_CACHE_REDIS_PORT=6379
 EOF
 
-# 2. Build and start containers (MCP server + Redis cache)
+# Set your user IDs automatically
+echo "LOCAL_UID=$(id -u)" >> .env
+echo "LOCAL_GID=$(id -g)" >> .env
+```
+
+**Important:** Replace `your-sc-server.com`, `your-access-key`, and `your-secret-key` with your actual Tenable.sc credentials.
+
+### Step 2: Build and Start
+
+```bash
+# Build the image
 docker build -t tenable-sc-mcp:latest .
+
+# Start both containers (MCP server + Redis cache)
 docker-compose up -d
 
-# 3. Verify containers are running
+# Verify containers are running
 docker ps --filter "name=tenable-sc-mcp"
 ```
 
@@ -581,23 +611,3 @@ TSC_ACCESS_KEY=your-access-key
 TSC_SECRET_KEY=your-secret-key
 TSC_VERIFY_SSL=true
 EOF
-
-docker build -t tenable-sc-mcp:latest .
-docker-compose up -d
-docker-compose ps
-
-# Your MCP endpoint: http://<your-ip>:8000/mcp
-```
-
-> **Note:** Use `docker compose` if you have Docker Compose v2 plugin.
-
-## Docker Compose Configuration
-
-To avoid warnings about `LOCAL_UID` and `LOCAL_GID`, create a `.env` file in the project root:
-
-```bash
-echo "LOCAL_UID=$(id -u)
-LOCAL_GID=$(id -g)" > .env
-```
-
-This ensures the container runs as your user instead of root, maintaining proper file permissions.
