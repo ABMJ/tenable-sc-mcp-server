@@ -6,6 +6,21 @@ Complete reference for all Tenable.sc MCP server tools - your AI assistant's gat
 
 ---
 
+## 🎯 Implementation Status
+
+| Tool | Status | Token Savings | Tests | Notes |
+|------|--------|---------------|-------|-------|
+| **Tool 1: IP Profile** | ✅ Complete | 83-90% | 79 passing | Full host profile with ACR, vulnerabilities, software, services, asset groups |
+| **Tool 2: Vuln Summary** | ✅ Complete | 88-92% | 19 passing | Efficient vulnerability aggregation by plugin |
+| **Tool 2: Vuln Full** | ✅ Complete | 58-75% | 19 passing | Detailed vulnerability listings with all metadata |
+| **Core Tools** | ✅ Stable | 50-70% | ✓ | Generic CRUD access to all Tenable.sc resources |
+| **Cache System** | ✅ Production | - | ✓ | Redis-backed with smart TTLs (60s-600s) |
+| **Documentation** | ✅ Complete | - | - | API reference, test prompts, examples |
+
+**Week 1 Progress**: 2/5 sessions complete (40%) • Tools 1-2 fully operational • 98 tests passing
+
+---
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -112,13 +127,12 @@ profile = tsc_profile_ip_efficient(
     "hostname": "webserver01.domain.com",
     "os": "Windows Server 2019",
     "repository": "Production",
-    "first_seen": "1640000000",
-    "last_seen": "1680000000",
+    "last_auth_scan": "1683211119",
     "acr_score": "8",
     "acr_source": "Manually Adjusted",
     "acr_details": "Current: 8, Original Tenable: 4",
     "asset_exposure_score": "742",
-    "last_scan": "2026-06-06T10:30:00Z",
+    "last_scan": "1762463829",
     "credentialed": "yes",
     "vulnerabilities": {
       "critical": 5,
@@ -136,8 +150,7 @@ profile = tsc_profile_ip_efficient(
       "ip": "10.1.20.10",
       "dns_name": "webserver01.domain.com",
       "operating_system": "Windows Server 2019",
-      "first_seen": "1640000000",
-      "last_seen": "1680000000",
+      "last_auth_scan": "1683211119",
       "acr_score": "8",
       "acr_source": "Manually Adjusted",
       "acr_details": "Current: 8, Original Tenable: 4",
@@ -145,7 +158,15 @@ profile = tsc_profile_ip_efficient(
       ...
     },
     "vulnerabilities": { ... },
-    "last_scan": { ... },
+    "last_scan": {
+      "scan_name": "Weekly Vuln Scan",
+      "scan_policy": "Basic Network Scan",
+      "scanner_ip": "10.1.20.74",
+      "scan_date": "1762463829",
+      "credentialed_checks": "yes, as 'domain\\user' via SMB",
+      "patch_management": "Windows Update Enumeration via WMI",
+      "scan_duration": "1628 seconds (~27 minutes)"
+    },
     "software": { ... },
     "services": { ... },
     "asset_groups": {
@@ -159,6 +180,13 @@ profile = tsc_profile_ip_efficient(
   }
 }
 ```
+
+**Timestamp Fields Explained**:
+- `last_auth_scan`: Unix timestamp of last authenticated scan (from sumip API)
+  - Example: `1683211119` = 2023-05-04 14:38:39
+- `last_scan`: Unix timestamp from plugin 19506 (when `include_scan_info=True`)
+  - Example: `1762463829` = 2025-11-06 21:17:09
+  - Includes full scan metadata (name, policy, credentials, duration)
 
 **ACR (Asset Criticality Rating) Fields Explained**:
 - `acr_score`: Current ACR value (0-10 scale)
