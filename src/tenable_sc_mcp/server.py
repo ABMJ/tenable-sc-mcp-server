@@ -385,8 +385,36 @@ def tsc_analyze(
     fields: list[str] | None = None,
     timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """Runs a Tenable.sc analysis query via POST /analysis."""
-    return tsc_request("POST", "/analysis", body=query, fields=fields, timeout_seconds=timeout_seconds)
+    """Runs a Tenable.sc analysis query via POST /analysis.
+    
+    Analysis queries are read-only operations that use POST for complex query parameters.
+    They are cached to improve performance and reduce token usage.
+    """
+    # Check cache first (analysis queries are read-only despite using POST)
+    cache = _get_cache()
+    cache_key = None
+    if cache:
+        # Generate deterministic cache key from query body
+        cache_key = generate_cache_key(
+            "analysis",
+            params={
+                "query": query,  # Cache handles JSON serialization with sort_keys=True
+                "fields": fields,
+            },
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+    
+    # Call API if not cached
+    result = tsc_request("POST", "/analysis", body=query, fields=fields, timeout_seconds=timeout_seconds)
+    
+    # Cache successful responses
+    if cache and cache_key and result.get("ok"):
+        ttl = get_ttl_for_resource("analysis")
+        cache.set(cache_key, result, ttl)
+    
+    return result
 
 
 @mcp.tool()
