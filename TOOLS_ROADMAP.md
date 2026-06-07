@@ -1,15 +1,15 @@
 # Tenable.sc Convenience Tools - Roadmap & User Guide
 
-**Status**: Week 1 - 50% Complete (3 tools operational, 22 remaining)  
-**Last Updated**: 2026-06-06 (Session 4)
+**Status**: Week 1 - Session 1.4 Complete (3 tools operational, modular architecture implemented)  
+**Last Updated**: 2026-06-07 (Session 1.4 - Refactoring Complete)
 
 ---
 
 ## 🎯 Quick Status
 
-**Completed**: 3/25 tools (12%)  
-**Current Phase**: Week 1 Session 1.3 (Bug Fix) - Complete  
-**Next Session**: Week 1 Session 1.4 - Implement `tsc_list_ips`
+**Completed**: 3/25 tools (12%) + Modular Architecture  
+**Current Phase**: Week 1 Session 1.4 (Refactoring) - ✅ Complete  
+**Next Session**: Week 1 Session 1.5 - Implement Tool 4 (`tsc_list_ips`) in `tools/asset_discovery.py`
 
 **Validated Performance:**
 - Cache hit rate: 57%+ achieved
