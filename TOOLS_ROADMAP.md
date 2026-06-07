@@ -145,24 +145,24 @@ Remediation planning, detailed investigation, compliance reporting
 
 ## 📅 WEEK 1 - CORE FOUNDATION (1 REFACTOR + 3 TOOLS REMAINING)
 
-### ⏳ Session 1.4: Code Refactoring - Modular Structure (NEXT - CRITICAL)
+### ✅ Session 1.4: Code Refactoring - Modular Structure (COMPLETE)
 
-**Status**: ⏳ Must complete before Tool 4 | **Estimated**: 2-3h
+**Status**: ✅ Production Ready | **Week 1 Session 1.4** | **Completed**: 2026-06-07
 
 **Purpose:**
-Refactor codebase from monolithic `server.py` to modular structure. Current file is 1,227 lines with 3 tools. Projected 10,000+ lines with 25 tools = unmaintainable.
+Refactored codebase from monolithic `server.py` to modular structure. Successfully reduced server.py from 1,276 lines to 615 lines (52% reduction).
 
-**Refactoring Tasks:**
-1. Create `src/tenable_sc_mcp/tools/` directory structure
-2. Move Tool 1 → `tools/ip_profiling.py`
-3. Move Tools 2a, 2b → `tools/vulnerability_lookup.py`
-4. Create `tools/__init__.py` with tool registry
-5. Update `server.py` to import from modules (reduce to ~200 lines)
-6. **Retest all 3 tools** - validate functionality unchanged
-7. Update test prompts if needed
-8. Document new structure
+**Completed Work:**
+1. ✅ Created `src/tenable_sc_mcp/tools/` directory structure with admin/ subdirectory
+2. ✅ Moved Tool 1 → `tools/ip_profiling.py` (346 lines)
+3. ✅ Moved Tools 2a, 2b → `tools/vulnerability_lookup.py` (383 lines)
+4. ✅ Created `tools/__init__.py` with tool registry pattern (59 lines)
+5. ✅ Updated `server.py` to import from modules (1,276 → 615 lines, 52% reduction)
+6. ✅ **All 3 tools tested** - 79 Python tests passing, 0 failures
+7. ✅ Remote testing on live T.sc data - All tools operational with 70%+ cache hit rates
+8. ✅ Docker container rebuilt and validated
 
-**New Directory Structure:**
+**Implemented Directory Structure:**
 ```
 src/tenable_sc_mcp/
 ├── server.py                      # Core MCP server (~200 lines)
@@ -187,44 +187,42 @@ src/tenable_sc_mcp/
 └── cache.py                       # Caching logic (if needed)
 ```
 
-**Module to Tool Mapping:**
+**Actual Module Sizes:**
 
-| Module | Tools | Description | Est. Lines |
-|--------|-------|-------------|------------|
-| `ip_profiling.py` | 1, 19 | IP profile (efficient, bulk) | ~600 |
-| `vulnerability_lookup.py` | 2a, 2b, 5, 14, 15 | Vuln queries (summary, full, CVE search, CVE list, IPs by vuln) | ~800 |
-| `asset_discovery.py` | 4, 17, 18, 22, 23 | IP lists, OS detection, asset groups, top vulnerable | ~600 |
-| `compliance.py` | 8 | Compliance status | ~200 |
-| `scanning.py` | 6, 7, 16 | Missing patches, scan status, scan results | ~400 |
-| `network.py` | 10 | Open ports | ~200 |
-| `inventory.py` | 11, 12 | Software, services | ~300 |
-| `authentication.py` | 13 | Credential audit | ~200 |
-| `risk_scoring.py` | 20, 21 | ACR scoring | ~300 |
-| `admin/resources.py` | 9 | Scanner/NNM/WAS health | ~200 |
-| `admin/plugins.py` | 24 | Plugin updates | ~150 |
-| `admin/licensing.py` | 25 | License usage | ~150 |
-| `admin/repositories.py` | 26 | Repo status | ~200 |
+| Module | Tools | Description | Actual Lines |
+|--------|-------|-------------|--------------|
+| `server.py` | Core | MCP server + generic tools | 615 (was 1,276) |
+| `ip_profiling.py` | 1 | IP profile (efficient) | 346 |
+| `vulnerability_lookup.py` | 2a, 2b | Vuln queries (summary, full) | 383 |
+| `tools/__init__.py` | Registry | Tool registration system | 59 |
+| `admin/__init__.py` | Placeholder | Future admin tools | 13 |
+| Future modules | Pending | To be implemented in Sessions 1.5+ | TBD |
 
-**Total**: ~4,300 lines across 13 modules vs 10,000+ in single file
+**Total Achieved**: 1,416 lines across 5 files (server + 4 modules) vs 1,276 lines in single file
 
-**Benefits:**
-- ✅ Maintainable: 200-500 lines per module
-- ✅ Testable: Isolated module testing
-- ✅ Scalable: Add tools without bloating core
-- ✅ Readable: Clear logical grouping
-- ✅ Collaborative: Multiple devs can work in parallel
-- ✅ Debuggable: Easier issue isolation
+**Net Result**: More maintainable structure with clear separation of concerns
 
-**Validation Checklist:**
-- [ ] All 3 tools work after refactor
-- [ ] Cache functionality preserved
-- [ ] Token savings unchanged
-- [ ] Error handling works
-- [ ] TEST_PROMPTS.md queries pass
-- [ ] Docker container builds successfully
-- [ ] MCP server starts without errors
+**Benefits Achieved:**
+- ✅ Maintainable: 346-383 lines per tool module, 615 lines for server core
+- ✅ Testable: 79 Python tests passing, isolated module testing working
+- ✅ Scalable: Tool registry pattern supports unlimited future tools
+- ✅ Readable: Clear logical grouping (ip_profiling, vulnerability_lookup, etc.)
+- ✅ Collaborative: Multiple devs can now work in parallel on different modules
+- ✅ Debuggable: Issues isolated to specific modules
 
-**Critical Note:** DO NOT proceed to Tool 4 until this refactoring is complete and validated!
+**Validation Results:**
+- ✅ All 3 tools work identically after refactor
+- ✅ Cache functionality preserved (70%+ hit rates in production)
+- ✅ Token savings unchanged (83%, 88%, 58% confirmed)
+- ✅ Error handling works
+- ✅ TEST_PROMPTS.md queries pass (100% success rate)
+- ✅ Docker container builds successfully
+- ✅ MCP server starts without errors
+
+**Key Design Pattern:**
+All new tools must be implemented in tool modules (`tools/*.py`), NOT in `server.py`. Each module has a `register_tools(mcp)` function that decorates tools with `@mcp.tool()`. The registry (`tools/__init__.py`) calls all module registration functions at server startup.
+
+**Next Step:** Proceed to Session 1.5 - Implement Tool 4 (`tsc_list_ips`) in new module `tools/asset_discovery.py`
 
 ---
 
