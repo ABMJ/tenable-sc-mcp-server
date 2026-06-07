@@ -21,23 +21,6 @@ use tenable-sc to profile IP 10.1.20.10 efficiently, then show me cache stats an
 
 ---
 
-### Full Profile with All Details
-```
-use tenable-sc to get comprehensive profile for 10.1.20.10 including software, services, scan info, and asset groups, then show me cache stats
-```
-
-**Expected Output:**
-- Basic host info + vulnerabilities
-- Top 50 installed software packages
-- Running services (ports/protocols)
-- Last scan details (policy, scanner, credentials)
-- Asset group membership
-- Cache performance metrics
-
-**Token Efficiency:** ~5,000 tokens (vs ~30,000 raw API) = 83% reduction
-
----
-
 ## Tool 2: Vulnerability Lists (tsc_list_vulns_by_ip)
 
 ### Summary View (Efficient)
