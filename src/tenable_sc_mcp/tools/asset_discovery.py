@@ -218,35 +218,10 @@ def register_tools(mcp):
                 })
             
             # Add additional filters from parameters
-            # Special handling for asset_criticality - API requires range format
-            acr_filter_value = asset_criticality
-            if asset_criticality:
-                # Convert comparison operators to ranges
-                import re
-                # Match patterns like ">7", ">=8", "<5", "<=4", "=7"
-                match = re.match(r'^([><=]+)\s*(\d+(?:\.\d+)?)$', asset_criticality.strip())
-                if match:
-                    operator = match.group(1)
-                    threshold = float(match.group(2))
-                    
-                    # Convert to Tenable.sc range format (0-10 scale)
-                    if operator == '>':
-                        # >7 means "greater than 7" = 7.1-10 (excludes 7, includes 7.1+)
-                        acr_filter_value = f"{threshold+0.1:.1f}-10"
-                    elif operator == '>=':
-                        acr_filter_value = f"{threshold:.1f}-10"
-                    elif operator == '<':
-                        # <5 means "less than 5" = 0-4.9 (excludes 5, includes up to 4.9)
-                        acr_filter_value = f"0-{threshold-0.1:.1f}"
-                    elif operator == '<=':
-                        acr_filter_value = f"0-{threshold:.1f}"
-                    elif operator == '=' or operator == '==':
-                        # Exact match - use single value range
-                        acr_filter_value = f"{threshold:.1f}-{threshold:.1f}"
-                # If no operator pattern matched, pass through as-is (might already be range)
-            
+            # Note: build_filters() automatically converts scoring filter operators (>, >=, <, <=)
+            # to range format required by Tenable.sc API (e.g., ">7" becomes "7.1-10")
             additional_filters = build_filters(
-                asset_criticality=acr_filter_value,
+                asset_criticality=asset_criticality,
                 uuid=uuid,
                 dns_name=dns_name,
                 first_seen=first_seen,

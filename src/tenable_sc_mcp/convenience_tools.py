@@ -153,11 +153,71 @@ def validate_severity(severity: str) -> tuple[bool, str]:
     return True, ""
 
 
+def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -> str:
+    """
+    Convert comparison operators to Tenable.sc range format for scoring filters.
+    
+    Tenable.sc API requires scoring filters (ACR, VPR, CVSS, EPSS) to use range format,
+    not comparison operators. This function converts user-friendly operators like ">7"
+    to API-compatible ranges like "7.1-10".
+    
+    Args:
+        score_value: Score with optional operator (e.g., ">7", ">=8.5", "7", "7-9")
+        max_score: Maximum value for the scoring scale (default: 10.0)
+    
+    Returns:
+        Range string compatible with Tenable.sc API (e.g., "7.1-10", "0-6.9")
+    
+    Examples:
+        ">7"   → "7.1-10"   (greater than 7)
+        ">=7"  → "7.0-10"   (greater than or equal to 7)
+        "<5"   → "0-4.9"    (less than 5)
+        "<=5"  → "0-5.0"    (less than or equal to 5)
+        "7"    → "7.0-7.0"  (exact match)
+        "7-9"  → "7-9"      (already range format)
+    """
+    import re
+    
+    # If already in range format (X-Y), return as-is
+    if '-' in score_value and not score_value.startswith('-'):
+        return score_value
+    
+    # Try to match operator pattern: (>=|>|<=|<|=)(\d+\.?\d*)
+    match = re.match(r'^(>=|>|<=|<|=|==)?(\d+\.?\d*)$', score_value.strip())
+    if not match:
+        # Invalid format, return as-is and let API reject it
+        return score_value
+    
+    operator = match.group(1) or '='  # Default to '=' if no operator
+    threshold = float(match.group(2))
+    
+    # Convert to range format based on operator
+    if operator == '>':
+        # >7 means "greater than 7" = 7.1-max (excludes 7, includes 7.1+)
+        return f"{threshold+0.1:.1f}-{max_score:.1f}"
+    elif operator == '>=':
+        # >=7 means "7 or higher" = 7.0-max
+        return f"{threshold:.1f}-{max_score:.1f}"
+    elif operator == '<':
+        # <5 means "less than 5" = 0-4.9 (excludes 5, includes up to 4.9)
+        return f"0-{threshold-0.1:.1f}"
+    elif operator == '<=':
+        # <=5 means "5 or lower" = 0-5.0
+        return f"0-{threshold:.1f}"
+    elif operator == '=' or operator == '==':
+        # Exact match - use single value range
+        return f"{threshold:.1f}-{threshold:.1f}"
+    
+    # Fallback (should never reach here)
+    return score_value
+
+
 def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
     """
     Universal filter builder for all convenience tools.
     
     Converts tool parameters to Tenable.sc analysis filter format.
+    Automatically converts scoring filter operators to range format.
     
     Args:
         **kwargs: Filter parameters using convenience names (e.g., ip="10.1.20.10")
@@ -165,6 +225,15 @@ def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
     Returns:
         List of filter dictionaries for analysis queries
     """
+    # Scoring filters that require operator-to-range conversion
+    SCORING_FILTERS = {
+        'asset_criticality': 10.0,  # ACR: 0-10 scale
+        'vpr_score': 10.0,          # VPR: 0-10 scale
+        'cvss_v3_base_score': 10.0, # CVSS v3: 0-10 scale
+        'cvss_base_score': 10.0,    # CVSS v2: 0-10 scale
+        'epss_score': 1.0,          # EPSS: 0-1 scale (probability)
+    }
+    
     filters = []
     for param, value in kwargs.items():
         if value is None:
@@ -185,6 +254,11 @@ def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
             # Simple filter with default operator
             operator = "="
             filter_value = value
+            
+            # Convert scoring filters from operator format to range format
+            if param in SCORING_FILTERS and isinstance(filter_value, str):
+                max_score = SCORING_FILTERS[param]
+                filter_value = convert_score_operator_to_range(filter_value, max_score)
         
         filters.append({
             "filterName": filter_name,
