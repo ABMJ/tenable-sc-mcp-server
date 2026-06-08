@@ -177,6 +177,9 @@ def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -
         "<=5"  → "0-5.0"    (less than or equal to 5)
         "7"    → "7.0-7.0"  (exact match)
         "7-9"  → "7-9"      (already range format)
+        
+        For AES (0-1000 scale):
+        ">600" → "601-1000"  (integer format for large scales)
     """
     import re
     
@@ -193,22 +196,48 @@ def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -
     operator = match.group(1) or '='  # Default to '=' if no operator
     threshold = float(match.group(2))
     
+    # Determine if we should use integer or decimal format
+    # Use integers for scales > 100 (e.g., AES 0-1000), decimals for smaller scales (e.g., ACR 0-10)
+    use_integer = max_score > 100
+    
     # Convert to range format based on operator
     if operator == '>':
         # >7 means "greater than 7" = 7.1-max (excludes 7, includes 7.1+)
-        return f"{threshold+0.1:.1f}-{max_score:.1f}"
+        if use_integer:
+            lower = int(threshold) + 1  # For AES: >600 = 601-1000
+            upper = int(max_score)
+            return f"{lower}-{upper}"
+        else:
+            return f"{threshold+0.1:.1f}-{max_score:.1f}"
     elif operator == '>=':
         # >=7 means "7 or higher" = 7.0-max
-        return f"{threshold:.1f}-{max_score:.1f}"
+        if use_integer:
+            lower = int(threshold)
+            upper = int(max_score)
+            return f"{lower}-{upper}"
+        else:
+            return f"{threshold:.1f}-{max_score:.1f}"
     elif operator == '<':
         # <5 means "less than 5" = 0-4.9 (excludes 5, includes up to 4.9)
-        return f"0-{threshold-0.1:.1f}"
+        if use_integer:
+            upper = int(threshold) - 1  # For AES: <600 = 0-599
+            return f"0-{upper}"
+        else:
+            return f"0-{threshold-0.1:.1f}"
     elif operator == '<=':
         # <=5 means "5 or lower" = 0-5.0
-        return f"0-{threshold:.1f}"
+        if use_integer:
+            upper = int(threshold)
+            return f"0-{upper}"
+        else:
+            return f"0-{threshold:.1f}"
     elif operator == '=' or operator == '==':
         # Exact match - use single value range
-        return f"{threshold:.1f}-{threshold:.1f}"
+        if use_integer:
+            value = int(threshold)
+            return f"{value}-{value}"
+        else:
+            return f"{threshold:.1f}-{threshold:.1f}"
     
     # Fallback (should never reach here)
     return score_value
