@@ -257,7 +257,7 @@ Lists all IP addresses in a repository or asset group with powerful filtering op
 ### When to Use This Tool
 - **Asset Discovery**: "Show me all IPs in our production network"
 - **Scope Building**: "List all IPs in Windows Hosts group for patching"
-- **High-Risk Identification**: "Show me all IPs with asset criticality >8"
+- **High-Risk Identification**: "Show me all IPs with high asset criticality and exposure scores"
 - **Reverse Lookup**: "Which asset groups contain this suspicious IP?"
 - **Subnet Enumeration**: "List all IPs we're actively scanning"
 - **CMDB Sync**: "Export all IPs with full metadata for our asset database"
@@ -272,8 +272,11 @@ list all IPs in repository "Default"
 # List IPs in asset group
 list IPs in asset group "Windows Hosts"
 
-# Filter by asset criticality
-list IPs in repository "Default" with asset criticality >7
+# Filter by asset criticality (use range format)
+list IPs in repository "Default" with asset criticality between 7 and 10
+
+# Filter by exposure score (use range format)
+list IPs with AES score between 600 and 1000
 
 # Get full details
 list IPs in asset group "Production Servers" with full details
@@ -315,7 +318,8 @@ I am testing tsc_list_ips to [your test scenario]. Please format your response a
 - MAC address
 - Asset UUID
 - Operating system
-- ACR score (0-10 scale)
+- ACR score (Asset Criticality Rating, 0-10 scale)
+- AES score (Asset Exposure Score, 0-1000 scale)
 - Repository name
 
 **Reverse Lookup Mode** (when using `ip` parameter):
@@ -324,15 +328,26 @@ I am testing tsc_list_ips to [your test scenario]. Please format your response a
 - Total membership count
 
 ### Available Filters (55+)
-This tool supports all Tenable.sc analysis filters:
-- **Asset Filters**: `asset_criticality` (ACR score >7, >=8, etc.), `uuid`, `dns_name`
+
+This tool supports comprehensive filtering across all Tenable.sc analysis dimensions:
+
+#### Risk Scoring Filters (use range format)
+When filtering by scores, specify ranges like `"7-10"` or `"600-1000"`:
+- **Asset Criticality (ACR)**: Range 0-10, e.g., `"7-10"` for high-risk assets
+- **Asset Exposure Score (AES)**: Range 0-1000, e.g., `"600-1000"` for high exposure
+- **VPR Score**: Range 0-10, e.g., `"7-10"` for vulnerabilities likely to be exploited
+- **CVSS v3**: Range 0-10, e.g., `"7-10"` for high severity vulnerabilities
+- **CVSS v2**: Range 0-10, legacy scoring system
+- **EPSS Score**: Range 0-1, e.g., `"0.5-1.0"` for high exploitation probability
+
+#### Other Filters
+- **Asset Filters**: `uuid`, `dns_name` (hostname)
 - **Time Filters**: `first_seen`, `last_seen` (Unix timestamps)
-- **Risk Scoring**: `vpr_score`, `cvss_v3_base_score`
-- **Vulnerability Filters**: `severity` (Critical/High/Med/Low), `exploit_available` (Yes/No), `plugin_id`, `family`
+- **Vulnerability Filters**: `severity` (Critical/High/Medium/Low/Info), `exploit_available` (Yes/No), `plugin_id`, `family`
 - **Network Filters**: `port`, `protocol` (TCP/UDP)
 - Plus 45+ additional Tenable.sc analysis filters
 
-**Special Feature**: Asset Criticality operators automatically convert (e.g., `>7` becomes `7.1-10` range to include decimals)
+**Note**: When you ask for something like "IPs with ACR greater than 7", the AI assistant will convert this to the proper range format (`"7-10"`) automatically.
 
 ### Performance
 - **Tokens Used**: 400-3,700 tokens depending on result size
@@ -347,11 +362,12 @@ This tool supports all Tenable.sc analysis filters:
 ### Best Use Cases
 - Asset discovery and inventory management
 - Building scan target lists
-- Finding high-risk assets (ACR >8 filters)
+- Finding high-risk assets based on ACR and AES scores
 - Asset group membership verification
 - Reverse lookup to find IP locations
 - CMDB synchronization and export
 - Subnet enumeration
+- Identifying assets with high exposure scores for prioritized remediation
 
 ---
 
