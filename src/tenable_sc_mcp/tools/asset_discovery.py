@@ -315,19 +315,21 @@ def register_tools(mcp):
             if asset_group:
                 response["asset_group"] = asset_group
             
-            # Track ALL applied filters dynamically (not just a hardcoded subset)
-            # Get all filter parameters from locals(), excluding non-filter params
-            non_filter_params = {'repository', 'asset_group', 'ip', 'include_details'}
+            # Track ALL applied filters dynamically
+            # List all filter parameters from function signature (not scope/control params)
+            filter_params = [
+                'asset_criticality', 'uuid', 'dns_name', 
+                'first_seen', 'last_seen',
+                'vpr_score', 'aes_score', 'cvss_v3_base_score', 'cvss_v4_base_score', 
+                'base_cvss_score', 'epss_score',
+                'severity', 'aes_severity', 'exploit_available',
+                'plugin_id', 'family', 'port', 'protocol'
+            ]
+            
             filters_applied = {
-                param: value 
-                for param, value in locals().items() 
-                if value is not None 
-                and param not in non_filter_params
-                and not param.startswith('_')
-                and param not in {'server', 'tsc_analyze', 'result', 'api_response', 
-                                   'ip_data', 'formatted_ips', 'response', 'filters', 
-                                   'additional_filters', 'query', 'repo_id', 'asset_group_id',
-                                   'asset_group_name', 'filters_applied'}
+                param: locals()[param]
+                for param in filter_params
+                if locals().get(param) is not None
             }
             
             if filters_applied:
