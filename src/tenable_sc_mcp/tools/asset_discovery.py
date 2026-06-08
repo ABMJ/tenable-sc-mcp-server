@@ -44,26 +44,28 @@ def register_tools(mcp):
         protocol: str | None = None,
     ) -> dict[str, Any]:
         """
-        List IP addresses in a repository or asset group with comprehensive filtering.
+        List IP addresses in repositories or asset groups. Use this when you need to:
+        - Enumerate all IPs in a specific repository or asset group
+        - Find which repositories/asset groups contain a specific IP (reverse lookup)
+        - Filter IPs by asset criticality, vulnerabilities, or other criteria
+        - Get detailed IP metadata (hostname, MAC, OS, ACR score)
         
-        This tool provides efficient IP enumeration with flexible filtering capabilities.
-        It automatically resolves repository and asset group names to IDs, applies filters,
-        and returns results in a token-optimized format.
+        WHEN TO USE THIS TOOL:
+        - User asks "list IPs in X" or "what IPs are in X"
+        - User asks "which asset group contains IP X" or "where is IP X"
+        - User asks "show me high-risk IPs" (use asset_criticality filter)
+        - User asks "list IPs with critical vulnerabilities" (use severity filter)
+        - User needs IP inventory or asset discovery
+        
+        DO NOT USE for single IP profiling - use tsc_profile_ip_efficient instead.
         
         Key Features:
-        - Automatic repository/asset group name resolution
-        - Supports 55+ analysis filters (ACR, severity, exploits, etc.)
-        - Reverse lookup: Find which repos/groups contain an IP
-        - Optional detailed metadata (DNS, MAC, OS, ACR, etc.)
-        - Smart caching (5-minute TTL)
-        - Token efficiency: 94% reduction vs raw API
-        
-        Use Cases:
-        1. List all IPs in a repository: tsc_list_ips(repository="Default")
-        2. List IPs in asset group: tsc_list_ips(asset_group="Windows Hosts")
-        3. Filter by criticality: tsc_list_ips(repository="Default", asset_criticality=">7")
-        4. Reverse lookup: tsc_list_ips(ip="10.1.20.10")
-        5. Get full details: tsc_list_ips(repository="Default", include_details=True)
+        - Automatic name-to-ID resolution for repositories and asset groups
+        - 55+ filters: asset criticality (ACR), severity, exploits, VPR, CVSS, port, protocol, etc.
+        - Reverse lookup mode: Find all repositories/asset groups containing an IP
+        - Optional detailed metadata: DNS name, MAC address, OS, UUID, ACR score
+        - Smart caching (120s TTL) for fast repeated queries
+        - Token efficient: 400-3,700 tokens depending on dataset size
         
         Args:
             repository: Repository name or ID (e.g., "Default", "9", "PCI Assets")

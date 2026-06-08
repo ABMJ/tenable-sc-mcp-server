@@ -27,14 +27,30 @@ def register_tools(mcp):
         include_asset_groups: bool = True,
     ) -> dict[str, Any]:
         """
-        Get comprehensive IP profile using efficient multi-query approach.
+        Get a complete security profile for a single IP address. Use this when you need to:
+        - Investigate a specific host's security posture
+        - Get vulnerability summary, OS, software, services, and scan status for one IP
+        - Validate authentication (credentialed vs non-credentialed scanning)
+        - Understand asset group membership for a single IP
         
-        This tool provides a complete security profile for an IP address by combining
-        data from multiple optimized queries. Each component is cached separately for
-        maximum cache hit rates.
+        WHEN TO USE THIS TOOL:
+        - User asks "profile IP X" or "tell me about IP X"
+        - User asks "what vulnerabilities does IP X have"
+        - User asks "what software is on IP X"
+        - User asks "was IP X scanned with credentials"
+        - User asks "what asset groups is IP X in"
+        - User needs comprehensive details for ONE specific IP
         
-        Token Efficiency: ~2,500 tokens (vs ~15,000 for single comprehensive query)
-        Cache TTL: 180s (3 minutes) for vulnerability data
+        DO NOT USE for listing multiple IPs - use tsc_list_ips instead.
+        DO NOT USE for detailed vulnerability records - use tsc_list_vulns_by_ip_full instead.
+        
+        This tool combines 6 optimized queries with separate caching for maximum efficiency.
+        Each component (vuln summary, software, services, scan info, asset groups) is cached
+        independently, allowing fast responses even when partial data changes.
+        
+        Token Efficiency: ~2,500 tokens (vs ~15,000 for unoptimized single query)
+        Cache TTL: 180s for vulnerability data, 300s for static data
+        Response Time: <1s cached, 1-3s fresh
         
         Args:
             ip: IP address to profile (IPv4 or IPv6)

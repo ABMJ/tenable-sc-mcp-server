@@ -23,353 +23,334 @@
 
 This document serves **two critical functions**:
 
-1. **User Guide** - Documentation for completed tools (Tools 1-3) with usage examples, token metrics, and best practices
-2. **Development Roadmap** - Detailed specifications for pending tools (Tools 4-25) organized chronologically by Week/Session
+1. **PART 1: USER GUIDE** - Professional documentation for completed tools (Tools 1, 2a, 2b, 4) with:
+   - Clear "When to Use" scenarios for each tool
+   - Practical usage examples with natural language commands
+   - Complete descriptions of what data you get back
+   - Performance metrics and best practices
+   - Suitable for non-technical users and security teams
 
-**For New Sessions:** Review this document + latest `week1_session_X` file to resume development immediately.
+2. **PART 2: DEVELOPMENT ROADMAP** - Detailed specifications for pending tools (Tools 5-26) organized by Week/Session with:
+   - Clear purpose and use cases
+   - Token budgets and cache TTL targets
+   - Module assignments and technical implementation notes
+   - Designed for LLM-assisted development sessions
+
+**For New Development Sessions**: Review this document + latest `week1_session_X_handoff.md` file to resume immediately.
 
 ---
 
 # 📚 PART 1: USER GUIDE (COMPLETED TOOLS)
 
-## ✅ Tool 1: `tsc_profile_ip_efficient` - IP Profile
+## ✅ Tool 1: `tsc_profile_ip_efficient` - Complete IP Security Profile
 
-**Status**: ✅ Production Ready | **Week 1 Session 1.1** | **Token Savings**: 83-90% | **Cache TTL**: 180-300s
+**Status**: ✅ Production Ready | **Token Savings**: 83-90% | **Cache**: 180-300s | **Module**: `tools/ip_profiling.py`
 
-### What It Does
-Multi-query efficient IP profiling using 6 optimized queries. Returns host identity, vulnerability summary, scan info, software, services, and asset groups.
+### What This Tool Does
+Gets a complete security assessment for a single IP address in one command. Combines host identity, vulnerability counts, scan status, installed software, running services, and asset group membership.
 
-### Usage
-```
+### When to Use This Tool
+- **Incident Response**: "Tell me everything about this suspicious IP"
+- **Asset Audit**: "What's the security posture of our database server at 10.1.20.10?"
+- **Credential Validation**: "Was this server scanned with credentials?"
+- **Compliance Check**: "Show me the scan status and vulnerabilities for this critical host"
+- **Before Patching**: "What software and services are running before I patch?"
+
+### How to Use
+```bash
+# Simple profile
+profile IP 10.1.20.10
+
+# Full example with context
 use tenable-sc to profile IP 10.1.20.10 efficiently, then show me cache stats
 ```
 
-### Returns
-- **Host Identity**: Hostname, NetBIOS, MAC, ACR score
-- **Vulnerability Summary**: Counts by severity
-- **Last Scan**: Name, policy, timestamp, credential status
-- **Software**: Top 50 packages
-- **Services**: Active services with ports
-- **Asset Groups**: Membership (up to 46)
+### What You Get Back
+- **Host Identity**: Hostname, DNS name, NetBIOS name, MAC address, ACR score
+- **Vulnerability Summary**: Count of vulnerabilities by severity (Critical/High/Medium/Low/Info)
+- **Last Scan Info**: Scan name, policy used, timestamp, authentication status
+- **Installed Software**: Up to 50 most important packages/applications
+- **Running Services**: Active services with port numbers
+- **Asset Groups**: All asset group memberships (up to 46 groups)
 
-### Token Efficiency
-~2,500 tokens (vs ~15,000 raw) = **83% reduction**
+### Performance
+- **Tokens Used**: ~2,500 tokens (vs ~15,000 without optimization) = **83% reduction**
+- **Speed**: <1 second if cached, 1-3 seconds fresh query
+- **Data Freshness**: Vulnerability data refreshes every 3 minutes, static data every 5 minutes
 
-### Best For
-Initial assessment, audits, asset inventory, credential validation
-
-### Implementation Notes
-- 6 parallel queries with smart caching
-- Handles missing data gracefully
-- Cache per-component for optimal hit rates
+### Best Use Cases
+- Initial security assessment of unknown hosts
+- Compliance audits requiring complete host documentation
+- Asset inventory verification
+- Credential scan validation (checking if authenticated scans are working)
+- Pre-patch planning (knowing what's installed before changes)
 
 ---
 
-## ✅ Tool 2a: `tsc_list_vulns_by_ip_summary` - Vulnerability Summary
+## ✅ Tool 2a: `tsc_list_vulns_by_ip_summary` - Quick Vulnerability Count
 
-**Status**: ✅ Production Ready | **Week 1 Session 1.2** | **Token Savings**: 88-92% | **Cache TTL**: 180s
+**Status**: ✅ Production Ready | **Token Savings**: 88-92% | **Cache**: 180s | **Module**: `tools/vulnerability_lookup.py`
 
-### What It Does
-Lightweight vulnerability counts by severity for quick overview.
+### What This Tool Does
+Gets vulnerability counts by severity for an IP address without pulling full details. Perfect for quick checks and determining scope before deeper investigation.
 
-### Usage
-```
+### When to Use This Tool
+- **Dashboard Reports**: "How many critical vulnerabilities do we have on this server?"
+- **Quick Assessment**: "Is this IP clean or does it have issues?"
+- **Scoping**: "How many vulns before I pull full details?" (avoid overloading with data)
+- **Executive Summary**: "Give me the vulnerability breakdown for our web server"
+- **Triage**: "Which servers have the most critical issues?" (check multiple IPs quickly)
+
+### How to Use
+```bash
+# Get all vulnerability counts
+get vulnerability summary for IP 10.1.20.10
+
+# Filter for specific severity
+get critical vulnerability count for IP 10.1.20.10
+
+# Full example with cache
 use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats
 ```
 
-### Returns
-- Total vulnerability count
-- Breakdown by severity (Critical/High/Medium/Low/Info)
-- Applied filter summary
+### What You Get Back
+- **Total Count**: Total number of vulnerabilities found
+- **Breakdown by Severity**:
+  - Critical: [count]
+  - High: [count]
+  - Medium: [count]
+  - Low: [count]
+  - Info: [count]
+- **Applied Filters**: Summary of any filters you used
 
 ### Available Filters (10)
-`severity`, `exploit_available`, `first_seen`, `last_seen`, `family`, `vpr_score`, `plugin_id`, `cve`, `port`, `protocol`
+- `severity`: Critical/High/Medium/Low/Info or 0-4
+- `exploit_available`: Yes/No
+- `first_seen`: Unix timestamp
+- `last_seen`: Unix timestamp
+- `family`: Plugin family (e.g., "Windows")
+- `vpr_score`: Vulnerability Priority Rating score
+- `plugin_id`: Specific Nessus plugin ID
+- `cve`: CVE identifier
+- `port`: Port number
+- `protocol`: TCP/UDP
 
-### Token Efficiency
-~700 tokens (vs ~6,000 raw) = **88% reduction**
+### Performance
+- **Tokens Used**: ~700 tokens (vs ~6,000 with full details) = **88% reduction**
+- **Speed**: <1 second cached, 1-2 seconds fresh
+- **Data Freshness**: Refreshes every 3 minutes
 
-### Best For
-Quick checks, dashboards, scope determination
+### Best Use Cases
+- Quick security posture checks
+- Dashboard metrics and reporting
+- Determining scope before pulling full vulnerability details
+- Comparing multiple IPs quickly (check 10 IPs in seconds vs minutes)
+- Executive briefings requiring summary statistics only
 
 ---
 
-## ✅ Tool 2b: `tsc_list_vulns_by_ip_full` - Full Vulnerability Details
+## ✅ Tool 2b: `tsc_list_vulns_by_ip_full` - Detailed Vulnerability Records
 
-**Status**: ✅ Production Ready | **Week 1 Session 1.2-1.3** | **Token Savings**: 58-75% | **Cache TTL**: 180s | **Pagination**: 10-200
+**Status**: ✅ Production Ready | **Token Savings**: 58-75% | **Cache**: 180s | **Pagination**: 10-200 | **Module**: `tools/vulnerability_lookup.py`
 
-### What It Does
-Complete vulnerability details for deep investigation and remediation.
+### What This Tool Does
+Gets complete vulnerability details with full metadata for an IP address. Returns all the information needed for remediation planning including plugin details, scoring, exploit status, and solution steps.
 
-### Usage
-```
+### When to Use This Tool
+- **Remediation Planning**: "What are the details on these critical vulnerabilities so I can fix them?"
+- **Ticketing**: "I need full vuln data to create tickets for my team"
+- **Investigation**: "Show me everything about the high-risk vulnerabilities on this server"
+- **Compliance Reports**: "Give me detailed vulnerability information for our audit"
+- **Risk Analysis**: "Which vulnerabilities have public exploits available?"
+
+### How to Use
+```bash
+# Get all critical vulnerabilities
+list all critical vulnerabilities for IP 10.1.20.10
+
+# First 10 records only
+use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records
+
+# With cache stats
 use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records, then show me cache stats
+
+# Filter by multiple criteria
+show vulnerabilities for IP 10.1.20.10 with severity high, exploit available, port 443
 ```
 
-### Returns (per vulnerability)
-- Plugin ID, name, severity
-- Family, port, protocol
-- CVSS v3, VPR, EPSS scores
-- Exploit availability/frameworks
-- CVE IDs
-- First/last seen timestamps
-- Synopsis, solution (200 chars truncated)
+### What You Get Back (Per Vulnerability)
+- **Identity**: Plugin ID, plugin name, plugin family
+- **Severity**: Severity level (Critical/High/Medium/Low/Info)
+- **Risk Scoring**: CVSS v3 score, VPR score, EPSS probability
+- **Exploit Status**: Exploit available (Yes/No), exploit frameworks (Metasploit, etc.)
+- **CVE IDs**: Associated CVE identifiers
+- **Network**: Port number, protocol (TCP/UDP)
+- **Timeline**: First seen, last seen timestamps
+- **Remediation**: Synopsis (200 chars), solution (200 chars), see_also URLs
+- **Patch Info**: Patch publication date, vulnerability publication date
+- **Mitigation**: Mitigation status
 
 ### Available Filters (15)
-All from summary (10) PLUS: `cvss_v3_base_score`, `epss_score`, `patch_published`, `vuln_published`, `mitigated_status`
+**Common Filters (10)**:
+- `severity`, `exploit_available`, `first_seen`, `last_seen`, `family`
+- `vpr_score`, `plugin_id`, `cve`, `port`, `protocol`
 
-### Pagination
-- Default: 0-50 records
-- Maximum: 0-200 records per query
-- Use `start_offset` and `end_offset` parameters
+**Additional Filters (5)**:
+- `cvss_v3_base_score`: CVSS v3 base score filter
+- `epss_score`: EPSS exploitation probability score
+- `patch_published`: Filter by patch publication date
+- `vuln_published`: Filter by vulnerability publication date
+- `mitigated_status`: Filter by mitigation status
 
-### Token Efficiency
-~5,000 tokens for 50 records (vs ~12,000 raw) = **58% reduction**
+### Pagination Controls
+- **Default**: Returns records 0-50 (50 records)
+- **Maximum**: 200 records per request
+- **Parameters**: `start_offset` and `end_offset`
+- **Example**: `start_offset=0, end_offset=100` returns first 100 records
 
-### Best For
-Remediation planning, detailed investigation, compliance reporting
+### Performance
+- **Tokens Used**: ~5,000 tokens for 50 records (vs ~12,000 unfiltered) = **58% reduction**
+- **Speed**: <1 second cached, 2-4 seconds fresh
+- **Data Freshness**: Refreshes every 3 minutes
+- **Best Practice**: Start with 50 records, paginate if needed
+
+### Best Use Cases
+- Remediation planning and prioritization
+- Creating detailed security tickets for IT teams
+- Compliance reporting with full vulnerability documentation
+- Risk analysis and exploit mapping
+- Investigation of specific vulnerabilities requiring full context
 
 ---
 
-## ✅ Tool 4: `tsc_list_ips` - IP Listing & Discovery
+## ✅ Tool 4: `tsc_list_ips` - IP Discovery & Asset Enumeration
 
-**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Token Savings**: Variable | **Cache TTL**: 120s (analysis queries)
+**Status**: ✅ Production Ready | **Token Range**: 400-3,700 | **Cache**: 120s | **Module**: `tools/asset_discovery.py`
 
-### What It Does
-List IP addresses in repositories or asset groups with comprehensive filtering. Supports reverse lookup to find where an IP appears. Optional detailed metadata for each IP.
+### What This Tool Does
+Lists all IP addresses in a repository or asset group with powerful filtering options. Also supports reverse lookup to find which repositories and asset groups contain a specific IP address.
 
-### Usage (Use New Visual Format)
+### When to Use This Tool
+- **Asset Discovery**: "Show me all IPs in our production network"
+- **Scope Building**: "List all IPs in Windows Hosts group for patching"
+- **High-Risk Identification**: "Show me all IPs with asset criticality >8"
+- **Reverse Lookup**: "Which asset groups contain this suspicious IP?"
+- **Subnet Enumeration**: "List all IPs we're actively scanning"
+- **CMDB Sync**: "Export all IPs with full metadata for our asset database"
 
-#### List IPs in Repository
+### How to Use
+
+#### Basic IP Listing
+```bash
+# List IPs in repository
+list all IPs in repository "Default"
+
+# List IPs in asset group
+list IPs in asset group "Windows Hosts"
+
+# Filter by asset criticality
+list IPs in repository "Default" with asset criticality >7
+
+# Get full details
+list IPs in asset group "Production Servers" with full details
 ```
-I am testing tsc_list_ips to list all IPs in repository "Default". Please format your response as:
+
+#### Reverse Lookup
+```bash
+# Find where an IP exists
+find which repositories and asset groups contain IP 10.1.20.10
+
+# Using test format with visual icons
+I am testing tsc_list_ips to find which repositories and asset groups contain IP 10.1.20.10
+```
+
+#### Developer Test Format (Use Visual Icons)
+When testing this tool, use the standardized format with visual icons for clear results:
+
+```
+I am testing tsc_list_ips to [your test scenario]. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner about cache and token performance]
-📦 RESULT: Total IPs: [count], First 5: [list]
+📦 RESULT: [your expected data]
 ```
 
-#### List IPs in Asset Group
-```
-I am testing tsc_list_ips to list all IPs in asset group "Windows Hosts". Please format your response as:
+### What You Get Back
 
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner]
-📦 RESULT: Total IPs: [count], First 5: [list]
-```
-
-#### Reverse Lookup (Find IP Membership)
-```
-I am testing tsc_list_ips to find which repositories and asset groups contain IP 10.1.20.10. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner]
-📦 RESULT: Repositories: [list], Asset Groups: [list]
-```
-
-#### Filtered List with Full Details
-```
-I am testing tsc_list_ips to list IPs in repository "Default" with asset criticality > 7 and include full details. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner]
-📦 RESULT: Total IPs with ACR > 7: [count], First 3 with details: [list]
-```
-
-### Returns
 **Minimal Mode** (default):
-- IP addresses only
+- List of IP addresses only
 - Total IP count
-- Scope info (repository or asset group name)
+- Repository or asset group name
 
 **With include_details=True**:
 - IP address
-- DNS name
+- DNS hostname
 - NetBIOS name
 - MAC address
-- UUID
+- Asset UUID
 - Operating system
-- ACR score (0-10 range, from `acrScore` field)
+- ACR score (0-10 scale)
 - Repository name
 
-**Reverse Lookup Mode** (when `ip` parameter provided):
+**Reverse Lookup Mode** (when using `ip` parameter):
 - List of repositories containing the IP
-- List of asset groups containing the IP (filtered by total > 0)
-- Membership counts
+- List of asset groups containing the IP (only groups where IP actually exists)
+- Total membership count
 
 ### Available Filters (55+)
-All Tenable.sc analysis filters supported:
-- **Asset**: `asset_criticality` (with operator conversion: >7 → 7.1-10), `uuid`, `dns_name`
-- **Temporal**: `first_seen`, `last_seen`
-- **Scoring**: `vpr_score`, `cvss_v3_base_score`
-- **Vulnerability**: `severity`, `exploit_available`, `plugin_id`, `family`
-- **Network**: `port`, `protocol`
-- Plus 45+ additional filters
+This tool supports all Tenable.sc analysis filters:
+- **Asset Filters**: `asset_criticality` (ACR score >7, >=8, etc.), `uuid`, `dns_name`
+- **Time Filters**: `first_seen`, `last_seen` (Unix timestamps)
+- **Risk Scoring**: `vpr_score`, `cvss_v3_base_score`
+- **Vulnerability Filters**: `severity` (Critical/High/Med/Low), `exploit_available` (Yes/No), `plugin_id`, `family`
+- **Network Filters**: `port`, `protocol` (TCP/UDP)
+- Plus 45+ additional Tenable.sc analysis filters
 
-### Token Efficiency (Tested Values)
-- ~3,400-3,700 tokens for large datasets (854 IPs) - Cache saves API time, not significant tokens due to large payload
-- ~1,000-1,200 tokens for medium datasets (174 IPs)
-- ~400-700 tokens for reverse lookup (minimal payload)
-- ~2,300-2,400 tokens with full details (37 IPs with metadata)
+**Special Feature**: Asset Criticality operators automatically convert (e.g., `>7` becomes `7.1-10` range to include decimals)
 
-**Note**: Large payloads don't show high token savings because response size dominates. Real benefit is cache HIT speed and API rate limit savings.
+### Performance
+- **Tokens Used**: 400-3,700 tokens depending on result size
+  - Large datasets (800+ IPs): ~3,500 tokens
+  - Medium datasets (100-200 IPs): ~1,200 tokens
+  - Reverse lookup: ~500 tokens
+  - With full details: ~2,400 tokens
+- **Speed**: <1 second cached, 1-3 seconds fresh
+- **Data Freshness**: Refreshes every 2 minutes
+- **Note**: Token count depends on payload size. Real benefit is cache speed and API rate limit savings.
 
-### Best For
-- IP discovery and inventory
-- Asset group membership queries
-- Finding where IPs appear across repositories
-- Building target lists for scans
-- ACR-based filtering for high-risk asset identification
-- CMDB synchronization
+### Best Use Cases
+- Asset discovery and inventory management
+- Building scan target lists
+- Finding high-risk assets (ACR >8 filters)
+- Asset group membership verification
+- Reverse lookup to find IP locations
+- CMDB synchronization and export
+- Subnet enumeration
 
-### Implementation Notes
-- Uses `sumip` analysis tool for IP listing
-- Uses `sumasset` tool for asset group membership in reverse lookup
-- Smart caching per query (120s TTL)
-- Handles asset group name → ID resolution automatically (resolves to both ID and name)
-- Asset filter format: `{"id": "3", "name": "Windows Hosts"}` (object, not array!)
+### Technical Notes for Developers
+- Uses `sumip` analysis tool for IP enumeration
+- Uses `sumasset` tool for reverse lookup of asset group membership
+- Automatic name-to-ID resolution for repositories and asset groups
+- Asset filter format: `{"id": "3", "name": "Windows Hosts"}` (object with both ID and name)
 - Repository filter format: `[{"id": "9"}]` (array with string ID)
-- ACR operator conversion: `>7` → `7.1-10`, `>=7` → `7.0-10`
-- Sumasset filtering: Only includes asset groups where `total > 0`
-- Gracefully handles missing data (empty lists, not errors)
+- ACR operator conversion: `>7` → `7.1-10`, `>=7` → `7.0-10` (handles decimals correctly)
+- Reverse lookup filters results by `total > 0` to show only actual memberships
+- Gracefully handles missing data (returns empty lists, not errors)
 
-### Critical Bugs Fixed (Session 1.5)
-1. ✅ Added nested `{"query": {...}}` wrapper for API compatibility
-2. ✅ Fixed asset filter to use object `{"id", "name"}` not array
-3. ✅ Fixed ACR field to use `acrScore` (0-10) not `score` (0-4000+)
-4. ✅ Fixed ACR operators: `>7` → `7.1-10` (not `8-10`)
-5. ✅ Fixed reverse lookup to use `sumasset` tool for asset groups
-6. ✅ Added `total > 0` filtering for sumasset results
-7. ✅ Validated all scenarios with real T.sc data
-
----
-
-## ✅ Week 1 Session 1.3: Testing & Validation (COMPLETE)
-
-**Activities:**
-- Validated all 3 tools in production
-- Confirmed cache performance (57%+ hit rate)
-- Verified token savings (58-90%)
-- Tools 1-3 production ready
-
----
-
-## ✅ Week 1 Session 1.5: Tool 4 Implementation (COMPLETE)
-
-**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Completed**: 2026-06-08
-
-**Completed Work:**
-1. ✅ Implemented `tsc_list_ips` in `tools/asset_discovery.py` (414 lines total)
-2. ✅ Fixed query structure to use `tsc_analyze()` instead of `tsc_request()`
-3. ✅ Implemented 3 modes: repository list, asset group list, reverse lookup
-4. ✅ Added comprehensive filtering support (55+ analysis filters)
-5. ✅ Added `include_details` parameter for full IP metadata
-6. ✅ Helper functions: `_resolve_asset_group_name`, `_find_ip_membership`
-7. ✅ Syntax validation passed
-8. ✅ Updated TEST_PROMPTS.md with 4 test scenarios
-9. ✅ Tool registered in `tools/__init__.py`
-
-**Validation Results:**
-- ✅ Code compiles without syntax errors
-- ✅ Tool registration pattern matches established style
-- ✅ Uses `tsc_analyze()` for proper caching behavior
-- ✅ Error handling for invalid inputs
-- ✅ Follows established coding patterns from Tools 1-3
-- ✅ Documentation complete in TEST_PROMPTS.md
-
-**Next Step:** Rebuild Docker container and test on live Tenable.sc data
+### Bugs Fixed in Session 1.5
+1. ✅ Added nested `{"query": {...}}` wrapper for API compatibility (HTTP 403 fix)
+2. ✅ Fixed asset filter structure to use object format not array
+3. ✅ Fixed ACR field mapping to `acrScore` (0-10) instead of `score` (0-4000+)
+4. ✅ Fixed ACR operator conversion to include decimal ranges (>7 → 7.1-10 not 8-10)
+5. ✅ Fixed reverse lookup to use correct `sumasset` analysis tool
+6. ✅ Added filtering to show only asset groups where `total > 0`
+7. ✅ Validated all scenarios with real Tenable.sc production data
 
 ---
 
 # 🗓️ PART 2: DEVELOPMENT ROADMAP (PENDING TOOLS)
-
----
-
-## 📅 WEEK 1 - CORE FOUNDATION (1 REFACTOR + 3 TOOLS REMAINING)
-
-### ✅ Session 1.4: Code Refactoring - Modular Structure (COMPLETE)
-
-**Status**: ✅ Production Ready | **Week 1 Session 1.4** | **Completed**: 2026-06-07
-
-**Purpose:**
-Refactored codebase from monolithic `server.py` to modular structure. Successfully reduced server.py from 1,276 lines to 615 lines (52% reduction).
-
-**Completed Work:**
-1. ✅ Created `src/tenable_sc_mcp/tools/` directory structure with admin/ subdirectory
-2. ✅ Moved Tool 1 → `tools/ip_profiling.py` (346 lines)
-3. ✅ Moved Tools 2a, 2b → `tools/vulnerability_lookup.py` (383 lines)
-4. ✅ Created `tools/__init__.py` with tool registry pattern (59 lines)
-5. ✅ Updated `server.py` to import from modules (1,276 → 615 lines, 52% reduction)
-6. ✅ **All 3 tools tested** - 79 Python tests passing, 0 failures
-7. ✅ Remote testing on live T.sc data - All tools operational with 70%+ cache hit rates
-8. ✅ Docker container rebuilt and validated
-
-**Implemented Directory Structure:**
-```
-src/tenable_sc_mcp/
-├── server.py                      # Core MCP server (~200 lines)
-├── convenience_tools.py           # Universal helpers (existing)
-├── tools/
-│   ├── __init__.py               # Tool registry
-│   ├── ip_profiling.py           # Tools 1, 19
-│   ├── vulnerability_lookup.py    # Tools 2a, 2b, 5, 14, 15
-│   ├── asset_discovery.py        # Tools 4, 17, 18, 22, 23
-│   ├── compliance.py             # Tool 8
-│   ├── scanning.py               # Tools 6, 7, 16
-│   ├── network.py                # Tool 10
-│   ├── inventory.py              # Tools 11, 12
-│   ├── authentication.py         # Tool 13
-│   ├── risk_scoring.py           # Tools 20, 21
-│   └── admin/
-│       ├── __init__.py
-│       ├── resources.py          # Tool 9
-│       ├── plugins.py            # Tool 24
-│       ├── licensing.py          # Tool 25
-│       └── repositories.py       # Tool 26
-└── cache.py                       # Caching logic (if needed)
-```
-
-**Actual Module Sizes:**
-
-| Module | Tools | Description | Actual Lines |
-|--------|-------|-------------|--------------|
-| `server.py` | Core | MCP server + generic tools | 615 (was 1,276) |
-| `ip_profiling.py` | 1 | IP profile (efficient) | 346 |
-| `vulnerability_lookup.py` | 2a, 2b | Vuln queries (summary, full) | 383 |
-| `tools/__init__.py` | Registry | Tool registration system | 59 |
-| `admin/__init__.py` | Placeholder | Future admin tools | 13 |
-| Future modules | Pending | To be implemented in Sessions 1.5+ | TBD |
-
-**Total Achieved**: 1,416 lines across 5 files (server + 4 modules) vs 1,276 lines in single file
-
-**Net Result**: More maintainable structure with clear separation of concerns
-
-**Benefits Achieved:**
-- ✅ Maintainable: 346-383 lines per tool module, 615 lines for server core
-- ✅ Testable: 79 Python tests passing, isolated module testing working
-- ✅ Scalable: Tool registry pattern supports unlimited future tools
-- ✅ Readable: Clear logical grouping (ip_profiling, vulnerability_lookup, etc.)
-- ✅ Collaborative: Multiple devs can now work in parallel on different modules
-- ✅ Debuggable: Issues isolated to specific modules
-
-**Validation Results:**
-- ✅ All 3 tools work identically after refactor
-- ✅ Cache functionality preserved (70%+ hit rates in production)
-- ✅ Token savings unchanged (83%, 88%, 58% confirmed)
-- ✅ Error handling works
-- ✅ TEST_PROMPTS.md queries pass (100% success rate)
-- ✅ Docker container builds successfully
-- ✅ MCP server starts without errors
-
-**Key Design Pattern:**
-All new tools must be implemented in tool modules (`tools/*.py`), NOT in `server.py`. Each module has a `register_tools(mcp)` function that decorates tools with `@mcp.tool()`. The registry (`tools/__init__.py`) calls all module registration functions at server startup.
 
 ---
 
