@@ -46,11 +46,14 @@ Production-ready MCP server for Tenable Security Center Plus with intelligent ca
 |-----------|--------|-------------|-------|
 | **Tool 1: IP Profile** | ✅ Production | 83-90% token savings | ✅ Passing |
 | **Tool 2: Vulnerability Lists** | ✅ Production | 58-92% token savings | ✅ Passing |
+| **Tool 4: IP Discovery** | ✅ Production | 400-3,700 tokens | ✅ Passing |
 | **Core API Tools** | ✅ Stable | Cached responses | ✅ Passing |
 | **Redis Cache** | ✅ Production | <1ms cached, 57%+ hit rate | ✅ Passing |
 | **Docker Deployment** | ✅ Ready | Single `.env` config | ✅ Passing |
 
-**Latest**: Tool 2 bug fixed (2026-06-06) • All convenience tools operational • Cache performance validated
+**Latest**: Tool 4 complete (2026-06-08) • 4/25 tools operational (16%) • All tests passing • Production ready
+
+**Progress**: Week 1 Session 1.5 Complete
 
 ---
 
@@ -169,6 +172,35 @@ Generic MCP tools for all Tenable.sc resources:
 - `tsc_catalog` - Browse 100+ available Tenable.sc resources
 - `tsc_current_user` - Verify API user identity and permissions
 - `tsc_resource_action` - Unified CRUD interface (`list`, `get`, `create`, `update`, `delete`)
+
+### Convenience Tools (High-Level Queries)
+Optimized tools with intelligent caching for common security workflows:
+
+**Tool 1: IP Profile** (`tsc_profile_ip_efficient`)
+- Complete security assessment for a single IP address
+- Returns host identity, vulnerability summary, scan status, software, services, and asset groups
+- **Token Efficiency**: ~2,500 tokens (vs ~15,000 raw) = **83% reduction**
+- **Use Case**: Incident response, compliance audits, credential validation
+
+**Tool 2a: Vulnerability Summary** (`tsc_list_vulns_by_ip_summary`)
+- Quick vulnerability counts by severity for an IP
+- **Token Efficiency**: ~700 tokens (vs ~6,000 raw) = **88% reduction**
+- **Use Case**: Dashboard metrics, quick checks, scoping
+
+**Tool 2b: Vulnerability Details** (`tsc_list_vulns_by_ip_full`)
+- Complete vulnerability records with full metadata and remediation info
+- Pagination support (10-200 records per query)
+- **Token Efficiency**: ~5,000 tokens for 50 records (vs ~12,000 raw) = **58% reduction**
+- **Use Case**: Remediation planning, detailed investigation, ticketing
+
+**Tool 4: IP Discovery** (`tsc_list_ips`)
+- List all IPs in repositories or asset groups with powerful filtering
+- Reverse lookup to find where an IP exists
+- Supports 55+ analysis filters (ACR, severity, exploits, VPR, CVSS)
+- **Token Range**: 400-3,700 tokens depending on result size
+- **Use Case**: Asset discovery, high-risk identification, CMDB sync
+
+📚 **Full Documentation**: See [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) for complete usage guide
 
 ### Specialized Tools
 - `tsc_analyze` - Run analysis queries (cached for performance)
