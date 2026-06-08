@@ -1,20 +1,21 @@
 # Tenable.sc Convenience Tools - Roadmap & User Guide
 
-**Status**: Week 1 - Session 1.4 Complete (3 tools operational, modular architecture implemented)  
-**Last Updated**: 2026-06-07 (Session 1.4 - Refactoring Complete)
+**Status**: Week 1 - Session 1.5 Complete (4 tools operational, Tool 4 fully validated)  
+**Last Updated**: 2026-06-08 (Session 1.5 - Tool 4 Complete)
 
 ---
 
 ## 🎯 Quick Status
 
 **Completed**: 4/25 tools (16%) + Modular Architecture  
-**Current Phase**: Week 1 Session 1.5 (Tool 4) - ✅ Complete  
+**Current Phase**: Week 1 Session 1.5 (Tool 4) - ✅ Complete & Validated  
 **Next Session**: Week 1 Session 1.6 - Implement Tool 5 (`tsc_list_vulns_by_cve`) in `tools/vulnerability_lookup.py`
 
-**Validated Performance:**
-- Cache hit rate: 57%+ achieved
-- Token savings: 58-90% confirmed
-- Response time: <1ms cached, 1-3s fresh
+**Validated Performance (Tool 4 - New):**
+- Cache hit rate: Working correctly (120s TTL)
+- Token efficiency: 400-3,700 tokens (payload-dependent)
+- Response time: <1s cached, 1-3s fresh
+- All 4 test scenarios: ✅ PASSING
 
 ---
 
@@ -131,31 +132,55 @@ Remediation planning, detailed investigation, compliance reporting
 
 ## ✅ Tool 4: `tsc_list_ips` - IP Listing & Discovery
 
-**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Token Savings**: 94% | **Cache TTL**: 300s
+**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Token Savings**: Variable | **Cache TTL**: 120s (analysis queries)
 
 ### What It Does
 List IP addresses in repositories or asset groups with comprehensive filtering. Supports reverse lookup to find where an IP appears. Optional detailed metadata for each IP.
 
-### Usage
+### Usage (Use New Visual Format)
 
 #### List IPs in Repository
 ```
-use tenable-sc to list all IPs in repository "Default", then show me cache stats
+I am testing tsc_list_ips to list all IPs in repository "Default". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Total IPs: [count], First 5: [list]
 ```
 
 #### List IPs in Asset Group
 ```
-use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats
+I am testing tsc_list_ips to list all IPs in asset group "Windows Hosts". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner]
+📦 RESULT: Total IPs: [count], First 5: [list]
 ```
 
 #### Reverse Lookup (Find IP Membership)
 ```
-use tenable-sc to find which repositories and asset groups contain IP 10.1.20.10, then show me cache stats
+I am testing tsc_list_ips to find which repositories and asset groups contain IP 10.1.20.10. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner]
+📦 RESULT: Repositories: [list], Asset Groups: [list]
 ```
 
 #### Filtered List with Full Details
 ```
-use tenable-sc to list IPs in repository "Default" with asset criticality > 8 and include full details, then show me cache stats
+I am testing tsc_list_ips to list IPs in repository "Default" with asset criticality > 7 and include full details. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner]
+📦 RESULT: Total IPs with ACR > 7: [count], First 3 with details: [list]
 ```
 
 ### Returns
@@ -171,40 +196,58 @@ use tenable-sc to list IPs in repository "Default" with asset criticality > 8 an
 - MAC address
 - UUID
 - Operating system
-- ACR score
+- ACR score (0-10 range, from `acrScore` field)
 - Repository name
 
 **Reverse Lookup Mode** (when `ip` parameter provided):
 - List of repositories containing the IP
-- List of asset groups containing the IP
+- List of asset groups containing the IP (filtered by total > 0)
 - Membership counts
 
 ### Available Filters (55+)
 All Tenable.sc analysis filters supported:
-- **Asset**: `asset_criticality`, `uuid`, `dns_name`
+- **Asset**: `asset_criticality` (with operator conversion: >7 → 7.1-10), `uuid`, `dns_name`
 - **Temporal**: `first_seen`, `last_seen`
 - **Scoring**: `vpr_score`, `cvss_v3_base_score`
 - **Vulnerability**: `severity`, `exploit_available`, `plugin_id`, `family`
 - **Network**: `port`, `protocol`
 - Plus 45+ additional filters
 
-### Token Efficiency
-~500-1,000 tokens minimal (vs ~9,000 raw) = **94% reduction**  
-~1,500-2,500 with details (still 70-85% reduction)
+### Token Efficiency (Tested Values)
+- ~3,400-3,700 tokens for large datasets (854 IPs) - Cache saves API time, not significant tokens due to large payload
+- ~1,000-1,200 tokens for medium datasets (174 IPs)
+- ~400-700 tokens for reverse lookup (minimal payload)
+- ~2,300-2,400 tokens with full details (37 IPs with metadata)
+
+**Note**: Large payloads don't show high token savings because response size dominates. Real benefit is cache HIT speed and API rate limit savings.
 
 ### Best For
 - IP discovery and inventory
-- Subnet enumeration
 - Asset group membership queries
 - Finding where IPs appear across repositories
 - Building target lists for scans
+- ACR-based filtering for high-risk asset identification
 - CMDB synchronization
 
 ### Implementation Notes
-- Uses `sumip` analysis tool
-- Smart caching per query
-- Handles asset group name → ID resolution automatically
+- Uses `sumip` analysis tool for IP listing
+- Uses `sumasset` tool for asset group membership in reverse lookup
+- Smart caching per query (120s TTL)
+- Handles asset group name → ID resolution automatically (resolves to both ID and name)
+- Asset filter format: `{"id": "3", "name": "Windows Hosts"}` (object, not array!)
+- Repository filter format: `[{"id": "9"}]` (array with string ID)
+- ACR operator conversion: `>7` → `7.1-10`, `>=7` → `7.0-10`
+- Sumasset filtering: Only includes asset groups where `total > 0`
 - Gracefully handles missing data (empty lists, not errors)
+
+### Critical Bugs Fixed (Session 1.5)
+1. ✅ Added nested `{"query": {...}}` wrapper for API compatibility
+2. ✅ Fixed asset filter to use object `{"id", "name"}` not array
+3. ✅ Fixed ACR field to use `acrScore` (0-10) not `score` (0-4000+)
+4. ✅ Fixed ACR operators: `>7` → `7.1-10` (not `8-10`)
+5. ✅ Fixed reverse lookup to use `sumasset` tool for asset groups
+6. ✅ Added `total > 0` filtering for sumasset results
+7. ✅ Validated all scenarios with real T.sc data
 
 ---
 
