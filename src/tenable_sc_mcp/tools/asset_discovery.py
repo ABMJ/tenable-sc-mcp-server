@@ -137,6 +137,7 @@ def register_tools(mcp):
                         "mac": "00:50:56:12:34:56",
                         "uuid": "abc123...",
                         "acr_score": 8.5,
+                        "aes_score": 650,
                         "os": "Windows Server 2019"
                     }
                 ]
@@ -288,6 +289,7 @@ def register_tools(mcp):
                         "uuid": item.get("uuid", ""),
                         "os": item.get("operatingSystem", item.get("osCPE", "")),
                         "acr_score": item.get("acrScore", "0"),  # Asset Criticality Rating (0-10)
+                        "aes_score": item.get("score", "0"),      # Asset Exposure Score (0-1000)
                         "repository": item.get("repository", {}).get("name", ""),
                     }
                     formatted_ips.append(ip_entry)
