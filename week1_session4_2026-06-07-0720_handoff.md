@@ -250,6 +250,64 @@ return {
 
 ---
 
+## 🧪 TEST PROMPT STYLE GUIDE
+
+### Format for User-Facing Test Prompts
+
+**Use visual icons and structured format for all test prompts in TEST_PROMPTS.md:**
+
+```
+I am testing [tool_name] to [action]. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: [brief summary of returned data]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
+```
+
+**Why This Format:**
+1. **Visual Icons** (✅/❌/📊/🔢/📝/📦) - Easy to scan for pass/fail status at a glance
+2. **Structured Sections** - Consistent across all tests, machine-parseable
+3. **Actionable Errors** - "ERROR DETAILS for developer" ensures useful debugging info
+4. **No Solutions** - "Do not suggest code" prevents polluting test output with fixes
+
+**Example - Good Test Prompt:**
+```
+I am testing tsc_list_ips to list all IPs in repository "Default". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Total IPs: [count], First 5: [list]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
+```
+
+**Example - Bad Test Prompt (Old Style):**
+```
+use tenable-sc to list all IPs in repository "Default"
+```
+
+**Benefits:**
+- User immediately sees ✅ PASS or ❌ FAIL
+- Cache metrics are always reported consistently
+- Token usage is tracked per query
+- Error details are structured and actionable
+- Format is consistent across all 25 tools
+
+**When Writing New Tests:**
+1. Always include the 5 icon sections (✅/❌, 📊, 🔢, 📝, 📦)
+2. Start with "I am testing [tool_name] to [action]"
+3. End with "Do not suggest code or fixes"
+4. Include expected values in RESULT section for validation
+5. Specify cache expectation (HIT/MISS) for repeat tests
+
+---
+
 ## 📊 VALIDATION CHECKLIST
 
 ### Refactoring Validation (Session 1.4) - COMPLETE:

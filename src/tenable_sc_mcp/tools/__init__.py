@@ -50,10 +50,11 @@ def register_all_tools(mcp: "FastMCP") -> None:
     from .vulnerability_lookup import register_tools as register_vulnerability_lookup
     register_vulnerability_lookup(mcp)
     
+    # Import and register asset discovery tools
+    from .asset_discovery import register_tools as register_asset_discovery
+    register_asset_discovery(mcp)
+    
     # Future tool modules will be registered here as they're implemented
-    # Example:
-    # from .asset_discovery import register_tools as register_asset_discovery
-    # register_asset_discovery(mcp)
 
 
 __all__ = ["register_all_tools"]

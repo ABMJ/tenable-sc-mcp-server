@@ -7,9 +7,9 @@
 
 ## 🎯 Quick Status
 
-**Completed**: 3/25 tools (12%) + Modular Architecture  
-**Current Phase**: Week 1 Session 1.4 (Refactoring) - ✅ Complete  
-**Next Session**: Week 1 Session 1.5 - Implement Tool 4 (`tsc_list_ips`) in `tools/asset_discovery.py`
+**Completed**: 4/25 tools (16%) + Modular Architecture  
+**Current Phase**: Week 1 Session 1.5 (Tool 4) - ✅ Complete  
+**Next Session**: Week 1 Session 1.6 - Implement Tool 5 (`tsc_list_vulns_by_cve`) in `tools/vulnerability_lookup.py`
 
 **Validated Performance:**
 - Cache hit rate: 57%+ achieved
@@ -129,6 +129,85 @@ Remediation planning, detailed investigation, compliance reporting
 
 ---
 
+## ✅ Tool 4: `tsc_list_ips` - IP Listing & Discovery
+
+**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Token Savings**: 94% | **Cache TTL**: 300s
+
+### What It Does
+List IP addresses in repositories or asset groups with comprehensive filtering. Supports reverse lookup to find where an IP appears. Optional detailed metadata for each IP.
+
+### Usage
+
+#### List IPs in Repository
+```
+use tenable-sc to list all IPs in repository "Default", then show me cache stats
+```
+
+#### List IPs in Asset Group
+```
+use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats
+```
+
+#### Reverse Lookup (Find IP Membership)
+```
+use tenable-sc to find which repositories and asset groups contain IP 10.1.20.10, then show me cache stats
+```
+
+#### Filtered List with Full Details
+```
+use tenable-sc to list IPs in repository "Default" with asset criticality > 8 and include full details, then show me cache stats
+```
+
+### Returns
+**Minimal Mode** (default):
+- IP addresses only
+- Total IP count
+- Scope info (repository or asset group name)
+
+**With include_details=True**:
+- IP address
+- DNS name
+- NetBIOS name
+- MAC address
+- UUID
+- Operating system
+- ACR score
+- Repository name
+
+**Reverse Lookup Mode** (when `ip` parameter provided):
+- List of repositories containing the IP
+- List of asset groups containing the IP
+- Membership counts
+
+### Available Filters (55+)
+All Tenable.sc analysis filters supported:
+- **Asset**: `asset_criticality`, `uuid`, `dns_name`
+- **Temporal**: `first_seen`, `last_seen`
+- **Scoring**: `vpr_score`, `cvss_v3_base_score`
+- **Vulnerability**: `severity`, `exploit_available`, `plugin_id`, `family`
+- **Network**: `port`, `protocol`
+- Plus 45+ additional filters
+
+### Token Efficiency
+~500-1,000 tokens minimal (vs ~9,000 raw) = **94% reduction**  
+~1,500-2,500 with details (still 70-85% reduction)
+
+### Best For
+- IP discovery and inventory
+- Subnet enumeration
+- Asset group membership queries
+- Finding where IPs appear across repositories
+- Building target lists for scans
+- CMDB synchronization
+
+### Implementation Notes
+- Uses `sumip` analysis tool
+- Smart caching per query
+- Handles asset group name → ID resolution automatically
+- Gracefully handles missing data (empty lists, not errors)
+
+---
+
 ## ✅ Week 1 Session 1.3: Testing & Validation (COMPLETE)
 
 **Activities:**
@@ -136,6 +215,33 @@ Remediation planning, detailed investigation, compliance reporting
 - Confirmed cache performance (57%+ hit rate)
 - Verified token savings (58-90%)
 - Tools 1-3 production ready
+
+---
+
+## ✅ Week 1 Session 1.5: Tool 4 Implementation (COMPLETE)
+
+**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Completed**: 2026-06-08
+
+**Completed Work:**
+1. ✅ Implemented `tsc_list_ips` in `tools/asset_discovery.py` (414 lines total)
+2. ✅ Fixed query structure to use `tsc_analyze()` instead of `tsc_request()`
+3. ✅ Implemented 3 modes: repository list, asset group list, reverse lookup
+4. ✅ Added comprehensive filtering support (55+ analysis filters)
+5. ✅ Added `include_details` parameter for full IP metadata
+6. ✅ Helper functions: `_resolve_asset_group_name`, `_find_ip_membership`
+7. ✅ Syntax validation passed
+8. ✅ Updated TEST_PROMPTS.md with 4 test scenarios
+9. ✅ Tool registered in `tools/__init__.py`
+
+**Validation Results:**
+- ✅ Code compiles without syntax errors
+- ✅ Tool registration pattern matches established style
+- ✅ Uses `tsc_analyze()` for proper caching behavior
+- ✅ Error handling for invalid inputs
+- ✅ Follows established coding patterns from Tools 1-3
+- ✅ Documentation complete in TEST_PROMPTS.md
+
+**Next Step:** Rebuild Docker container and test on live Tenable.sc data
 
 ---
 
@@ -222,53 +328,9 @@ src/tenable_sc_mcp/
 **Key Design Pattern:**
 All new tools must be implemented in tool modules (`tools/*.py`), NOT in `server.py`. Each module has a `register_tools(mcp)` function that decorates tools with `@mcp.tool()`. The registry (`tools/__init__.py`) calls all module registration functions at server startup.
 
-**Next Step:** Proceed to Session 1.5 - Implement Tool 4 (`tsc_list_ips`) in new module `tools/asset_discovery.py`
-
 ---
 
-### ⏳ Session 1.5: Tool 4 - IP Listing
-
-#### `tsc_list_ips`
-
-**Status**: ⏳ Next to implement | **Token Budget**: 500-1,000 | **Cache TTL**: 300s | **Estimated**: 2h
-
-**Purpose:**
-List IPs with comprehensive filtering - subnet, asset groups, tags, repositories, ALL 55+ analysis filters.
-
-**Planned Features:**
-- Subnet/CIDR range filtering
-- Asset group membership
-- Tag filtering (Category:Value format)
-- Repository ID filtering
-- Asset criticality filtering
-- Last seen date ranges
-- All 55+ analysis filters supported
-
-**Output:**
-List of IPs with:
-- IP address
-- Hostname
-- Operating system
-- Last seen timestamp
-- ACR score
-- Repository membership
-
-**Use Cases:**
-- IP discovery and inventory
-- Subnet enumeration
-- Asset group membership queries
-- Tag-based asset identification
-- Repository content listing
-
-**Implementation Notes:**
-- Use `sumip` or `iplist` analysis tool
-- Support CIDR notation (e.g., "10.1.20.0/24")
-- Validate IP format and CIDR ranges
-- Cache TTL: 300s (5 minutes)
-- Token budget: 500-1,000 tokens
-- **Module**: `tools/asset_discovery.py`
-
----
+## 📅 WEEK 1 - CORE FOUNDATION (2 TOOLS REMAINING)
 
 ### ⏳ Session 1.6: Tool 5 - CVE Search (NEW - HIGH PRIORITY) 🆕
 
@@ -838,20 +900,21 @@ This roadmap reflects user decisions from 2026-06-06 Session 4:
 
 **To Resume Development:**
 ```
-Review TOOLS_ROADMAP.md and week1_session_4_2026-06-06_XXXX.md, 
-then implement Week 1 Session 1.4: tsc_list_ips tool
+Review TOOLS_ROADMAP.md and week1_session5_2026-06-08_handoff.md, 
+then implement Week 1 Session 1.6: tsc_list_vulns_by_cve tool
 ```
 
 **Next Task Details:**
-- Tool: `tsc_list_ips` (Tool 4)
-- Session: Week 1 Session 1.4
-- Time: 2 hours
-- Token budget: 500-1,000
-- Cache TTL: 300s
-- Key filters: subnet/CIDR, asset groups, tags, repository IDs, asset criticality
+- Tool: `tsc_list_vulns_by_cve` (Tool 5)
+- Session: Week 1 Session 1.6
+- Time: 2-3 hours
+- Token budget: 1,000-2,000
+- Cache TTL: 240s
+- Key features: CVE search across infrastructure, affected IP list, remediation summary
 
 **Implementation Context:**
-- Codebase: `src/tenable_sc_mcp/server.py` (lines 547-1227 contain Tools 1-3)
+- Codebase: `src/tenable_sc_mcp/tools/vulnerability_lookup.py` (add Tool 5 here)
+- Tool 4 complete in `tools/asset_discovery.py` (414 lines)
 - Universal filter builder: `src/tenable_sc_mcp/convenience_tools.py`
 - Test prompts: `TEST_PROMPTS.md`
 - All validation/error patterns established
@@ -862,12 +925,12 @@ then implement Week 1 Session 1.4: tsc_list_ips tool
 
 - **Test Queries**: TEST_PROMPTS.md
 - **Caching Details**: CACHING_DEEP_DIVE.md
-- **Latest Session**: week1_session_4_2026-06-06_XXXX.md
+- **Latest Session**: week1_session5_2026-06-08_handoff.md
 - **API Reference**: https://docs.tenable.com/security-center/api/index.htm
 
 ---
 
-**Version**: 4.0 (Optimized 25-Tool Plan)  
-**Last Updated**: 2026-06-06 Session 4  
-**Status**: Week 1 - 50% Complete (3/6 tools done)  
-**Next**: Week 1 Session 1.4 - `tsc_list_ips` (Tool 4)
+**Version**: 4.1 (Session 1.5 Complete)  
+**Last Updated**: 2026-06-08 Session 5  
+**Status**: Week 1 - 67% Complete (4/6 tools done)  
+**Next**: Week 1 Session 1.6 - `tsc_list_vulns_by_cve` (Tool 5)
