@@ -250,6 +250,11 @@ def register_tools(mcp):
             )
             filters.extend(additional_filters)
             
+            # DEBUG: Log filters being sent to API
+            import json
+            print(f"DEBUG: Filters being sent to Tenable.sc API:")
+            print(json.dumps(filters, indent=2))
+            
             # Build query for sumip analysis tool with proper nested structure
             # Tenable.sc API requires: {"type": "vuln", "query": {...}, "sourceType": "cumulative"}
             query = {
@@ -310,18 +315,20 @@ def register_tools(mcp):
             if asset_group:
                 response["asset_group"] = asset_group
             
-            # Add filter info if any filters were applied
-            filters_applied = {}
-            if asset_criticality:
-                filters_applied["asset_criticality"] = asset_criticality
-            if severity:
-                filters_applied["severity"] = severity
-            if exploit_available:
-                filters_applied["exploit_available"] = exploit_available
-            if vpr_score:
-                filters_applied["vpr_score"] = vpr_score
-            if last_seen:
-                filters_applied["last_seen"] = last_seen
+            # Track ALL applied filters dynamically (not just a hardcoded subset)
+            # Get all filter parameters from locals(), excluding non-filter params
+            non_filter_params = {'repository', 'asset_group', 'ip', 'include_details'}
+            filters_applied = {
+                param: value 
+                for param, value in locals().items() 
+                if value is not None 
+                and param not in non_filter_params
+                and not param.startswith('_')
+                and param not in {'server', 'tsc_analyze', 'result', 'api_response', 
+                                   'ip_data', 'formatted_ips', 'response', 'filters', 
+                                   'additional_filters', 'query', 'repo_id', 'asset_group_id',
+                                   'asset_group_name', 'filters_applied'}
+            }
             
             if filters_applied:
                 response["filters_applied"] = filters_applied
