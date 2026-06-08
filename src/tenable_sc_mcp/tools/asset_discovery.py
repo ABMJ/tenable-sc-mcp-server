@@ -293,8 +293,8 @@ def register_tools(mcp):
                         "mac_address": item.get("macAddress", ""),
                         "uuid": item.get("uuid", ""),
                         "os": item.get("operatingSystem", item.get("osCPE", "")),
-                        "acr_score": item.get("acrScore", "0"),  # Asset Criticality Rating (0-10)
-                        "aes_score": item.get("score", "0"),      # Asset Exposure Score (0-1000)
+                        "acr_score": item.get("acrScore", "0"),              # Asset Criticality Rating (0-10)
+                        "aes_score": item.get("assetExposureScore", "0"),    # Asset Exposure Score (0-1000)
                         "repository": item.get("repository", {}).get("name", ""),
                     }
                     formatted_ips.append(ip_entry)
