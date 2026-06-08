@@ -74,7 +74,7 @@ use tenable-sc to find all vulnerabilities on 10.1.20.10 with available exploits
 
 ### Test 1: List IPs by Repository Name
 ```
-I am testing tsc_list_ips, so please use it to list all IPs in repository "Default", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods.
+I am testing tsc_list_ips, so please use it to list all IPs in repository "Default", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods. Do not suggest fixes or code, just state the facts.
 ```
 
 **Expected Output:**
@@ -92,7 +92,7 @@ I am testing tsc_list_ips, so please use it to list all IPs in repository "Defau
 
 ### Test 2: List IPs by Asset Group Name
 ```
-I am testing tsc_list_ips, so please use it to list all IPs in asset group "Windows Hosts", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods.
+I am testing tsc_list_ips, so please use it to list all IPs in asset group "Windows Hosts", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods. Do not suggest fixes or code, just state the facts.
 ```
 
 **Expected Output:**
@@ -110,7 +110,7 @@ I am testing tsc_list_ips, so please use it to list all IPs in asset group "Wind
 
 ### Test 3: Reverse Lookup (Find IP Membership)
 ```
-I am testing tsc_list_ips, so please use it to find which repositories and asset groups contain IP 10.1.20.10, then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods.
+I am testing tsc_list_ips, so please use it to find which repositories and asset groups contain IP 10.1.20.10, then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods. Do not suggest fixes or code, just state the facts.
 ```
 
 **Expected Output:**
@@ -129,7 +129,7 @@ I am testing tsc_list_ips, so please use it to find which repositories and asset
 
 ### Test 4: Filtered IP List with Full Details
 ```
-I am testing tsc_list_ips, so please use it to list IPs in repository "Default" with asset criticality > 7 and include full details, then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods.
+I am testing tsc_list_ips, so please use it to list IPs in repository "Default" with asset criticality > 7 and include full details, then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, and 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods. Do not suggest fixes or code, just state the facts.
 ```
 
 **Expected Output:**
