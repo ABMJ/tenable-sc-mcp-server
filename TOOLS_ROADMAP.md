@@ -353,25 +353,6 @@ This tool supports all Tenable.sc analysis filters:
 - CMDB synchronization and export
 - Subnet enumeration
 
-### Technical Notes for Developers
-- Uses `sumip` analysis tool for IP enumeration
-- Uses `sumasset` tool for reverse lookup of asset group membership
-- Automatic name-to-ID resolution for repositories and asset groups
-- Asset filter format: `{"id": "3", "name": "Windows Hosts"}` (object with both ID and name)
-- Repository filter format: `[{"id": "9"}]` (array with string ID)
-- ACR operator conversion: `>7` → `7.1-10`, `>=7` → `7.0-10` (handles decimals correctly)
-- Reverse lookup filters results by `total > 0` to show only actual memberships
-- Gracefully handles missing data (returns empty lists, not errors)
-
-### Bugs Fixed in Session 1.5
-1. ✅ Added nested `{"query": {...}}` wrapper for API compatibility (HTTP 403 fix)
-2. ✅ Fixed asset filter structure to use object format not array
-3. ✅ Fixed ACR field mapping to `acrScore` (0-10) instead of `score` (0-4000+)
-4. ✅ Fixed ACR operator conversion to include decimal ranges (>7 → 7.1-10 not 8-10)
-5. ✅ Fixed reverse lookup to use correct `sumasset` analysis tool
-6. ✅ Added filtering to show only asset groups where `total > 0`
-7. ✅ Validated all scenarios with real Tenable.sc production data
-
 ---
 
 # 🗓️ PART 2: DEVELOPMENT ROADMAP (PENDING TOOLS)

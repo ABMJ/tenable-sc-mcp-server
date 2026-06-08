@@ -8,21 +8,29 @@ Use these prompts to test the tools and verify functionality. **Always append ca
 
 ### Completed Tools (Week 1)
 - [Tool 1: IP Profile (tsc_profile_ip_efficient)](#tool-1-ip-profile-tsc_profile_ip_efficient)
-- [Tool 2: Vulnerability Lists](#tool-2-vulnerability-lists-tsc_list_vulns_by_ip)
+- [Tool 2: Vulnerability Lists (tsc_list_vulns_by_ip)](#tool-2-vulnerability-lists-tsc_list_vulns_by_ip)
   - [Summary View (Efficient)](#summary-view-efficient)
-  - [Full Details View](#full-details-view)
-  - [Pagination Test](#pagination-test)
-- [Tool 4: IP Discovery & Listing (tsc_list_ips)](#tool-4-ip-discovery--listing-tsc_list_ips)
-  - [Test 1: List all IPs in Repository](#test-1-list-all-ips-in-repository)
-  - [Test 2: List IPs in Asset Group](#test-2-list-ips-in-asset-group)
-  - [Test 3: Reverse Lookup (Find IP Membership)](#test-3-reverse-lookup-find-ip-membership)
-  - [Test 4: Filtered List with Details](#test-4-filtered-list-with-details)
+  - [Full Details View](#full-details-view-tool-2---primary-test)
+  - [Filtered Search with Exploits](#filtered-search-with-exploits)
+- [Tool 4: IP Listing (tsc_list_ips)](#tool-4-ip-listing-tsc_list_ips)
+  - [Test 1: List IPs by Repository Name](#test-1-list-ips-by-repository-name)
+  - [Test 2: List IPs by Asset Group Name](#test-2-list-ips-by-asset-group-name)
+  - [Test 3: Reverse Lookup](#test-3-reverse-lookup-find-ip-membership)
+  - [Test 4: Filtered List with Details](#test-4-filtered-ip-list-with-full-details)
+  - [Test 5: Cache HIT Behavior](#test-5-verify-cache-hit-behavior-repeat-test-1)
 
-### Generic/Core Tools
-- [Tool 3: Cache Performance (tsc_cache_stats)](#tool-3-cache-performance-tsc_cache_stats)
+### Testing & Performance
+- [Cache Performance Testing](#cache-performance-testing)
+- [Token Efficiency Demonstration](#token-efficiency-demonstration)
+- [Complete Test Sequence](#complete-test-sequence-run-all)
+- [Advanced Filtering Examples](#advanced-filtering-examples)
+- [Cache Management](#cache-management)
+- [Performance Benchmarking](#performance-benchmarking)
+- [Error Handling Verification](#error-handling-verification)
 
-### Visual Test Prompt Style Guide
-- [Test Prompt Format and Best Practices](#visual-test-prompt-style-guide)
+### Reference
+- [Visual Test Prompt Style Guide](#visual-test-prompt-style-guide)
+- [Notes & Best Practices](#notes--best-practices)
 
 ---
 
@@ -464,160 +472,68 @@ use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_
 
 ---
 
-## Tool 4: IP Listing (tsc_list_ips)
-
-**Status**: ✅ Production Ready | **Week 1 Session 1.5** | **Token Savings**: 94% | **Cache TTL**: 300s
-
-### Basic IP Listing by Asset Group
-```
-use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats and token usage for this request
-```
-
-**Expected Output:**
-- List of IP addresses in the asset group
-- Total IP count
-- Cache hit rate
-- Token efficiency metrics
-
-**Token Efficiency:** ~500-1,000 tokens (vs ~9,000 raw) = 94% reduction
 
 ---
 
-### IP Listing by Repository
+## Visual Test Prompt Style Guide
+
+### Standard Format
+
+All test prompts should use this visual format for consistency:
+
 ```
-use tenable-sc to list all IPs in repository "Default", then show me cache stats and token usage for this request
+I am testing [tool_name] to [action]. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: [brief summary of returned data]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
 
-**Expected Output:**
-- List of IP addresses in the repository
-- Total IP count
-- Repository name confirmation
-- Cache performance
+### Benefits
+
+- **Visual Icons** (✅/❌/📊/🔢/📝/📦) - Easy to scan for pass/fail at a glance
+- **Structured Sections** - Consistent across all tests, machine-parseable
+- **Cache Tracking** - Always report HIT/MISS for performance validation
+- **Token Metrics** - Track token usage per query
+- **Actionable Errors** - Clear debugging information without suggested fixes
+
+### Example
+
+```
+I am testing tsc_list_ips to list all IPs in repository "Default". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Total IPs: [count], First 5: [list]
+```
 
 ---
 
-### Filtered Listing (ACR Filter)
-```
-use tenable-sc to list all IPs in asset group "Windows Hosts" with ACR > 8, then show me cache stats and token usage for this request
-```
+## Notes & Best Practices
 
-**Expected Output:**
-- Filtered IP list (only IPs with ACR score > 8)
-- Total count after filtering
-- Applied filters summary
-- Cache stats
+### Cache Behavior
+- First query of any unique dataset will be a **MISS**
+- Repeated queries (within TTL window) will be a **HIT**
+- Different filters create different cache keys (new MISS)
+- Cache TTLs: 120-300s depending on tool
 
----
+### Token Optimization
+- Use summary tools first (`tsc_list_vulns_by_ip_summary`) before full details
+- Apply filters to reduce payload size
+- Pagination helps manage large datasets
+- Cache hits use minimal tokens (~50-100 vs thousands on MISS)
 
-### Multi-Filter Query
-```
-use tenable-sc to list all IPs in repository "Default" with critical severity and exploit available, then show me cache stats and token usage for this request
-```
-
-**Expected Output:**
-- IPs matching all filter criteria
-- Filters applied summary
-- Token savings vs raw API
-- Cache performance
+### Testing Tips
+- Run each query twice to verify cache HIT behavior
+- Check `tsc_cache_stats` to monitor overall hit rate
+- Test error handling with invalid inputs
+- Validate filters work correctly with real data
+- Compare token usage: first query (MISS) vs repeat (HIT)
 
 ---
-
-### Reverse Lookup (IP Membership)
-```
-use tenable-sc to find which repository or asset group contains IP 10.1.20.10, then show me cache stats and token usage for this request
-```
-
-**Expected Output:**
-- List of repositories containing the IP
-- List of asset groups containing the IP
-- Membership counts
-- Cache hit rate
-
----
-
-### Detailed Listing (With Metadata)
-```
-use tenable-sc to list all IPs in asset group "Production Servers" with details including DNS, MAC, UUID, ACR, and OS, then show me cache stats and token usage for this request
-```
-
-**Expected Output:**
-- IP addresses with full metadata:
-  - DNS name
-  - MAC address
-  - UUID
-  - ACR score
-  - Operating system
-  - Repository membership
-- Cache performance
-- Token utilization
-
----
-
-### Cache Performance Test (Run 3 Times)
-
-**Query 1 (Cache Miss):**
-```
-use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats and token usage for this request
-```
-Expected: 0% hit rate (first query)
-
-**Query 2 (Cache Hit):**
-```
-use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats and token usage for this request
-```
-Expected: 50% hit rate (cache hit on repeated query)
-
-**Query 3 (Cache Hit):**
-```
-use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats and token usage for this request
-```
-Expected: 66%+ hit rate (hit rate improving)
-
----
-
-### Error Handling Tests
-
-**Missing Parameters:**
-```
-use tenable-sc to list IPs (no parameters)
-```
-**Expected:** Error message: "Must provide either 'repository', 'asset_group', or 'ip' parameter"
-
-**Both Repository and Asset Group:**
-```
-use tenable-sc to list IPs in repository "Default" and asset group "Windows Hosts"
-```
-**Expected:** Error message: "Provide only ONE of: repository, asset_group (not both)"
-
-**Invalid IP for Reverse Lookup:**
-```
-use tenable-sc to find which asset groups contain IP 999.999.999.999
-```
-**Expected:** Error message: "Invalid IP address format"
-
----
-
-## Complete Tool 4 Test Sequence
-
-Execute these in order for comprehensive testing:
-
-```
-1. use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats and token usage for this request
-
-2. use tenable-sc to list all IPs in asset group "Windows Hosts", then show me cache stats and token usage for this request (repeat for cache hit)
-
-3. use tenable-sc to list all IPs in asset group "Windows Hosts" with ACR > 8, then show me cache stats and token usage for this request
-
-4. use tenable-sc to find which repository or asset group contains IP 10.1.20.10, then show me cache stats and token usage for this request
-
-5. use tenable-sc to list all IPs in repository "Default" with details, then show me cache stats and token usage for this request
-
-6. use tenable-sc to show me cache statistics and explain the hit rate improvement
-```
-
-**Expected Results:**
-- All queries work correctly
-- Cache hit rate improves with repeated queries (0% → 50% → 66%+)
-- Token savings validated (~94% reduction)
-- All use cases covered (basic listing, filtering, reverse lookup, detailed metadata)
-- No errors or failures
