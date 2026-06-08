@@ -11,6 +11,35 @@
 
 Production-ready MCP server for Tenable Security Center Plus with intelligent caching for 90% token savings and 1000x faster responses.
 
+---
+
+## 📑 Table of Contents
+
+### Getting Started
+- [🎯 Status Overview](#-status-overview)
+- [Quick Start (Docker Compose)](#quick-start-docker-compose)
+- [Configuration](#configuration)
+- [Usage](#usage)
+
+### Features & Tools
+- [✨ Key Features](#-key-features)
+- [🛠️ Available Tools](#️-available-tools)
+- [📊 Convenience Tools](#-convenience-tools-intelligent-caching--token-optimization)
+
+### Technical Details
+- [🔧 How It Works](#-how-it-works)
+- [🏗️ Architecture](#️-architecture)
+- [🧪 Testing](#-testing)
+- [🔍 Troubleshooting](#-troubleshooting)
+
+### Development
+- [🚀 Development](#-development)
+- [📝 Contributing](#-contributing)
+- [🔒 Security](#-security)
+- [📜 License](#-license)
+
+---
+
 ## 🎯 Status Overview
 
 | Component | Status | Performance | Tests |

@@ -5,6 +5,30 @@
 
 ---
 
+## 📑 Table of Contents
+
+### Quick Navigation
+- [🎯 Quick Status](#-quick-status)
+- [📋 Document Purpose](#-document-purpose)
+
+### Part 1: User Guide (Completed Tools)
+- [Tool 1: tsc_profile_ip_efficient - Complete IP Security Profile](#-tool-1-tsc_profile_ip_efficient---complete-ip-security-profile)
+- [Tool 2a: tsc_list_vulns_by_ip_summary - Quick Vulnerability Count](#-tool-2a-tsc_list_vulns_by_ip_summary---quick-vulnerability-count)
+- [Tool 2b: tsc_list_vulns_by_ip_full - Detailed Vulnerability Records](#-tool-2b-tsc_list_vulns_by_ip_full---detailed-vulnerability-records)
+- [Tool 4: tsc_list_ips - IP Discovery & Asset Enumeration](#-tool-4-tsc_list_ips---ip-discovery--asset-enumeration)
+
+### Part 2: Development Roadmap (Pending Tools)
+- [📅 Week 1 - Core Foundation (2 Tools Remaining)](#-week-1---core-foundation-2-tools-remaining)
+  - [Session 1.6: Tool 5 - CVE Search](#-session-16-tool-5---cve-search-new---high-priority-)
+  - [Session 1.7: Tool 6 - Missing Patches](#-session-17-tool-6---missing-patches)
+  - [Session 1.8: Tool 7 - Scan Status](#-session-18-tool-7---scan-status)
+- [📅 Week 2 - Essential Queries](#-week-2---essential-queries-10-tools)
+- [📅 Week 3 - Advanced Features](#-week-3---advanced-features-8-tools)
+- [🔧 Technical Architecture](#-technical-architecture)
+- [💡 Best Practices](#-best-practices)
+
+---
+
 ## 🎯 Quick Status
 
 **Completed**: 4/25 tools (16%) + Modular Architecture  
