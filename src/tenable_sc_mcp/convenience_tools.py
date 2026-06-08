@@ -70,11 +70,12 @@ COMMON_FILTERS = {
     "cpe": "cpe",
     "stig_severity": "stigSeverity",
     
-    # Scoring (9 filters)
+    # Scoring (10 filters)
     "base_cvss_score": "baseCVSSScore",
     "cvss_v3_base_score": "cvssV3BaseScore",
     "cvss_v4_base_score": "cvssV4BaseScore",
     "vpr_score": "vprScore",
+    "aes_score": "assetExposureScore",  # Asset Exposure Score (AES)
     "epss_score": "epssScore",
     "cvss_vector": "cvssVector",
     "cvss_v3_vector": "cvssV3Vector",
@@ -227,11 +228,13 @@ def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
     """
     # Scoring filters that require operator-to-range conversion
     SCORING_FILTERS = {
-        'asset_criticality': 10.0,  # ACR: 0-10 scale
-        'vpr_score': 10.0,          # VPR: 0-10 scale
-        'cvss_v3_base_score': 10.0, # CVSS v3: 0-10 scale
-        'cvss_base_score': 10.0,    # CVSS v2: 0-10 scale
-        'epss_score': 1.0,          # EPSS: 0-1 scale (probability)
+        'asset_criticality': 10.0,    # ACR: 0-10 scale
+        'vpr_score': 10.0,            # VPR: 0-10 scale
+        'aes_score': 1000.0,          # AES: 0-1000 scale (Asset Exposure Score)
+        'cvss_v3_base_score': 10.0,   # CVSS v3: 0-10 scale
+        'cvss_v4_base_score': 10.0,   # CVSS v4: 0-10 scale
+        'base_cvss_score': 10.0,      # CVSS v2: 0-10 scale
+        'epss_score': 1.0,            # EPSS: 0-1 scale (probability)
     }
     
     filters = []

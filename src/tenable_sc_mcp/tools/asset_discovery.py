@@ -31,9 +31,13 @@ def register_tools(mcp):
         # Temporal filters
         first_seen: str | None = None,
         last_seen: str | None = None,
-        # Scoring filters
+        # Scoring filters (all support operators: >, >=, <, <=, =)
         vpr_score: str | None = None,
+        aes_score: str | None = None,
         cvss_v3_base_score: str | None = None,
+        cvss_v4_base_score: str | None = None,
+        base_cvss_score: str | None = None,
+        epss_score: str | None = None,
         # Vulnerability filters
         severity: str | None = None,
         exploit_available: str | None = None,
@@ -227,7 +231,11 @@ def register_tools(mcp):
                 first_seen=first_seen,
                 last_seen=last_seen,
                 vpr_score=vpr_score,
+                aes_score=aes_score,
                 cvss_v3_base_score=cvss_v3_base_score,
+                cvss_v4_base_score=cvss_v4_base_score,
+                base_cvss_score=base_cvss_score,
+                epss_score=epss_score,
                 severity=severity,
                 exploit_available=exploit_available,
                 plugin_id=plugin_id,
