@@ -74,97 +74,125 @@ use tenable-sc to find all vulnerabilities on 10.1.20.10 with available exploits
 
 ### Test 1: List IPs by Repository Name
 ```
-I am testing tsc_list_ips, so please use it to list all IPs in repository "Default", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods, 5) show me a brief summary of what the MCP server returned (total IPs found, first 5 IPs as sample). Do not suggest fixes or code.
+I am testing tsc_list_ips to list all IPs in repository "Default". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS] 
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Total IPs: [count], First 5: [list]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
 
 **Expected Output:**
-- Tool name confirmation: `tsc_list_ips` used
-- List of IP addresses in the repository
-- Total IP count
-- Repository name confirmation
-- Cache status: **MISS** on first run, **HIT** on repeat
-- Specific token count for this query
-- One-liner summary of cache performance and token usage
+- ✅ **PASS** with visual confirmation
+- 📊 Cache status clearly marked (MISS on first run, HIT on repeat)
+- 🔢 Specific token count
+- 📦 Total IPs: ~854, sample of first 5 IPs
+- Repository: "Default"
 
-**Token Efficiency:** ~500-1,000 tokens (vs ~9,000 raw API) = 94% reduction
+**Token Efficiency:** ~3,400 tokens on MISS, ~3,700 on HIT (cache saves API time, not significant tokens due to large payload)
 
 ---
 
 ### Test 2: List IPs by Asset Group Name
 ```
-I am testing tsc_list_ips, so please use it to list all IPs in asset group "Windows Hosts", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods, 5) show me a brief summary of what the MCP server returned (total IPs found, first 5 IPs as sample). Do not suggest fixes or code.
+I am testing tsc_list_ips to list all IPs in asset group "Windows Hosts". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used  
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Total IPs: [count], First 5: [list]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
 
 **Expected Output:**
-- Tool name confirmation: `tsc_list_ips` used
-- List of IP addresses in the asset group
-- Total IP count
-- Asset group name confirmation
-- Cache status: **MISS** on first run, **HIT** on repeat
-- Specific token count for this query
-- One-liner summary of cache performance and token usage
+- ✅ **PASS** with visual confirmation
+- 📊 Cache status clearly marked
+- 🔢 Specific token count
+- 📦 Total IPs: ~174, sample of first 5 IPs
+- Asset group: "Windows Hosts"
 
-**Token Efficiency:** ~500-1,000 tokens (vs ~9,000 raw API) = 94% reduction
+**Token Efficiency:** ~1,000-1,200 tokens (smaller result set = fewer tokens)
 
 ---
 
 ### Test 3: Reverse Lookup (Find IP Membership)
 ```
-I am testing tsc_list_ips, so please use it to find which repositories and asset groups contain IP 10.1.20.10, then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods, 5) show me what the MCP server returned (list all repositories and asset groups found). Do not suggest fixes or code.
+I am testing tsc_list_ips to find which repositories and asset groups contain IP 10.1.20.10. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]  
+📦 RESULT: Repositories: [list], Asset Groups: [list]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
 
 **Expected Output:**
-- Tool name confirmation: `tsc_list_ips` used
-- IP address confirmation
-- List of repositories containing the IP
-- List of asset groups containing the IP
+- ✅ **PASS** with visual confirmation
+- 📊 Cache status clearly marked
+- 🔢 Specific token count
+- 📦 Repositories: ["Default"], Asset Groups: ~6 groups (filtered by total > 0)
+- IP: 10.1.20.10
+
+**Use Case:** Answer "Where does this IP show up?" for asset management
+
+**Token Efficiency:** ~400-700 tokens (minimal payload)
+
+---
+
+### Test 4: Filtered IP List with Full Details
+```
+I am testing tsc_list_ips to list IPs in repository "Default" with asset criticality > 7 and full details. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Total IPs with ACR > 7: [count], First 3 with DNS and ACR: [list]
+
+If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
+```
+
+**Expected Output:**
+- ✅ **PASS** with visual confirmation
+- 📊 Cache status clearly marked  
+- 🔢 Specific token count
+- 📦 Total IPs: ~37 (ACR 8-10 range)
+- First 3 IPs with full details:
+  - IP, DNS name, ACR score (0-10 range)
+  - OS, MAC, UUID included
+- Applied filters: asset_criticality > 7 (converted to 7.1-10 range)
+
+**Available Filters:** All 55+ analysis filters supported (severity, exploit_available, vpr_score, cvss_v3_base_score, first_seen, last_seen, etc.)
+
+**Token Efficiency:** ~2,300-2,400 tokens with full details (still efficient vs raw API)
+
+---
+
+### Test 5: Verify Cache HIT Behavior (Repeat Test 1)
+```
+I am testing tsc_list_ips cache behavior by repeating Test 1 (repository "Default"). Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [MUST BE HIT]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner comparing to first query]
+📦 RESULT: Confirm total IPs matches Test 1
+
+If cache shows MISS instead of HIT, provide ERROR DETAILS. Do not suggest code or fixes.
+```
 - Membership counts
 - Cache status: **MISS** on first run, **HIT** on repeat
 - Specific token count for this query
 - One-liner summary of cache performance and token usage
 
 **Use Case:** Answer "Where does this IP show up?" for asset management
-
----
-
-### Test 4: Filtered IP List with Full Details
-```
-I am testing tsc_list_ips, so please use it to list IPs in repository "Default" with asset criticality > 7 and include full details, then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods, 5) show me what the MCP server returned (total IPs found with ACR > 7, show first 3 IPs with their DNS name and ACR score). Do not suggest fixes or code.
-```
-
-**Expected Output:**
-- Tool name confirmation: `tsc_list_ips` used
-- Filtered IP list (only ACR > 7)
-- Full details for each IP:
-  - IP address
-  - DNS name
-  - NetBIOS name
-  - MAC address
-  - UUID
-  - Operating system
-  - ACR score
-  - Repository name
-- Applied filters summary
-- Cache status: **MISS** on first run, **HIT** on repeat
-- Specific token count for this query
-- One-liner summary of cache performance and token usage
-
-**Available Filters:** All 55+ analysis filters supported (severity, exploit_available, vpr_score, cvss_v3_base_score, first_seen, last_seen, etc.)
-
-**Token Efficiency:** ~500-1,000 tokens minimal, ~1,500-2,500 with details (still 70-85% reduction)
-
----
-
-### Test 5: Verify Cache HIT Behavior (Repeat Test 1)
-```
-I am testing tsc_list_ips, so please use it to list all IPs in repository "Default", then show me: 1) was this query a cache HIT or MISS, 2) how many tokens were used for this specific query, 3) provide a one-liner summary of the cache performance and token usage, 4) if it fails please provide me with the reason, enough details for the developing llm to fix and dont try other methods, 5) confirm the total IPs returned matches Test 1. Do not suggest fixes or code.
-```
-
-**Expected Output:**
-- Cache status: **HIT** (same query as Test 1)
-- Near-instant response time
-- Same results as Test 1
-- Token count should be minimal (cache overhead only)
 
 ---
 
