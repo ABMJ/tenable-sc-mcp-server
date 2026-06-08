@@ -78,22 +78,39 @@ def register_tools(mcp):
             repository: Repository name or ID (e.g., "Default", "9", "PCI Assets")
             asset_group: Asset group name or ID (e.g., "Windows Hosts", "3")
             ip: Specific IP for reverse lookup (find membership in repos/groups)
-            include_details: Return full metadata per IP (DNS, MAC, UUID, ACR, OS)
+            include_details: Return full metadata per IP (DNS, MAC, UUID, ACR, AES, OS)
             
-            # Advanced Filters (55+ supported):
-            asset_criticality: ACR filter (e.g., ">8", ">=7.5")
+            # Scoring Filters (use RANGE format, NOT operators):
+            asset_criticality: ACR range (e.g., "7-10", "8-10"). DO NOT use operators like ">7".
+            vpr_score: VPR range (e.g., "7-10", "8-10"). DO NOT use ">7" or ">=7".
+            aes_score: AES range (e.g., "600-1000", "700-1000"). Scale: 0-1000.
+            cvss_v3_base_score: CVSS v3 range (e.g., "7-10"). DO NOT use ">7".
+            cvss_v4_base_score: CVSS v4 range (e.g., "7-10").
+            base_cvss_score: CVSS v2 range (e.g., "7-10").
+            epss_score: EPSS range (e.g., "0.5-1.0"). Scale: 0-1.
+            
+            # Other Filters:
             uuid: Asset UUID filter
             dns_name: DNS name filter (hostname)
             first_seen: First seen timestamp (epoch)
             last_seen: Last seen timestamp (epoch)
-            vpr_score: VPR score filter (e.g., ">=7.0")
-            cvss_v3_base_score: CVSS v3 base score filter
             severity: Vulnerability severity (0-4 or info/low/medium/high/critical)
+            aes_severity: AES-based severity (info/low/medium/high/critical)
             exploit_available: Exploit availability (Yes/No)
             plugin_id: Specific plugin ID
             family: Plugin family name
             port: Port number
             protocol: Protocol (TCP/UDP)
+            
+            IMPORTANT - Scoring Filter Format:
+            - Use RANGE format: "min-max" (e.g., "7-10", "600-1000")
+            - DO NOT use operators: ">7", ">=7", "<5", "<=5"
+            - Why? Tenable.sc backend only supports inclusive ranges
+            - Examples:
+              * For "ACR greater than 7": use "7-10" (includes 7,8,9,10)
+              * For "AES greater than 600": use "600-1000" (includes 600-1000)
+              * For "VPR 7-8": use "7-8"
+            - MCP Client: Ask user to confirm range if they provide operators
             
         Returns:
             Success response with:
@@ -114,8 +131,11 @@ def register_tools(mcp):
             >>> tsc_list_ips(repository="Default")
             {"ok": True, "repository": "Default", "total_ips": 413, "ips": ["10.1.20.10", ...]}
             
-            >>> tsc_list_ips(asset_group="Windows Hosts", asset_criticality=">8")
-            {"ok": True, "asset_group": "Windows Hosts", "filters_applied": {"asset_criticality": ">8"}, "total_ips": 12, "ips": [...]}
+            >>> tsc_list_ips(asset_group="Windows Hosts", asset_criticality="8-10")
+            {"ok": True, "asset_group": "Windows Hosts", "filters_applied": {"asset_criticality": "8-10"}, "total_ips": 12, "ips": [...]}
+            
+            >>> tsc_list_ips(repository="Default", asset_criticality="7-10", aes_score="600-1000")
+            {"ok": True, "repository": "Default", "filters_applied": {"asset_criticality": "7-10", "aes_score": "600-1000"}, "total_ips": 54, "ips": [...]}
             
             >>> tsc_list_ips(ip="10.10.10.10")
             {
@@ -226,8 +246,8 @@ def register_tools(mcp):
                 })
             
             # Add additional filters from parameters
-            # Note: build_filters() automatically converts scoring filter operators (>, >=, <, <=)
-            # to range format required by Tenable.sc API (e.g., ">7" becomes "7.1-10")
+            # Note: Scoring filters must be in range format (e.g., "7-10", "600-1000").
+            # Operators like ">7" will raise ValueError with helpful message.
             additional_filters = build_filters(
                 asset_criticality=asset_criticality,
                 uuid=uuid,

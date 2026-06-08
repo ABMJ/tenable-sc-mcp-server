@@ -155,92 +155,99 @@ def validate_severity(severity: str) -> tuple[bool, str]:
     return True, ""
 
 
-def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -> str:
+def validate_score_filter(score_value: str, max_score: float = 10.0) -> tuple[bool, str]:
     """
-    Convert comparison operators to Tenable.sc range format for scoring filters.
+    Validate scoring filter format (must be range, not operator).
     
-    Tenable.sc API requires scoring filters (ACR, VPR, CVSS, EPSS) to use range format,
-    not comparison operators. This function converts user-friendly operators like ">7"
-    to API-compatible ranges like "7.1-10".
+    Tenable.sc API requires inclusive range format (e.g., "7-10", "600-1000").
+    Operators like >, >=, <, <= are NOT supported by the backend.
     
     Args:
-        score_value: Score with optional operator (e.g., ">7", ">=8.5", "7", "7-9")
-        max_score: Maximum value for the scoring scale (default: 10.0)
+        score_value: Score filter value (e.g., "7-10", "600-1000")
+        max_score: Maximum value for validation
     
     Returns:
-        Range string compatible with Tenable.sc API (e.g., "7.1-10", "0-6.9")
+        Tuple of (is_valid, error_message)
     
     Examples:
-        ">7"   → "7.1-10"   (greater than 7)
-        ">=7"  → "7.0-10"   (greater than or equal to 7)
-        "<5"   → "0-4.9"    (less than 5)
-        "<=5"  → "0-5.0"    (less than or equal to 5)
-        "7"    → "7.0-7.0"  (exact match)
-        "7-9"  → "7-9"      (already range format)
-        
-        For AES (0-1000 scale):
-        ">600" → "601-1000"  (integer format for large scales)
+        "7-10" → (True, "")
+        "600-1000" → (True, "")
+        ">7" → (False, "Use range format '7-10', not operator '>7'")
     """
     import re
     
-    # If already in range format (X-Y), return as-is
-    if '-' in score_value and not score_value.startswith('-'):
-        return score_value
+    # Check for operator usage (not allowed)
+    if any(op in score_value for op in ['>', '<', '>=', '<=']):
+        return (False, f"Scoring filters require range format (e.g., '7-10'), not operators (e.g., '>7'). "
+                       f"For 'greater than 7', use range '7-{int(max_score)}'. "
+                       f"For 'less than 7', use range '0-7'.")
     
-    # Try to match operator pattern: (>=|>|<=|<|=)(\d+\.?\d*)
-    match = re.match(r'^(>=|>|<=|<|=|==)?(\d+\.?\d*)$', score_value.strip())
+    # Validate range format: X-Y where X and Y are numbers
+    match = re.match(r'^(\d+\.?\d*)-(\d+\.?\d*)$', score_value.strip())
     if not match:
-        # Invalid format, return as-is and let API reject it
+        return (False, f"Invalid range format '{score_value}'. Use format 'min-max' (e.g., '7-10', '600-1000').")
+    
+    lower = float(match.group(1))
+    upper = float(match.group(2))
+    
+    if lower > upper:
+        return (False, f"Invalid range '{score_value}': lower bound ({lower}) cannot be greater than upper bound ({upper}).")
+    
+    if lower < 0 or upper > max_score:
+        return (False, f"Range '{score_value}' out of bounds. Valid range: 0-{int(max_score)}.")
+    
+    return (True, "")
+
+
+def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -> str:
+    """
+    DEPRECATED: This function is kept for backward compatibility only.
+    
+    New behavior: Pass through range format unchanged, validate format.
+    Operators are no longer supported - users must provide ranges.
+    
+    Args:
+        score_value: Score range in format "min-max" (e.g., "7-10", "600-1000")
+        max_score: Maximum value for the scoring scale
+    
+    Returns:
+        The range string unchanged (after validation)
+    
+    Examples:
+        "7-10" → "7-10" (valid range, passed through)
+        "600-1000" → "600-1000" (valid range, passed through)
+        ">7" → raises ValueError (operators not supported)
+    """
+    import re
+    
+    # Check for operator usage (not allowed)
+    if any(op in score_value for op in ['>', '<', '>=', '<=']):
+        raise ValueError(
+            f"Operator format '{score_value}' is not supported. "
+            f"Use range format instead: for '>7' use '7-{int(max_score)}', "
+            f"for '<7' use '0-7', for '>=7' use '7-{int(max_score)}', "
+            f"for '<=7' use '0-7'. "
+            f"Example: asset_criticality='7-10' instead of '>7'"
+        )
+    
+    # If already in range format, validate and return
+    if '-' in score_value and not score_value.startswith('-'):
+        is_valid, error = validate_score_filter(score_value, max_score)
+        if not is_valid:
+            raise ValueError(error)
         return score_value
     
-    operator = match.group(1) or '='  # Default to '=' if no operator
-    threshold = float(match.group(2))
+    # Single value - convert to range
+    match = re.match(r'^(\d+\.?\d*)$', score_value.strip())
+    if match:
+        value = match.group(1)
+        return f"{value}-{value}"
     
-    # Determine if we should use integer or decimal format
-    # Use integers for scales > 100 (e.g., AES 0-1000), decimals for smaller scales (e.g., ACR 0-10)
-    use_integer = max_score > 100
-    
-    # Convert to range format based on operator
-    if operator == '>':
-        # >7 means "greater than 7" = 7.1-max (excludes 7, includes 7.1+)
-        if use_integer:
-            lower = int(threshold) + 1  # For AES: >600 = 601-1000
-            upper = int(max_score)
-            return f"{lower}-{upper}"
-        else:
-            return f"{threshold+0.1:.1f}-{max_score:.1f}"
-    elif operator == '>=':
-        # >=7 means "7 or higher" = 7.0-max
-        if use_integer:
-            lower = int(threshold)
-            upper = int(max_score)
-            return f"{lower}-{upper}"
-        else:
-            return f"{threshold:.1f}-{max_score:.1f}"
-    elif operator == '<':
-        # <5 means "less than 5" = 0-4.9 (excludes 5, includes up to 4.9)
-        if use_integer:
-            upper = int(threshold) - 1  # For AES: <600 = 0-599
-            return f"0-{upper}"
-        else:
-            return f"0-{threshold-0.1:.1f}"
-    elif operator == '<=':
-        # <=5 means "5 or lower" = 0-5.0
-        if use_integer:
-            upper = int(threshold)
-            return f"0-{upper}"
-        else:
-            return f"0-{threshold:.1f}"
-    elif operator == '=' or operator == '==':
-        # Exact match - use single value range
-        if use_integer:
-            value = int(threshold)
-            return f"{value}-{value}"
-        else:
-            return f"{threshold:.1f}-{threshold:.1f}"
-    
-    # Fallback (should never reach here)
-    return score_value
+    # Invalid format
+    raise ValueError(
+        f"Invalid scoring filter format '{score_value}'. "
+        f"Use range format: 'min-max' (e.g., '7-10', '600-1000')"
+    )
 
 
 def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
