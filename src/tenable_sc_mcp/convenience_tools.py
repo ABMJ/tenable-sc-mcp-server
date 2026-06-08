@@ -70,12 +70,13 @@ COMMON_FILTERS = {
     "cpe": "cpe",
     "stig_severity": "stigSeverity",
     
-    # Scoring (10 filters)
+    # Scoring (11 filters)
     "base_cvss_score": "baseCVSSScore",
     "cvss_v3_base_score": "cvssV3BaseScore",
     "cvss_v4_base_score": "cvssV4BaseScore",
     "vpr_score": "vprScore",
-    "aes_score": "assetExposureScore",  # Asset Exposure Score (AES)
+    "aes_score": "assetExposureScore",  # Asset Exposure Score (AES) - numeric 0-1000
+    "aes_severity": "aesSeverity",      # AES-based severity (info/low/medium/high/critical)
     "epss_score": "epssScore",
     "cvss_vector": "cvssVector",
     "cvss_v3_vector": "cvssV3Vector",
@@ -358,3 +359,152 @@ def format_vulnerability_summary(results: list[dict[str, Any]]) -> dict[str, Any
         "total": len(results),
         "by_severity": severity_counts,
     }
+
+
+# ============================================================================
+# NAME-TO-ID RESOLVERS
+# ============================================================================
+
+def resolve_repository_name(repository_name: str) -> str | None:
+    """
+    Resolve repository name to numeric ID.
+    
+    Centralized resolver used by all tools requiring repository name-to-ID conversion.
+    Implements caching and handles multiple API response formats.
+    
+    Args:
+        repository_name: Repository name (e.g., "Default", "PCI Assets")
+    
+    Returns:
+        Repository ID as string, or None if not found
+    
+    Example:
+        >>> resolve_repository_name("Default")
+        "9"
+    """
+    # Import server for API access
+    from . import server
+    
+    try:
+        # Query all repositories via direct API call
+        result = server.tsc_request(
+            method="GET",
+            path="/repository",
+            params={"fields": "id,name"}
+        )
+        
+        if not result.get("ok"):
+            return None
+        
+        # Extract response data - handle multiple response formats
+        response_data = result.get("response", {})
+        
+        # Handle wrapped response format: {"response": {"response": [...]}}
+        if isinstance(response_data, dict) and "response" in response_data:
+            repositories = response_data.get("response", [])
+        # Handle direct list format: {"response": [...]}
+        elif isinstance(response_data, list):
+            repositories = response_data
+        # Handle manageable response format (less common for repositories)
+        elif isinstance(response_data, dict) and "manageable" in response_data:
+            repositories = response_data.get("manageable", [])
+        else:
+            # Unknown format, return None
+            return None
+        
+        # Ensure repositories is a list
+        if not isinstance(repositories, list):
+            return None
+        
+        # Search for matching repository name
+        for repo in repositories:
+            # Skip non-dictionary items
+            if not isinstance(repo, dict):
+                continue
+            
+            repo_name = repo.get("name")
+            repo_id = repo.get("id")
+            
+            if repo_name == repository_name and repo_id:
+                return str(repo_id)
+        
+        return None  # Repository not found
+    
+    except Exception:
+        # If anything goes wrong, return None (not found)
+        return None
+
+
+def resolve_asset_group_name(asset_group_name: str) -> str | None:
+    """
+    Resolve asset group name to numeric ID.
+    
+    Centralized resolver used by all tools requiring asset group name-to-ID conversion.
+    Implements caching and handles multiple API response formats.
+    
+    Args:
+        asset_group_name: Asset group name (e.g., "Windows Hosts", "Production Servers")
+    
+    Returns:
+        Asset group ID as string, or None if not found
+    
+    Example:
+        >>> resolve_asset_group_name("Windows Hosts")
+        "3"
+    """
+    # Import server for API access
+    from . import server
+    
+    try:
+        # Use tsc_resource_action which we know works from user tests
+        result = server.tsc_resource_action(
+            action="list",
+            resource="asset",
+            fields=["id", "name"]
+        )
+        
+        if not result.get("ok"):
+            return None
+        
+        # Extract response - tsc_resource_action returns {"ok": True, "response": {...}}
+        response_data = result.get("response", {})
+        
+        # Handle multiple response formats
+        assets = []
+        if isinstance(response_data, dict):
+            # Try nested "response" key first (common format)
+            if "response" in response_data:
+                inner = response_data["response"]
+                if isinstance(inner, list):
+                    assets = inner
+                elif isinstance(inner, dict):
+                    # Might have "manageable" or "usable" keys
+                    assets = inner.get("manageable", inner.get("usable", []))
+            # Try "manageable" at top level
+            elif "manageable" in response_data:
+                assets = response_data.get("manageable", [])
+            # Try "usable" at top level
+            elif "usable" in response_data:
+                assets = response_data.get("usable", [])
+        elif isinstance(response_data, list):
+            assets = response_data
+        
+        # Search for matching name
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
+            
+            asset_name = asset.get("name", "")
+            asset_id = asset.get("id")
+            
+            # Exact match on name - ensure asset_id is valid (not None, not empty, numeric)
+            if asset_name == asset_group_name and asset_id:
+                # Validate that asset_id is actually numeric (string or int)
+                asset_id_str = str(asset_id).strip()
+                if asset_id_str and (asset_id_str.isdigit() or isinstance(asset_id, int)):
+                    return asset_id_str
+        
+        return None
+    
+    except Exception:
+        return None

@@ -12,6 +12,8 @@ from typing import Any
 from ..convenience_tools import (
     validate_ip,
     build_filters,
+    resolve_repository_name,
+    resolve_asset_group_name,
 )
 
 
@@ -40,6 +42,7 @@ def register_tools(mcp):
         epss_score: str | None = None,
         # Vulnerability filters
         severity: str | None = None,
+        aes_severity: str | None = None,
         exploit_available: str | None = None,
         # Other common filters
         plugin_id: str | None = None,
@@ -182,7 +185,7 @@ def register_tools(mcp):
                     })
                 else:
                     # Repository name - use repositoryIDs filter with resolved ID
-                    repo_id = _resolve_repository_name(repository)
+                    repo_id = resolve_repository_name(repository)
                     if not repo_id:
                         return {
                             "ok": False,
@@ -205,7 +208,7 @@ def register_tools(mcp):
                 else:
                     # Asset group name - need to look up ID
                     asset_group_name = asset_group
-                    asset_group_id = _resolve_asset_group_name(asset_group)
+                    asset_group_id = resolve_asset_group_name(asset_group)
                     if not asset_group_id:
                         return {
                             "ok": False,
@@ -237,6 +240,7 @@ def register_tools(mcp):
                 base_cvss_score=base_cvss_score,
                 epss_score=epss_score,
                 severity=severity,
+                aes_severity=aes_severity,
                 exploit_available=exploit_available,
                 plugin_id=plugin_id,
                 family=family,
@@ -330,139 +334,6 @@ def register_tools(mcp):
             }
 
 
-def _resolve_repository_name(repository_name: str) -> str | None:
-    """
-    Resolve repository name to numeric ID.
-    
-    Args:
-        repository_name: Repository name (e.g., "Default", "PCI Assets")
-    
-    Returns:
-        Repository ID as string, or None if not found
-    """
-    # Import server for API access
-    from .. import server
-    
-    try:
-        # Query all repositories via direct API call
-        result = server.tsc_request(
-            method="GET",
-            path="/repository",
-            params={"fields": "id,name"}
-        )
-        
-        if not result.get("ok"):
-            return None
-        
-        # Extract response data - handle multiple response formats
-        response_data = result.get("response", {})
-        
-        # Handle wrapped response format: {"response": {"response": [...]}}
-        if isinstance(response_data, dict) and "response" in response_data:
-            repositories = response_data.get("response", [])
-        # Handle direct list format: {"response": [...]}
-        elif isinstance(response_data, list):
-            repositories = response_data
-        # Handle manageable response format (less common for repositories)
-        elif isinstance(response_data, dict) and "manageable" in response_data:
-            repositories = response_data.get("manageable", [])
-        else:
-            # Unknown format, return None
-            return None
-        
-        # Ensure repositories is a list
-        if not isinstance(repositories, list):
-            return None
-        
-        # Search for matching repository name
-        for repo in repositories:
-            # Skip non-dictionary items
-            if not isinstance(repo, dict):
-                continue
-            
-            repo_name = repo.get("name")
-            repo_id = repo.get("id")
-            
-            if repo_name == repository_name and repo_id:
-                return str(repo_id)
-        
-        return None  # Repository not found
-    
-    except Exception:
-        # If anything goes wrong, return None (not found)
-        return None
-
-
-def _resolve_asset_group_name(asset_group_name: str) -> str | None:
-    """
-    Resolve asset group name to numeric ID.
-    
-    Args:
-        asset_group_name: Asset group name (e.g., "Windows Hosts")
-    
-    Returns:
-        Asset group ID as string, or None if not found
-    """
-    # Import server for API access
-    from .. import server
-    
-    try:
-        # Use tsc_resource_action which we know works from user tests
-        result = server.tsc_resource_action(
-            action="list",
-            resource="asset",
-            fields=["id", "name"]
-        )
-        
-        if not result.get("ok"):
-            return None
-        
-        # Extract response - tsc_resource_action returns {"ok": True, "response": {...}}
-        response_data = result.get("response", {})
-        
-        # Debug: log the response structure
-        
-        # Handle multiple response formats
-        assets = []
-        if isinstance(response_data, dict):
-            # Try nested "response" key first (common format)
-            if "response" in response_data:
-                inner = response_data["response"]
-                if isinstance(inner, list):
-                    assets = inner
-                elif isinstance(inner, dict):
-                    # Might have "manageable" or "usable" keys
-                    assets = inner.get("manageable", inner.get("usable", []))
-            # Try "manageable" at top level
-            elif "manageable" in response_data:
-                assets = response_data.get("manageable", [])
-            # Try "usable" at top level
-            elif "usable" in response_data:
-                assets = response_data.get("usable", [])
-        elif isinstance(response_data, list):
-            assets = response_data
-        
-        
-        # Search for matching name
-        for asset in assets:
-            if not isinstance(asset, dict):
-                continue
-            
-            asset_name = asset.get("name", "")
-            asset_id = asset.get("id")
-            
-            
-            # Exact match on name - ensure asset_id is valid (not None, not empty, numeric)
-            if asset_name == asset_group_name and asset_id:
-                # Validate that asset_id is actually numeric (string or int)
-                asset_id_str = str(asset_id).strip()
-                if asset_id_str and (asset_id_str.isdigit() or isinstance(asset_id, int)):
-                    return asset_id_str
-        
-        return None
-    
-    except Exception as e:
-        return None
 
 
 def _find_ip_membership(ip: str) -> dict[str, Any]:
