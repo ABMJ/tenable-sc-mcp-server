@@ -20,9 +20,10 @@
 - [Tool 5: tsc_list_vulns_by_cve - CVE Search Across Infrastructure](#-tool-5-tsc_list_vulns_by_cve---cve-search-across-infrastructure)
 
 ### Part 2: Development Roadmap (Pending Tools)
+- [🚨 v1.2.1 - CVSS Component Filters (NEXT PRIORITY)](#-next-priority-v121---cvss-component-filters)
 - [📅 Week 1 - Core Foundation (2 Tools Remaining)](#-week-1---core-foundation-2-tools-remaining)
-  - [Session 1.7: Tool 6 - Missing Patches](#-session-17-tool-6---missing-patches)
-  - [Session 1.8: Tool 7 - Scan Status](#-session-18-tool-7---scan-status)
+- [Session 1.7: Tool 6 - Missing Patches](#-session-17-tool-6---missing-patches)
+- [Session 1.8: Tool 7 - Scan Status](#-session-18-tool-7---scan-status)
 - [📅 Week 2 - Essential Queries](#-week-2---essential-queries-10-tools)
 - [📅 Week 3 - Advanced Features](#-week-3---advanced-features-8-tools)
 - [🔧 Technical Architecture](#-technical-architecture)
@@ -652,69 +653,7 @@ search for CVE-2021-44228 in repository "Patched Systems"
 
 ---
 
-## 📅 WEEK 1 - CORE FOUNDATION (1 TOOL REMAINING)
-
-### ✅ Session 1.6: Tool 5 - CVE Search (COMPLETE) ✅
-
-#### `tsc_list_vulns_by_cve`
-
-**Status**: ✅ Complete - Pending User Testing | **Token Budget**: 1,000-2,000 | **Cache TTL**: 240s | **Completed**: 2026-06-10
-
-**Purpose:**
-Search for specific CVE across entire infrastructure. Emergency outbreak response tool.
-
-**Implemented Features:**
-- ✅ Search by CVE ID (e.g., "CVE-2021-44228") with format validation
-- ✅ List all affected IPs with IP, hostname, severity, port, protocol
-- ✅ Support ALL 55+ Tenable.sc filters via **kwargs pattern
-- ✅ Summarized remediation steps extracted from plugin output
-- ✅ References and vendor advisory extraction
-- ✅ Full plugin output available via include_full_output parameter
-- ✅ Graceful handling of non-existent CVEs (returns 0 assets, not error)
-- ✅ Advanced filtering support (asset_criticality, repository, severity, etc.)
-- ✅ Cache-enabled (240s TTL) for performance
-
-**Output:**
-```json
-{
-  "cve": "CVE-2021-44228",
-  "total_affected_ips": 47,
-  "plugin_id": "156013",
-  "plugin_name": "Apache Log4j < 2.15.0 Remote Code Execution",
-  "affected_assets": [
-    {
-      "ip": "10.1.20.10",
-      "hostname": "webserver01",
-      "severity": "Critical",
-      "port": 8080,
-      "protocol": "TCP"
-    }
-  ],
-  "remediation_summary": {
-    "steps": ["Upgrade to Log4j 2.17.1 or later", "Apply vendor patches"],
-    "references": ["https://logging.apache.org/log4j/2.x/security.html"],
-    "vendor_advisories": ["Apache Security Advisory"]
-  },
-  "plugin_output_available": true
-}
-```
-
-**Use Cases:**
-- Emergency CVE outbreak response (Log4Shell, ProxyLogon, etc.)
-- Security bulletin tracking
-- Incident response - "Do we have CVE-XXXX-XXXX?"
-- Patch verification after remediation
-
-**Implementation Notes:**
-- Use `listvuln` analysis tool with `cve` filter
-- Cache TTL: 240s (4 minutes) - balance freshness vs performance
-- Token budget: 1,000-2,000 tokens
-- Parse plugin output for remediation section
-- Offer full plugin output via optional parameter `include_full_output=true`
-- No limit on number of affected IPs returned
-- **Module**: `tools/vulnerability_lookup.py`
-
----
+## 📅 WEEK 1 - CORE FOUNDATION (2 TOOLS REMAINING)
 
 ### 🚨 NEXT PRIORITY: v1.2.1 - CVSS Component Filters
 
