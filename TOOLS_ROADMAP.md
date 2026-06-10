@@ -1,7 +1,7 @@
 # Tenable.sc Convenience Tools - Roadmap & User Guide
 
-**Status**: Week 1 - Session 1.5 Complete (4 tools operational, Tool 4 fully validated)  
-**Last Updated**: 2026-06-08 (Session 1.5 - Tool 4 Complete)
+**Status**: Week 1 - Session 2 Complete (Documentation Updated for v1.2.0)  
+**Last Updated**: 2026-06-10 (Session 2 - Unified Filters Architecture)
 
 ---
 
@@ -10,6 +10,7 @@
 ### Quick Navigation
 - [🎯 Quick Status](#-quick-status)
 - [📋 Document Purpose](#-document-purpose)
+- [⚠️ Breaking Changes in v1.2.0](#️-breaking-changes-in-v120)
 
 ### Part 1: User Guide (Completed Tools)
 - [Tool 1: tsc_profile_ip_efficient - Complete IP Security Profile](#-tool-1-tsc_profile_ip_efficient---complete-ip-security-profile)
@@ -20,7 +21,6 @@
 
 ### Part 2: Development Roadmap (Pending Tools)
 - [📅 Week 1 - Core Foundation (2 Tools Remaining)](#-week-1---core-foundation-2-tools-remaining)
-  - [Session 1.6: Tool 5 - CVE Search](#-session-16-tool-5---cve-search-new---high-priority-)
   - [Session 1.7: Tool 6 - Missing Patches](#-session-17-tool-6---missing-patches)
   - [Session 1.8: Tool 7 - Scan Status](#-session-18-tool-7---scan-status)
 - [📅 Week 2 - Essential Queries](#-week-2---essential-queries-10-tools)
@@ -32,15 +32,16 @@
 
 ## 🎯 Quick Status
 
-**Completed**: 5/25 tools (20%) + Modular Architecture  
-**Current Phase**: Week 1 Session 1.6 (Tool 5) - ✅ Complete & Ready for Testing  
-**Next Session**: Week 1 Session 1.7 - Implement Tool 6 (`tsc_list_missing_patches_windows`) in `tools/scanning.py`
+**Completed**: 5/25 tools (20%) + Unified Filters Architecture (v1.2.0)  
+**Current Phase**: Week 1 Session 2 - Documentation Complete, Code Awaiting Testing  
+**Next Session**: User testing → Tool 6 implementation (`tsc_list_missing_patches_windows`)
 
-**Validated Performance (Tool 5 - New):**
-- Cache TTL: 240s (4 minutes) - optimized for emergency outbreak response
-- Token efficiency: 1,000-2,000 tokens (target budget)
-- Response time: <1s cached, 2-4s fresh
-- All 55+ filters supported via **kwargs pattern
+**v1.2.0 Architecture (NEW):**
+- ✅ Unified `filters: dict` parameter across all tools
+- ✅ Single source of truth: `COMMON_FILTERS` in `convenience_tools.py`
+- ✅ Zero tool edits when adding new filters
+- ✅ Fixed MCP `**kwargs` limitation bug
+- ⏳ All 4 tools refactored, awaiting comprehensive user testing
 
 ---
 
@@ -48,20 +49,65 @@
 
 This document serves **two critical functions**:
 
-1. **PART 1: USER GUIDE** - Professional documentation for completed tools (Tools 1, 2a, 2b, 4) with:
+1. **PART 1: USER GUIDE** - Professional documentation for completed tools (Tools 1, 2a, 2b, 4, 5) with:
    - Clear "When to Use" scenarios for each tool
+   - **Updated for v1.2.0 unified filters dict syntax**
    - Practical usage examples with natural language commands
    - Complete descriptions of what data you get back
    - Performance metrics and best practices
    - Suitable for non-technical users and security teams
 
-2. **PART 2: DEVELOPMENT ROADMAP** - Detailed specifications for pending tools (Tools 5-26) organized by Week/Session with:
+2. **PART 2: DEVELOPMENT ROADMAP** - Detailed specifications for pending tools (Tools 6-26) organized by Week/Session with:
    - Clear purpose and use cases
    - Token budgets and cache TTL targets
    - Module assignments and technical implementation notes
+   - **MUST follow v1.2.0 unified filters dict pattern (see DESIGN_PRINCIPLES.md)**
    - Designed for LLM-assisted development sessions
 
-**For New Development Sessions**: Review this document + latest `week1_session_X_handoff.md` file to resume immediately.
+**For New Development Sessions**: Review DESIGN_PRINCIPLES.md + latest handoff document to understand mandatory patterns.
+
+---
+
+## ⚠️ BREAKING CHANGES IN v1.2.0
+
+### Unified Filters Dict Parameter
+
+**All convenience tools now use a single `filters` dict parameter instead of explicit filter parameters.**
+
+#### Old Syntax (v1.1 and earlier - DEPRECATED):
+```python
+# ❌ No longer supported
+tsc_list_ips(repository="Default", asset_criticality="8-10", severity="critical")
+tsc_list_vulns_by_cve("CVE-2021-44228", asset_criticality="7-10", exploit_available="Yes")
+```
+
+#### New Syntax (v1.2.0+):
+```python
+# ✅ Use filters dict parameter
+tsc_list_ips(
+    repository="Default",
+    filters={"asset_criticality": "8-10", "severity": "critical"}
+)
+
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={"asset_criticality": "7-10", "exploit_available": "Yes"}
+)
+```
+
+### Why This Change?
+
+1. **Simpler function signatures** - 5 lines instead of 100+ per tool
+2. **Consistent interface** - All tools use identical filter pattern
+3. **Zero-edit filter additions** - Add to `COMMON_FILTERS` dict, available everywhere
+4. **Better MCP compatibility** - Fixes `**kwargs` serialization bug
+5. **Scales to 25+ tools** - Maintainable long-term architecture
+
+### Migration Guide
+
+**See:** `REFACTOR_SUMMARY.md` for complete migration guide with before/after examples.
+
+**All filter examples in this document have been updated to v1.2.0 syntax.**
 
 ---
 
@@ -131,11 +177,11 @@ Gets vulnerability counts by severity for an IP address without pulling full det
 # Get all vulnerability counts
 get vulnerability summary for IP 10.1.20.10
 
-# Filter for specific severity
+# Filter for specific severity (v1.2.0 syntax)
 get critical vulnerability count for IP 10.1.20.10
 
-# Full example with cache
-use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical, then show me cache stats
+# With multiple filters
+use tenable-sc to get vulnerability summary for IP 10.1.20.10, filter by severity critical and exploit available Yes
 ```
 
 ### What You Get Back
@@ -148,17 +194,35 @@ use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity crit
   - Info: [count]
 - **Applied Filters**: Summary of any filters you used
 
-### Available Filters (10)
+### Available Filters
+
+Tool 2a supports all 55+ Tenable.sc analysis filters via the `filters` dict parameter.
+
+**Most Common (10 filters):**
 - `severity`: Critical/High/Medium/Low/Info or 0-4
 - `exploit_available`: Yes/No
 - `first_seen`: Unix timestamp
 - `last_seen`: Unix timestamp
 - `family`: Plugin family (e.g., "Windows")
-- `vpr_score`: Vulnerability Priority Rating score
+- `vpr_score`: VPR range (e.g., "7-10")
 - `plugin_id`: Specific Nessus plugin ID
 - `cve`: CVE identifier
 - `port`: Port number
 - `protocol`: TCP/UDP
+
+**For complete filter reference:** Fetch MCP resource `tenable-sc://filters/reference` or see `COMMON_FILTERS` in `convenience_tools.py`.
+
+**Filter Usage Example:**
+```python
+tsc_list_vulns_by_ip_summary(
+    "10.1.20.10",
+    filters={
+        "severity": "critical",
+        "exploit_available": "Yes",
+        "vpr_score": "7-10"
+    }
+)
+```
 
 ### Performance
 - **Tokens Used**: ~700 tokens (vs ~6,000 with full details) = **88% reduction**
@@ -194,13 +258,10 @@ Gets complete vulnerability details with full metadata for an IP address. Return
 list all critical vulnerabilities for IP 10.1.20.10
 
 # First 10 records only
-use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records
+use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10, show first 10 records
 
-# With cache stats
-use tenable-sc to list all critical vulnerabilities for IP 10.1.20.10 using tsc_list_vulns_by_ip_full, show first 10 records, then show me cache stats
-
-# Filter by multiple criteria
-show vulnerabilities for IP 10.1.20.10 with severity high, exploit available, port 443
+# With multiple filters (v1.2.0 syntax)
+show vulnerabilities for IP 10.1.20.10, filter by severity high, exploit available, port 443
 ```
 
 ### What You Get Back (Per Vulnerability)
@@ -215,17 +276,37 @@ show vulnerabilities for IP 10.1.20.10 with severity high, exploit available, po
 - **Patch Info**: Patch publication date, vulnerability publication date
 - **Mitigation**: Mitigation status
 
-### Available Filters (15)
-**Common Filters (10)**:
+### Available Filters
+
+Tool 2b supports all 55+ Tenable.sc analysis filters via the `filters` dict parameter.
+
+**Common Filters:**
 - `severity`, `exploit_available`, `first_seen`, `last_seen`, `family`
 - `vpr_score`, `plugin_id`, `cve`, `port`, `protocol`
 
-**Additional Filters (5)**:
-- `cvss_v3_base_score`: CVSS v3 base score filter
-- `epss_score`: EPSS exploitation probability score
-- `patch_published`: Filter by patch publication date
-- `vuln_published`: Filter by vulnerability publication date
+**Additional Filters:**
+- `cvss_v3_base_score`: CVSS v3 base score range (e.g., "7-10")
+- `epss_score`: EPSS exploitation probability score range
+- `patch_published`: Filter by patch publication date (Unix timestamp)
+- `vuln_published`: Filter by vulnerability publication date (Unix timestamp)
 - `mitigated_status`: Filter by mitigation status
+
+**For complete filter reference:** Fetch MCP resource `tenable-sc://filters/reference`
+
+**Filter Usage Example:**
+```python
+# Multiple filters for targeted query
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={
+        "severity": "high",
+        "exploit_available": "Yes",
+        "port": 443,
+        "cvss_v3_base_score": "7-10"
+    },
+    end_offset=20  # First 20 records
+)
+```
 
 ### Pagination Controls
 - **Default**: Returns records 0-50 (50 records)
@@ -328,12 +409,11 @@ I am testing tsc_list_ips to [your test scenario]. Please format your response a
 - List of asset groups containing the IP (only groups where IP actually exists)
 - Total membership count
 
-### Available Filters (55+)
+### Available Filters
 
-This tool supports comprehensive filtering across all Tenable.sc analysis dimensions:
+**v1.2.0**: Tool 4 supports all 55+ Tenable.sc analysis filters via the `filters` dict parameter.
 
-#### Risk Scoring Filters (use range format)
-When filtering by scores, specify ranges like `"7-10"` or `"600-1000"`:
+#### Risk Scoring Filters (use range format "min-max")
 - **Asset Criticality (ACR)**: Range 0-10, e.g., `"7-10"` for high-risk assets
 - **Asset Exposure Score (AES)**: Range 0-1000, e.g., `"600-1000"` for high exposure
 - **VPR Score**: Range 0-10, e.g., `"7-10"` for vulnerabilities likely to be exploited
@@ -341,14 +421,36 @@ When filtering by scores, specify ranges like `"7-10"` or `"600-1000"`:
 - **CVSS v2**: Range 0-10, legacy scoring system
 - **EPSS Score**: Range 0-1, e.g., `"0.5-1.0"` for high exploitation probability
 
-#### Other Filters
-- **Asset Filters**: `uuid`, `dns_name` (hostname)
-- **Time Filters**: `first_seen`, `last_seen` (Unix timestamps)
-- **Vulnerability Filters**: `severity` (Critical/High/Medium/Low/Info), `exploit_available` (Yes/No), `plugin_id`, `family`
-- **Network Filters**: `port`, `protocol` (TCP/UDP)
-- Plus 45+ additional Tenable.sc analysis filters
+#### Other Common Filters
+- **Asset**: `uuid`, `dns_name` (hostname)
+- **Time**: `first_seen`, `last_seen` (Unix timestamps)
+- **Vulnerability**: `severity` (critical/high/medium/low/info), `exploit_available` (Yes/No), `plugin_id`, `family`
+- **Network**: `port`, `protocol` (TCP/UDP)
 
-**Note**: When you ask for something like "IPs with ACR greater than 7", the AI assistant will convert this to the proper range format (`"7-10"`) automatically.
+**For complete filter reference:** Fetch MCP resource `tenable-sc://filters/reference` or see `COMMON_FILTERS` in `convenience_tools.py`.
+
+**Filter Usage Examples:**
+
+```python
+# High-risk assets with critical vulnerabilities
+tsc_list_ips(
+    repository="Default",
+    filters={
+        "asset_criticality": "7-10",
+        "severity": "critical"
+    }
+)
+
+# Assets with exploitable vulnerabilities and high exposure
+tsc_list_ips(
+    asset_group="Production Servers",
+    filters={
+        "exploit_available": "Yes",
+        "aes_score": "600-1000"
+    },
+    include_details=True
+)
+```
 
 ### Performance
 - **Tokens Used**: 400-3,700 tokens depending on result size
@@ -403,14 +505,14 @@ search for CVE-2017-0144 with full plugin output
 
 #### Advanced Filtering (Critical Assets)
 ```bash
-# Find critical assets with specific CVE
+# Find critical assets with specific CVE (v1.2.0 - filters passed via natural language)
 list all assets with CVE-2021-44228 and asset criticality 7-10
 
 # Complex query combining multiple filters
-show me Windows servers in Production repository with CVE-2021-26855 and severity critical
+show me Windows servers with CVE-2021-26855, severity critical, in Production repository
 
 # Filter by multiple criteria
-find CVE-2017-0144 on assets with ACR > 7, running Windows, in repository "DMZ"
+find CVE-2017-0144 on assets with ACR 7-10, exploit available Yes, in DMZ repository
 ```
 
 #### Developer Test Format (Use Visual Icons)
@@ -455,30 +557,57 @@ I am testing tsc_list_vulns_by_cve to search for CVE-2021-44228. Please format y
 - total_affected_assets: 0
 - User-friendly message explaining CVE not found in environment
 
-### Supported Filters (ALL 55+)
+### Supported Filters
 
-This tool accepts **ALL 55+ Tenable.sc analysis filters** via `**kwargs` for maximum flexibility:
+**v1.2.0**: Tool 5 supports ALL 55+ Tenable.sc analysis filters via the `filters` dict parameter.
 
 #### Common Filters for Critical Asset Queries
 - **repository**: Repository name or ID (e.g., "Production", "DMZ")
 - **asset_group**: Asset group name (e.g., "Windows Hosts", "Database Servers")
 - **asset_criticality**: ACR range (e.g., "7-10" for high-risk assets)
 - **severity**: Vulnerability severity (critical/high/medium/low/info)
+- **vpr_score**: VPR range (e.g., "7-10")
+- **exploit_available**: Yes/No
 - **ip**: Specific IP address
 - **dns_name**: Hostname filter
 - **port**: Port number
 - **protocol**: TCP/UDP
 
-#### Additional Filters (Full List Available)
-- **Asset Identification (8)**: asset_id, asset, uuid, repository_ids, dns_name
-- **Vulnerability Info (10)**: plugin_id, plugin_name, family, family_id, port, protocol
-- **CVE/Compliance (8)**: cce_id, iavm_id, ms_bulletin_id, xref, cpe, stig_severity
-- **Scoring (11)**: vpr_score, cvss_v3_base_score, cvss_v4_base_score, aes_score, epss_score, base_cvss_score
-- **Threat Context (2)**: exploit_available, exploit_frameworks
-- **Temporal (10)**: first_seen, last_seen, vuln_published, patch_published, plugin_published
-- **Risk Management (5)**: accept_risk_status, recast_risk_status, mitigated_status, responsible_user
-- **Policy/Audit (5)**: policy, policy_id, audit_file, audit_file_id, benchmark_name
-- **Plus more**: See `COMMON_FILTERS` in `convenience_tools.py` for complete list
+#### Additional Filter Categories (55+ total)
+- **Asset Identification**: asset_id, uuid, repository_ids, dns_name
+- **Vulnerability**: plugin_id, plugin_name, family, family_id
+- **Scoring**: cvss_v3_base_score, cvss_v4_base_score, aes_score, epss_score
+- **Temporal**: first_seen, last_seen, vuln_published, patch_published
+- **Risk Management**: accept_risk_status, mitigated_status
+- **Plus 40+ more**: See `tenable-sc://filters/reference` or `COMMON_FILTERS` in `convenience_tools.py`
+
+**Filter Usage Examples:**
+
+```python
+# Find CVE on critical assets only
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={"asset_criticality": "7-10"}
+)
+
+# Complex query: High-risk Windows assets with exploitable CVE
+tsc_list_vulns_by_cve(
+    "CVE-2017-0144",
+    filters={
+        "asset_criticality": "8-10",
+        "exploit_available": "Yes",
+        "repository": "Production"
+    }
+)
+
+# Pagination for large result sets
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    start_offset=0,
+    end_offset=100,  # First 100 records
+    filters={"severity": "critical"}
+)
+```
 
 ### Performance
 

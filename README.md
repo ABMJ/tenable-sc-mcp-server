@@ -44,17 +44,19 @@ Production-ready MCP server for Tenable Security Center Plus with intelligent ca
 
 | Component | Status | Performance | Tests |
 |-----------|--------|-------------|-------|
-| **Tool 1: IP Profile** | ✅ Production | 83-90% token savings | ✅ Passing |
-| **Tool 2: Vulnerability Lists** | ✅ Production | 58-92% token savings | ✅ Passing |
-| **Tool 4: IP Discovery** | ✅ Production | 400-3,700 tokens | ✅ Passing |
-| **Tool 5: CVE Search** | ✅ Ready for Testing | 85% token savings | ⏳ Pending |
+| **Tool 1: IP Profile** | ✅ Refactored (v1.2) | 83-90% token savings | ⏳ Testing |
+| **Tool 2: Vulnerability Lists** | ✅ Refactored (v1.2) | 58-92% token savings | ⏳ Testing |
+| **Tool 4: IP Discovery** | ✅ Refactored (v1.2) | 400-3,700 tokens | ⏳ Testing |
+| **Tool 5: CVE Search** | ✅ Refactored (v1.2) | 85% token savings | ⏳ Testing |
 | **Core API Tools** | ✅ Stable | Cached responses | ✅ Passing |
 | **Redis Cache** | ✅ Production | <1ms cached, 57%+ hit rate | ✅ Passing |
 | **Docker Deployment** | ✅ Ready | Single `.env` config | ✅ Passing |
 
-**Latest**: Tool 5 complete (2026-06-10) • 5/25 tools operational (20%) • Ready for user testing
+**Latest**: v1.2.0 Unified Filters Architecture (2026-06-10) • All 4 convenience tools refactored • Awaiting user testing
 
-**Progress**: Week 1 Session 1.6 Complete
+**Breaking Change**: v1.2.0 introduces unified `filters` dict parameter (see [Filter Documentation](#filter-documentation-system))
+
+**Progress**: Week 1 Session 2 Complete - Documentation Updated
 
 ---
 
@@ -474,6 +476,115 @@ Result: All cache entries removed
 Ask: "clear repository cache"
 Result: Only repository-related entries removed
 ```
+
+---
+
+## Filter Documentation System
+
+**New in v1.2:** Unified filters dict architecture with comprehensive MCP resource documentation.
+
+### Breaking Change in v1.2.0
+
+All convenience tools now use a **unified `filters` dict parameter** instead of explicit filter parameters:
+
+```python
+# ❌ OLD (v1.1 and earlier) - DEPRECATED
+tsc_list_vulns_by_cve("CVE-2021-44228", asset_criticality="7-10", severity="critical")
+
+# ✅ NEW (v1.2+) - Use filters dict
+tsc_list_vulns_by_cve("CVE-2021-44228", filters={"asset_criticality": "7-10", "severity": "critical"})
+```
+
+**Why this change?**
+- Single `filters` parameter provides access to all 55+ filters
+- Consistent interface across all tools
+- Zero tool edits when adding new filters
+- Better MCP protocol compatibility (avoids `**kwargs` limitation)
+
+### Why This Matters
+
+Convenience tools support 55+ analysis filters (asset_criticality, vpr_score, severity, etc.). 
+The MCP server provides self-documenting filter reference that LLMs can fetch to understand:
+- Correct parameter names (e.g., `asset_criticality` not `acr_score`)
+- Required formats (e.g., `"7-10"` range format, not `">7"` operators)
+- All available filters grouped by category
+- Practical examples and common mistakes
+
+### How to Access
+
+**MCP Resource:** `tenable-sc://filters/reference`
+
+MCP clients can fetch this resource at startup or on-demand to get complete filter documentation.
+
+### Key Filter Rules
+
+**1. Use `filters` dict parameter (v1.2+):**
+```python
+# All tools now accept filters as a dict
+tool_name(..., filters={"filter_name": "value", "another_filter": "value"})
+```
+
+**2. Scoring Filters (ACR, VPR, AES, CVSS, EPSS):**
+- MUST use range format: `"min-max"` (e.g., `"7-10"`, `"600-1000"`)
+- DO NOT use operators: `">7"`, `">=7"`, `"<5"` (not supported by Tenable.sc API)
+
+**3. Common Filters:**
+- `asset_criticality`: ACR range (e.g., `"7-10"` for high-risk assets)
+- `vpr_score`: VPR range (e.g., `"8-10"`)
+- `severity`: `critical`/`high`/`medium`/`low`/`info`
+- `exploit_available`: `Yes`/`No`
+- `cve`: CVE identifier
+- `plugin_id`: Nessus plugin ID
+
+**Examples:**
+
+```python
+# Find critical assets with high VPR vulnerabilities
+tsc_list_ips(
+    repository="Production",
+    filters={
+        "asset_criticality": "8-10",
+        "vpr_score": "7-10",
+        "severity": "critical"
+    }
+)
+
+# Search for CVE across high-risk assets only
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={
+        "asset_criticality": "7-10",
+        "exploit_available": "Yes"
+    }
+)
+
+# Get IP vulnerabilities with multiple filters
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={
+        "severity": "critical",
+        "exploit_available": "Yes",
+        "port": 443
+    }
+)
+```
+
+### Filter Validation
+
+The server logs warnings for unknown filter parameters:
+```bash
+docker logs tenable-sc-mcp 2>&1 | grep "Unknown filter"
+```
+
+If you see warnings, check the filter reference resource or COMMON_FILTERS in `convenience_tools.py`.
+
+### Documentation
+
+- **Design Principles:** See DESIGN_PRINCIPLES.md (mandatory patterns for tool development)
+- **Complete Filter Reference:** Fetch `tenable-sc://filters/reference` MCP resource
+- **Architecture Details:** See ARCHITECTURE.md section 4
+- **Code Reference:** `src/tenable_sc_mcp/convenience_tools.py` (COMMON_FILTERS dict)
+- **Migration Guide:** See REFACTOR_SUMMARY.md for v1.1 → v1.2 changes
 
 ---
 
