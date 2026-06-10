@@ -155,6 +155,35 @@ def validate_severity(severity: str) -> tuple[bool, str]:
     return True, ""
 
 
+def validate_cve(cve_id: str) -> tuple[bool, str]:
+    """
+    Validate CVE ID format.
+    
+    Returns:
+        (is_valid, error_message)
+    
+    Examples:
+        "CVE-2021-44228" → (True, "")
+        "CVE-2017-0144" → (True, "")
+        "cve-2021-44228" → (True, "") (auto-normalized to uppercase)
+        "2021-44228" → (False, "Invalid CVE format...")
+    """
+    # Normalize to uppercase for validation
+    cve_normalized = cve_id.strip().upper()
+    
+    # Validate CVE format: CVE-YYYY-NNNNN (year can be 4 digits, number can be 4+ digits)
+    pattern = r'^CVE-\d{4}-\d{4,}$'
+    
+    if not re.match(pattern, cve_normalized):
+        return False, (
+            f"Invalid CVE format: '{cve_id}'\n"
+            f"Expected: CVE-YYYY-NNNNN (e.g., CVE-2021-44228, CVE-2017-0144)\n"
+            f"Suggestion: Use standard CVE ID format from NVD or MITRE"
+        )
+    
+    return True, ""
+
+
 def validate_score_filter(score_value: str, max_score: float = 10.0) -> tuple[bool, str]:
     """
     Validate scoring filter format (must be range, not operator).

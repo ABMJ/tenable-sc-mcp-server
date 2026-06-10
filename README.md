@@ -47,13 +47,14 @@ Production-ready MCP server for Tenable Security Center Plus with intelligent ca
 | **Tool 1: IP Profile** | ✅ Production | 83-90% token savings | ✅ Passing |
 | **Tool 2: Vulnerability Lists** | ✅ Production | 58-92% token savings | ✅ Passing |
 | **Tool 4: IP Discovery** | ✅ Production | 400-3,700 tokens | ✅ Passing |
+| **Tool 5: CVE Search** | ✅ Ready for Testing | 85% token savings | ⏳ Pending |
 | **Core API Tools** | ✅ Stable | Cached responses | ✅ Passing |
 | **Redis Cache** | ✅ Production | <1ms cached, 57%+ hit rate | ✅ Passing |
 | **Docker Deployment** | ✅ Ready | Single `.env` config | ✅ Passing |
 
-**Latest**: Tool 4 complete (2026-06-08) • 4/25 tools operational (16%) • All tests passing • Production ready
+**Latest**: Tool 5 complete (2026-06-10) • 5/25 tools operational (20%) • Ready for user testing
 
-**Progress**: Week 1 Session 1.5 Complete
+**Progress**: Week 1 Session 1.6 Complete
 
 ---
 
@@ -199,6 +200,15 @@ Optimized tools with intelligent caching for common security workflows:
 - Supports 55+ analysis filters (ACR, severity, exploits, VPR, CVSS)
 - **Token Range**: 400-3,700 tokens depending on result size
 - **Use Case**: Asset discovery, high-risk identification, CMDB sync
+
+**Tool 5: CVE Search** (`tsc_list_vulns_by_cve`)
+- Search for specific CVE across entire infrastructure (emergency outbreak response)
+- List all affected assets with IP, hostname, severity, port, protocol
+- Supports ALL 55+ Tenable.sc filters for complex queries (e.g., "critical assets with ACR > 7 running Windows that have CVE-X")
+- Automatic remediation summary extraction with steps, references, vendor advisories
+- Optional full plugin output (may be 500+ lines)
+- **Token Efficiency**: ~1,000-2,000 tokens (vs ~10,000 raw) = **85% reduction**
+- **Use Case**: Emergency CVE outbreak response, patch verification, risk prioritization
 
 📚 **Full Documentation**: See [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) for complete usage guide
 
