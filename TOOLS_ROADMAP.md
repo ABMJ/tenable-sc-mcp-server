@@ -32,9 +32,9 @@
 
 ## 🎯 Quick Status
 
-**Completed**: 5/25 tools (20%) + Unified Filters Architecture (v1.2.0)  
-**Current Phase**: Week 1 Session 2 - Documentation Complete, Code Awaiting Testing  
-**Next Session**: User testing → Tool 6 implementation (`tsc_list_missing_patches_windows`)
+**Completed**: 5/25 tools (20%) + Unified Filters Architecture (v1.2.0 Released)  
+**Current Phase**: v1.2.0 Released (Git commit d91cca7, tag v1.2.0)  
+**Next Session**: v1.2.1 - Add CVSS Component Filters (MANDATORY before Tool 6)
 
 **v1.2.0 Architecture (NEW):**
 - ✅ Unified `filters: dict` parameter across all tools
@@ -713,6 +713,94 @@ Search for specific CVE across entire infrastructure. Emergency outbreak respons
 - Offer full plugin output via optional parameter `include_full_output=true`
 - No limit on number of affected IPs returned
 - **Module**: `tools/vulnerability_lookup.py`
+
+---
+
+### 🚨 NEXT PRIORITY: v1.2.1 - CVSS Component Filters
+
+**⚠️ MUST BE COMPLETED BEFORE Tool 6 - DO NOT SKIP**
+
+**Status**: ⏳ Pending | **Estimated**: 3-4 hours | **Priority**: CRITICAL
+
+**Purpose:**
+Add individual CVSS component filters that users are already trying to use (seen in Docker logs).
+
+**What to Add:**
+
+```python
+# Add to COMMON_FILTERS in convenience_tools.py:
+
+# CVSS v3 Components (8 filters) - NEW
+"attack_vector": "cvssV3AttackVector",  # Network/Adjacent/Local/Physical
+"attack_complexity": "cvssV3AttackComplexity",  # Low/High
+"privileges_required": "cvssV3PrivilegesRequired",  # None/Low/High
+"user_interaction": "cvssV3UserInteraction",  # None/Required
+"scope": "cvssV3Scope",  # Unchanged/Changed
+"confidentiality_impact": "cvssV3ConfidentialityImpact",  # None/Low/High
+"integrity_impact": "cvssV3IntegrityImpact",  # None/Low/High
+"availability_impact": "cvssV3AvailabilityImpact",  # None/Low/High
+
+# VPR Components (1 filter) - NEW
+"exploit_maturity": "vprExploitMaturity",  # Unproven/PoC/Functional/High
+
+# CVSS v2 Components (optional)
+"access_vector": "cvssV2AccessVector",  # Network/Adjacent/Local
+"access_complexity": "cvssV2AccessComplexity",  # Low/Medium/High
+"authentication": "cvssV2Authentication",  # None/Single/Multiple
+```
+
+**Action Items:**
+1. **Research API filter names** (30-60 min)
+   - Check https://docs.tenable.com/security-center/6_8/Content/VulnerabilityAnalysisFilters.htm
+   - Test with Tenable.sc API to verify exact names
+   - Document findings in `CVSS_COMPONENTS_ANALYSIS.md`
+
+2. **Add filters to code** (30 min)
+   - Update `COMMON_FILTERS` in `convenience_tools.py`
+   - Update `FILTER_FORMAT_REFERENCE.md` with examples
+   - Update `filter_reference.py` resource
+
+3. **Comprehensive testing** (2-3 hours)
+   - Add 10-15 tests to `COMPREHENSIVE_TEST_SUITE.md`
+   - Test all 5 existing tools with new filters
+   - Run complete 70+ test suite
+   - Verify ≥95% pass rate
+
+4. **Docker rebuild & commit**
+   - Rebuild Docker container
+   - Test via MCP client
+   - Commit as v1.2.1
+   - Tag and push to GitHub
+
+**Use Cases:**
+```python
+# Find easily exploitable critical vulnerabilities
+filters = {
+    "severity": "4",
+    "attack_vector": "Network",
+    "attack_complexity": "Low",
+    "exploit_maturity": "Functional"
+}
+
+# Find high-impact vulnerabilities requiring no privileges
+filters = {
+    "attack_vector": "Network",
+    "privileges_required": "None",
+    "confidentiality_impact": "High",
+    "integrity_impact": "High"
+}
+```
+
+**Files to Update:**
+- `src/tenable_sc_mcp/convenience_tools.py` - Add filters to `COMMON_FILTERS`
+- `FILTER_FORMAT_REFERENCE.md` - Add CVSS component section
+- `COMPREHENSIVE_TEST_SUITE.md` - Add 10-15 new tests
+- `HANDOFF.md` - Update status
+- `RELEASE_NOTES_v1.2.1.md` - Create release notes
+
+**See:** `CVSS_COMPONENTS_ANALYSIS.md` for detailed investigation notes
+
+**Module**: `convenience_tools.py` (core infrastructure, affects all tools)
 
 ---
 

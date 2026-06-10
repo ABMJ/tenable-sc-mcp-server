@@ -1,8 +1,8 @@
 # Tenable.sc MCP Server - Handoff Document
 
-**Last Updated:** 2026-06-10 21:00  
-**Project Status:** ✅ v1.2.0 Complete - Ready for Release  
-**Next Session:** Add CVSS component filters (v1.2.1)
+**Last Updated:** 2026-06-10 21:30  
+**Project Status:** ✅ v1.2.0 Released (Git commit d91cca7, tag v1.2.0)  
+**Next Session Priority:** Add CVSS component filters → Comprehensive testing → v1.2.1 release
 
 ---
 
@@ -17,7 +17,7 @@
 | **Testing** | ✅ Complete | 60-test suite executed |
 | **Docker Container** | ✅ Running | Rebuilt with latest code |
 | **MCP Resources** | ✅ Complete | Filter reference published |
-| **Git Commit** | ⏳ Pending | Ready to commit |
+| **Git Commit** | ✅ Complete | Commit d91cca7, tag v1.2.0 |
 | **CVSS Components** | 📋 Backlog | v1.2.1 enhancement |
 
 ---
@@ -101,50 +101,224 @@
 
 ---
 
-## 🔮 Next Steps (v1.2.1)
+## 🚨 NEXT SESSION START HERE - MANDATORY SEQUENCE
 
-### Priority 1: Add CVSS Component Filters
+**⚠️ DO NOT SKIP OR REORDER - THIS IS THE CRITICAL PATH**
 
-**Problem:** Users are trying to use CVSS components that we don't support yet:
+### Step 1: Research CVSS Component Filters (MANDATORY - 30-60 min)
+
+**Goal:** Identify exact Tenable.sc API filter names for CVSS components
+
+**Why:** Users are trying to use these filters (seen in Docker logs):
 ```
 Unknown filter parameters: attack_vector, attack_complexity, exploit_maturity
 ```
 
-**What's Missing:**
+**Action Items:**
+1. **Check official documentation:**
+   - https://docs.tenable.com/security-center/6_8/Content/VulnerabilityAnalysisFilters.htm
+   - Look for CVSS v2/v3/v4 component filters
+   
+2. **Query Tenable.sc API directly:**
+   ```python
+   # Use tsc_request() or direct API call
+   GET /rest/analysis
+   # Look for filter definitions in response
+   ```
+
+3. **Test with known working filters:**
+   ```python
+   # Try variations to find correct names:
+   "cvssV3AttackVector" vs "attackVector" vs "cvss_v3_attack_vector"
+   ```
+
+4. **Document findings** in `CVSS_COMPONENTS_ANALYSIS.md`
+
+**What to Find:**
 - CVSS v3 components: attack_vector, attack_complexity, privileges_required, user_interaction, scope
 - Impact metrics: confidentiality_impact, integrity_impact, availability_impact
 - VPR components: exploit_maturity
 - CVSS v2 components: access_vector, access_complexity, authentication
 
-**Current Support:**
-- ✅ Full CVSS vectors: `cvss_vector`, `cvss_v3_vector`, `cvss_v4_vector`
-- ❌ Individual components: Not yet supported
+**Output:** Updated `CVSS_COMPONENTS_ANALYSIS.md` with exact API filter names
 
-**Why It Matters:**
-```python
-# Users want to do advanced filtering like:
-filters = {
-    "severity": "critical",
-    "attack_vector": "Network",      # ❌ Not supported yet
-    "attack_complexity": "Low",       # ❌ Not supported yet  
-    "exploit_maturity": "Functional", # ❌ Not supported yet
-    "exploit_available": "true"       # ✅ Supported
-}
+---
+
+### Step 2: Add CVSS Filters to Code (MANDATORY - 30 min)
+
+**Goal:** Extend `COMMON_FILTERS` with CVSS component filters
+
+**Files to Edit:**
+1. `src/tenable_sc_mcp/convenience_tools.py`
+   ```python
+   COMMON_FILTERS = {
+       # ... existing filters ...
+       
+       # CVSS v3 Components (NEW)
+       "attack_vector": "cvssV3AttackVector",  # Use exact name from Step 1
+       "attack_complexity": "cvssV3AttackComplexity",
+       "privileges_required": "cvssV3PrivilegesRequired",
+       "user_interaction": "cvssV3UserInteraction",
+       "scope": "cvssV3Scope",
+       "confidentiality_impact": "cvssV3ConfidentialityImpact",
+       "integrity_impact": "cvssV3IntegrityImpact",
+       "availability_impact": "cvssV3AvailabilityImpact",
+       
+       # VPR Components (NEW)
+       "exploit_maturity": "vprExploitMaturity",
+       
+       # ... rest of filters ...
+   }
+   ```
+
+2. `FILTER_FORMAT_REFERENCE.md`
+   - Add CVSS component filter examples
+   - Document valid values (Network/Adjacent/Local, Low/High, etc.)
+
+3. `src/tenable_sc_mcp/resources/filter_reference.py`
+   - Add CVSS components to categorized list
+
+**Output:** Code updated with CVSS component filters
+
+---
+
+### Step 3: Comprehensive Testing (MANDATORY - 2-3 hours)
+
+**Goal:** Validate all 5 existing tools + new CVSS filters with 60+ test suite
+
+**⚠️ CRITICAL: Test EXISTING tools first, then CVSS additions**
+
+**Action Items:**
+1. **Run existing 60-test suite FIRST:**
+   ```bash
+   # Transfer COMPREHENSIVE_TEST_SUITE.md to Claude Code machine
+   # Execute all 60 tests
+   # Verify 56/60 still passing (or better with CVSS components)
+   ```
+
+2. **Add 10-15 new tests for CVSS components:**
+   ```markdown
+   ## Test 2a.11: Filter by Attack Vector (Network)
+   filters = {"attack_vector": "Network", "severity": "4"}
+   
+   ## Test 2a.12: Filter by Attack Complexity (Low)
+   filters = {"attack_complexity": "Low", "exploit_available": "true"}
+   
+   ## Test 2a.13: Filter by Exploit Maturity
+   filters = {"exploit_maturity": "Functional", "vpr_score": "8-10"}
+   
+   ## Test 2b.13: Complex CVSS Filter (Network + Low + No Privileges)
+   filters = {
+       "attack_vector": "Network",
+       "attack_complexity": "Low",
+       "privileges_required": "None",
+       "severity": "4"
+   }
+   ```
+
+3. **Update COMPREHENSIVE_TEST_SUITE.md** with new tests
+
+4. **Run complete test suite** (now 70-75 tests)
+
+5. **Verify pass rate** ≥ 93% (goal: 95%+)
+
+**Output:** Test results showing all tools + CVSS filters working
+
+---
+
+### Step 4: Rebuild Docker & Validate (MANDATORY - 15 min)
+
+**Goal:** Ensure Docker container has latest code
+
+**Action Items:**
+```bash
+cd /home/abmj/apps/tenable-sc-mcp-server
+
+# Rebuild Docker container
+docker-compose down
+docker-compose up -d --build
+
+# Wait for startup
+sleep 10
+
+# Verify no filter warnings for CVSS components
+docker logs tenable-sc-mcp 2>&1 | grep -E "(attack_vector|attack_complexity|exploit_maturity)"
+# Should show NO warnings about unknown filters
+
+# Test a CVSS filter via MCP
+# Use Claude Desktop or curl to test
 ```
 
-**Action Items for v1.2.1:**
-1. Research exact Tenable.sc API filter names
-   - Check official docs: https://docs.tenable.com/security-center/6_8/Content/VulnerabilityAnalysisFilters.htm
-   - Query API: `GET /rest/analysis` for available filters
-2. Add ~15-20 new filters to `COMMON_FILTERS` in `convenience_tools.py`
-3. Update `FILTER_FORMAT_REFERENCE.md` with component examples
-4. Test with Tenable.sc API
-5. Add to 60-test suite
-6. Release v1.2.1 (minor version - additive change)
+**Output:** Docker container running with CVSS filters supported
 
-**Estimated Effort:** 2-3 hours
+---
 
-**See:** `CVSS_COMPONENTS_ANALYSIS.md` for detailed investigation notes
+### Step 5: Documentation & Commit (MANDATORY - 30 min)
+
+**Goal:** Update all documentation and commit v1.2.1
+
+**Action Items:**
+1. **Update FILTER_FORMAT_REFERENCE.md:**
+   - Add CVSS component section
+   - Include examples and valid values
+   - Add troubleshooting notes
+
+2. **Update HANDOFF.md:**
+   - Mark CVSS components as ✅ Complete
+   - Remove from "Next Steps"
+   - Update status table
+
+3. **Create RELEASE_NOTES_v1.2.1.md:**
+   - List new CVSS filters
+   - Include examples
+   - Note: additive change (no breaking changes)
+
+4. **Commit and tag:**
+   ```bash
+   git add -A
+   git commit -m "Release v1.2.1: Add CVSS Component Filters
+   
+   New Filters:
+   - CVSS v3 components: attack_vector, attack_complexity, privileges_required, etc.
+   - Impact metrics: confidentiality_impact, integrity_impact, availability_impact
+   - VPR component: exploit_maturity
+   
+   Test Results:
+   - 70+ tests executed
+   - XX/XX tests passed (XX% pass rate)
+   - All existing tools validated
+   - CVSS component filters working
+   
+   Documentation:
+   - FILTER_FORMAT_REFERENCE.md updated
+   - COMPREHENSIVE_TEST_SUITE.md expanded
+   - RELEASE_NOTES_v1.2.1.md created"
+   
+   git tag -a v1.2.1 -m "v1.2.1: CVSS Component Filters"
+   git push origin main
+   git push origin v1.2.1
+   ```
+
+**Output:** v1.2.1 committed and pushed to GitHub
+
+---
+
+### Step 6: Only After Steps 1-5 Complete
+
+**⚠️ DO NOT proceed to Tool 6 until:**
+- ✅ CVSS components researched and added
+- ✅ All 5 existing tools tested with new filters
+- ✅ 70+ test suite passing at ≥95%
+- ✅ Docker rebuilt and validated
+- ✅ v1.2.1 committed and released
+
+**Then and only then:**
+- See `TOOLS_ROADMAP.md` for Tool 6 implementation plan
+- Tool 6 is NOT a priority - CVSS filters are
+
+---
+
+## 🔮 After v1.2.1: Optional Enhancements
 
 ### Priority 2: Helper Functions (Optional)
 
