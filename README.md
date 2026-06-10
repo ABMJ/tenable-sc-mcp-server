@@ -512,9 +512,26 @@ The MCP server provides self-documenting filter reference that LLMs can fetch to
 
 ### How to Access
 
-**MCP Resource:** `tenable-sc://filters/reference`
+**MCP Resources Available:**
 
-MCP clients can fetch this resource at startup or on-demand to get complete filter documentation.
+1. **Comprehensive Filter Format Reference (v1.2.0)** - **RECOMMENDED**
+   - **URI:** `tenable-sc://filters/format-reference`
+   - **Content:** Complete filter format guide with examples, test results, troubleshooting
+   - **File:** `FILTER_FORMAT_REFERENCE.md`
+   - **Test Coverage:** Based on 60-test validation suite (93.3% pass rate)
+   - **Size:** ~12,000 words
+   
+2. **Auto-Generated Filter Reference (Legacy)**
+   - **URI:** `tenable-sc://filters/reference`
+   - **Content:** Auto-generated from COMMON_FILTERS dict
+   - **Use Case:** Quick filter name/category lookup
+
+**For Claude/OpenCode:** Fetch the comprehensive reference at startup:
+```
+/resources/tenable-sc://filters/format-reference
+```
+
+MCP clients can fetch these resources at startup or on-demand to get complete filter documentation.
 
 ### Key Filter Rules
 

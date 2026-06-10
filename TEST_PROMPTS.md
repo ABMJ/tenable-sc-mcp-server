@@ -272,7 +272,7 @@ I am testing tsc_list_vulns_by_cve to search for CVE-2021-44228 (Log4Shell) acro
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner about cache and token performance]
-📦 RESULT: Total affected assets: [count], Plugin ID: [id], Plugin Name: [name], First 3 affected IPs: [list]
+📦 RESULT: Total unique IPs: [count], First 3 affected IPs with severity counts: [list with critical/high/medium/low/info counts]
 
 If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
@@ -280,13 +280,12 @@ If failed, provide ERROR DETAILS with enough information for the developer to fi
 **Expected Output:**
 - ✅ **PASS** with visual confirmation
 - 📊 Cache status clearly marked (MISS on first run, HIT on repeat)
-- 🔢 Specific token count (target: 1,000-2,000 tokens)
-- 📦 Total affected assets count
-- Plugin ID and name for this CVE
-- First 3 affected IPs with hostname, severity, port, protocol
-- Remediation summary with steps, references, vendor advisories
+- 🔢 Specific token count (target: 800-1,500 tokens)
+- 📦 Total unique IPs count (no duplicate records)
+- First 3 affected IPs with hostname, severity counts (critical/high/medium/low/info), ACR/AES scores
+- Note about using tsc_list_vulns_by_ip_full for detailed remediation
 
-**Token Efficiency:** ~1,000-2,000 tokens (vs ~10,000 raw API) = 85% reduction
+**Token Efficiency:** ~800-1,500 tokens (vs ~10,000 raw API) = 85% reduction
 
 ---
 
@@ -298,7 +297,7 @@ I am testing tsc_list_vulns_by_cve to find CVE-2017-0144 (EternalBlue) on critic
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner about filtering effectiveness]
-📦 RESULT: Total critical assets with CVE: [count], Filters applied: asset_criticality="7-10", First 3 IPs with ACR scores: [list]
+📦 RESULT: Total critical IPs with CVE: [count], Filters applied: asset_criticality="7-10", First 3 IPs with ACR scores and severity counts: [list]
 
 If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
@@ -307,23 +306,23 @@ If failed, provide ERROR DETAILS with enough information for the developer to fi
 - ✅ **PASS** with visual confirmation
 - 📊 Cache status clearly marked
 - 🔢 Specific token count
-- 📦 Filtered results showing only assets with ACR 7-10
-- Each affected IP showing ACR score
+- 📦 Filtered results showing only IPs with ACR 7-10
+- Each affected IP showing ACR score and severity counts
 - Filters applied summary
 
 **Use Case:** Answer "Do we have critical assets with this CVE?" for risk prioritization
 
 ---
 
-### Test 3: CVE with Full Plugin Output
+### Test 3: CVE Pagination (Large Result Sets)
 ```
-I am testing tsc_list_vulns_by_cve to get CVE-2021-26855 (ProxyLogon) with full plugin output. Please format your response as:
+I am testing tsc_list_vulns_by_cve pagination with a CVE that affects many IPs. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about full output size]
-📦 RESULT: Total assets: [count], Full output present: [Yes/No], Output size: [chars/lines]
+📝 SUMMARY: [one-liner about pagination]
+📦 RESULT: Total IPs: [count], Returned IPs: [count], Start offset: 0, End offset: 200, More available: [Yes/No]
 
 If failed, provide ERROR DETAILS with enough information for the developer to fix. Do not suggest code or fixes.
 ```
@@ -331,12 +330,11 @@ If failed, provide ERROR DETAILS with enough information for the developer to fi
 **Expected Output:**
 - ✅ **PASS** with visual confirmation
 - 📊 Cache status clearly marked
-- 🔢 Token count (higher due to full output)
-- 📦 Full plugin output included (may be 500+ lines)
-- plugin_output_available: true
-- Complete remediation details from plugin text
+- 🔢 Token count for first page
+- 📦 Pagination metadata showing total_ips, returned_ips, more_available flag
+- If more_available is true, instructions on how to fetch next page
 
-**Use Case:** Detailed remediation planning requiring complete plugin context
+**Use Case:** Handle large CVE outbreaks affecting hundreds of assets
 
 ---
 
@@ -357,10 +355,10 @@ If failed, provide ERROR DETAILS with enough information for the developer to fi
 - ✅ **PASS** (graceful handling, not an error)
 - 📊 Cache status
 - 🔢 Minimal token count
-- 📦 ok: true, total_affected_assets: 0
+- 📦 ok: true, summary.total_ips: 0, affected_ips: []
 - User-friendly message explaining CVE not found
 
-**Use Case:** Verify patch deployment - if CVE returns 0 assets after patching, remediation was successful
+**Use Case:** Verify patch deployment - if CVE returns 0 IPs after patching, remediation was successful
 
 ---
 
@@ -372,7 +370,7 @@ I am testing tsc_list_vulns_by_cve cache behavior by repeating Test 1 (CVE-2021-
 📊 CACHE: [MUST BE HIT]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner comparing to first query]
-📦 RESULT: Confirm total assets matches Test 1, Cache TTL: 240s (4 minutes)
+📦 RESULT: Confirm total IPs matches Test 1, Cache TTL: 240s (4 minutes)
 
 If cache shows MISS instead of HIT, provide ERROR DETAILS. Do not suggest code or fixes.
 ```

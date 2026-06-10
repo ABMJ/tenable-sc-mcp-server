@@ -563,6 +563,15 @@ def _get_tool(name: str):
 # This is called at the end of this file before main() runs
 
 
+# ============================================================================
+# MCP RESOURCES - Documentation & References
+# ============================================================================
+
+# Import and register all MCP resources (filter docs, etc.)
+from .resources import register_resources
+
+# Resources are registered during module initialization via register_resources(mcp)
+# This provides documentation like tenable-sc://filters/reference for LLM consumption
 
 
 @mcp.resource("tenable-sc://catalog")
@@ -600,6 +609,9 @@ def main() -> None:
     # Initialize cache (already done in configure_client_env, but ensure it's set up)
     if _CACHE is None:
         _init_cache()
+    
+    # Register all MCP resources (filter documentation, etc.)
+    register_resources(mcp)
     
     # Register all convenience tools from modules
     register_all_tools(mcp)

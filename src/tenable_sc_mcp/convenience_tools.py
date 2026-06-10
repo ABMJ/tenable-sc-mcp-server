@@ -14,6 +14,73 @@ from typing import Any, Optional
 
 
 # ============================================================================
+# FILTER DOCUMENTATION TEMPLATE
+# ============================================================================
+
+FILTER_DOCS_TEMPLATE = """
+FILTERS:
+This tool supports 55+ Tenable.sc analysis filters via **kwargs.
+For COMPLETE filter reference, fetch MCP resource: tenable-sc://filters/reference
+
+COMMON FILTERS (Quick Reference):
+
+Scoring Filters (RANGE FORMAT "min-max" REQUIRED):
+    asset_criticality="7-10"      # ACR range (0-10) - DO NOT use ">7"
+    vpr_score="8-10"               # VPR range (0-10)
+    aes_score="600-1000"           # AES range (0-1000)
+    cvss_v3_base_score="7-10"      # CVSS v3 range (0-10)
+    epss_score="0.5-1.0"           # EPSS range (0-1)
+
+Asset Filters:
+    repository="Production"        # Repository name or ID
+    ip="10.1.20.10"               # Specific IP address
+    dns_name="webserver01"        # Hostname
+
+Vulnerability Filters:
+    severity="critical"           # critical/high/medium/low/info or 0-4
+    exploit_available="Yes"       # Yes/No
+    family="Windows"              # Plugin family
+    cve="CVE-2021-44228"         # CVE identifier (for per-IP queries)
+    plugin_id="156013"           # Plugin ID
+
+Network Filters:
+    port=443                      # Port number
+    protocol="TCP"                # TCP/UDP
+
+Temporal Filters (Unix timestamps):
+    first_seen="1704067200"       # First detection
+    last_seen="1735689600"        # Last detection
+    patch_published="1704067200"  # Patch publication date
+    vuln_published="1704067200"   # Vulnerability publication date
+
+FILTER EXAMPLES:
+    # Critical assets only
+    tool_name(..., asset_criticality="7-10")
+    
+    # Multiple filters
+    tool_name(..., 
+              repository="Production",
+              severity="high",
+              exploit_available="Yes")
+    
+    # Complex scoring query
+    tool_name(...,
+              asset_criticality="8-10",
+              aes_score="700-1000",
+              cvss_v3_base_score="9-10")
+
+IMPORTANT NOTES:
+    1. Scoring filters MUST use range format: "7-10" NOT ">7" or ">=7"
+    2. Unknown filter parameters are silently ignored (check logs for warnings)
+    3. For detailed docs on all 55+ filters, see: tenable-sc://filters/reference
+    4. Common mistakes:
+       - "acr_score" → use "asset_criticality"
+       - "hostname" → use "dns_name"
+       - ">7" → use "7-10"
+"""
+
+
+# ============================================================================
 # CONSTANTS
 # ============================================================================
 
@@ -62,7 +129,7 @@ COMMON_FILTERS = {
     
     # CVE/Compliance (8 filters)
     "cve_id": "cveID",
-    "cve": "cve",
+    "cve": "cveID",
     "cce_id": "cceID",
     "iavm_id": "iavmID",
     "ms_bulletin_id": "msbulletinID",
@@ -279,14 +346,16 @@ def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -
     )
 
 
-def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
+def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
     """
     Universal filter builder for all convenience tools.
     
     Converts tool parameters to Tenable.sc analysis filter format.
     Automatically converts scoring filter operators to range format.
+    Validates parameters and warns about unknown filters.
     
     Args:
+        validate: If True, log warnings for unknown parameters (default: True)
         **kwargs: Filter parameters using convenience names (e.g., ip="10.1.20.10")
     
     Returns:
@@ -304,6 +373,8 @@ def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
     }
     
     filters = []
+    unknown_params = []
+    
     for param, value in kwargs.items():
         if value is None:
             continue
@@ -311,7 +382,9 @@ def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
         # Get the official API filter name
         filter_name = COMMON_FILTERS.get(param)
         if not filter_name:
-            # Skip unknown parameters
+            # Track unknown parameters for validation warning
+            if validate:
+                unknown_params.append(param)
             continue
         
         # Handle different value types
@@ -334,6 +407,19 @@ def build_filters(**kwargs: Any) -> list[dict[str, Any]]:
             "operator": operator,
             "value": filter_value
         })
+    
+    # Warn about unknown parameters
+    if validate and unknown_params:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Unknown filter parameters will be ignored: {', '.join(unknown_params)}. "
+            f"These parameters were not found in COMMON_FILTERS. "
+            f"For valid filter names, see MCP resource: tenable-sc://filters/reference "
+            f"or check COMMON_FILTERS in convenience_tools.py. "
+            f"Common mistakes: 'acr_score' should be 'asset_criticality', "
+            f"'hostname' should be 'dns_name'."
+        )
     
     return filters
 
