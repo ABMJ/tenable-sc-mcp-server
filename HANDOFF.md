@@ -335,9 +335,108 @@ doc = generate_filter_reference()
 
 ## 🚀 Next Session Plan
 
+### Priority 0: CPE False Positive Mitigation (1-2 hours) ⚠️
+
+**CRITICAL - MUST BE COMPLETED BEFORE Plugin Family Investigation**
+
+**Context from User Testing (Tests 4 & 6):**
+
+Regex patterns caused false positives:
+- `.*windows.*(10|11).*` matched Server 2016/2019 (version "10.0.17763")
+- `.*windows_server_201[6-9].*` matched Windows 10 systems
+- LLMs can compensate but wastes tokens, causes confusion
+
+**Real Impact:**
+- ❌ Token waste showing 30+ irrelevant results
+- ❌ User confusion: "Why Server when I asked for Win 10?"
+- ❌ Trust erosion in tool accuracy
+- ❌ Requires manual verification, defeats automation
+
+**Solution: Add `os_type` Parameter + Improve Regex Documentation**
+
+**Tasks:**
+
+1. **Research Tenable.sc API Field** (30 min)
+   - Identify OS field name (likely `operatingSystem`)
+   - Test actual field values and format
+   - Verify exact matching behavior
+   - Document available values
+
+2. **Implement `os_type` Filter** (30 min)
+   ```python
+   # Add to COMMON_FILTERS in convenience_tools.py
+   "os_type": "operatingSystem",  # Exact OS match, zero false positives
+   "os_family": "operatingSystem",  # Alias for natural language
+   ```
+   - Test with existing tools
+   - Verify zero false positives
+   - 72-73 total filters (was 71)
+
+3. **Update Documentation** (30 min)
+   - Add to `FILTER_FORMAT_REFERENCE.md` (replace CPE section):
+     ```markdown
+     ### OS Filtering - Three Approaches
+     
+     #### 1. Exact Match (RECOMMENDED for most users) ⭐
+     filters = {"os_type": "Windows 10"}              # Exact, zero false positives
+     filters = {"os_type": "Windows Server 2019"}     # Specific server
+     filters = {"os_type": "CentOS Linux 7"}          # Specific distro
+     
+     #### 2. CPE Substring (Quick, may include related systems)
+     filters = {"cpe": "microsoft:windows"}           # All Windows variants
+     filters = {"cpe": "cisco"}                       # All Cisco devices
+     
+     #### 3. CPE Regex (Power users only - IMPROVED PATTERNS)
+     # ✅ BETTER patterns with boundaries:
+     filters = {"cpe": ".*windows_(10|11).*"}                  # Underscore boundary
+     filters = {"cpe": ".*windows(?!_server).*(10|11).*"}      # Negative lookahead
+     filters = {"cpe": ".*:windows_server_201[6-9]:.*"}        # Colon boundaries
+     
+     # ❌ AVOID these patterns (cause false positives):
+     filters = {"cpe": ".*windows.*(10|11).*"}                 # Too broad
+     filters = {"cpe": ".*windows_server_201[6-9].*"}          # No boundaries
+     ```
+   - Update existing CPE examples with improved patterns
+   - Add warnings about false positive patterns
+
+4. **Create Test Cases** (30 min)
+   - `os_type="Windows 10"` → Should exclude all Server editions
+   - `os_type="Windows Server 2019"` → Exact match only
+   - `os_type="CentOS Linux 7"` → Exact Linux distro
+   - Improved regex: `.*windows_(10|11).*` → Verify excludes Server
+   - Negative lookahead: `.*windows(?!_server).*(10|11).*` → Test exclusion
+   - Verify ALL return zero false positives
+
+5. **Docker Rebuild & Commit** (10 min)
+   - Rebuild container with new filters
+   - Test via MCP client
+   - Commit as v1.2.2 (OS filtering improvements)
+
+**Deliverables:**
+- [ ] `os_type` and `os_family` parameters added (72-73 filters)
+- [ ] Updated `FILTER_FORMAT_REFERENCE.md` with three-tier approach
+- [ ] Improved CPE regex patterns documented with warnings
+- [ ] 5 test cases passing with zero false positives
+- [ ] Committed and tagged as v1.2.2
+
+**Benefits:**
+- ✅ 90% of users get exact matching (no regex expertise needed)
+- ✅ Zero false positives for common OS queries
+- ✅ LLMs choose appropriate filter automatically
+- ✅ Power users get improved regex patterns
+- ✅ Backward compatible (existing `cpe` filter unchanged)
+
+**Why This First:**
+- User testing revealed real UX problem
+- Quick win (1-2 hours) before multi-hour plugin family investigation
+- Builds user confidence before tackling complex issues
+- Prevents wasted tokens in production usage
+
+---
+
 ### Priority 1: Plugin Family Filter Investigation (2-3 hours)
 
-**MUST BE COMPLETED BEFORE Tool 6**
+**BLOCKED UNTIL CPE False Positives Resolved**
 
 **Tasks:**
 1. **Research Tenable.sc API behavior** (60-90 min)

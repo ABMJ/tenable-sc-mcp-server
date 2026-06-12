@@ -656,9 +656,132 @@ search for CVE-2021-44228 in repository "Patched Systems"
 
 ## 📅 WEEK 1 - CORE FOUNDATION (2 TOOLS REMAINING)
 
-### 🚨 KNOWN ISSUE: Plugin Family Filter (INVESTIGATE BEFORE TOOL 6)
+### 🚨 PRIORITY 0: CPE False Positive Mitigation (CRITICAL - v1.2.2)
 
-**⚠️ MUST BE RESOLVED BEFORE Tool 6 - DO NOT SKIP**
+**⚠️ MUST BE COMPLETED BEFORE Plugin Family Investigation**
+
+**Status**: ⏳ Pending | **Estimated**: 1-2 hours | **Priority**: CRITICAL
+
+**Problem Discovered in User Testing (v1.2.1 Tests 4 & 6):**
+
+Regex CPE patterns cause false positives that waste tokens and confuse users:
+
+**Test 4 Example:**
+```python
+# User wants: Windows 10 OR 11 only
+filters = {"cpe": ".*windows.*(10|11).*"}
+
+# Got: 56 systems including Server 2016/2019 ❌
+# Why: Server 2019 version is "10.0.17763" (matches "10")
+```
+
+**Test 6 Example:**
+```python
+# User wants: Server 2016-2019 only
+filters = {"cpe": ".*windows_server_201[6-9].*"}
+
+# Got: Windows 10 systems mixed in ❌
+# Why: CPE strings don't always follow expected format
+```
+
+**Real Impact:**
+- ❌ 30+ irrelevant results wasting tokens
+- ❌ User confusion: "Why did I get Server when I asked for Win 10?"
+- ❌ Requires manual filtering, defeats automation
+- ❌ Erodes trust in tool accuracy
+
+**Solution: Add `os_type` Parameter + Improve Regex Patterns**
+
+**Implementation Plan:**
+
+1. **Add `os_type` Filter for Exact Matching** (30 min)
+   ```python
+   # Add to COMMON_FILTERS in convenience_tools.py
+   "os_type": "operatingSystem",  # Exact OS name, zero false positives
+   "os_family": "operatingSystem",  # Alias for natural language
+   ```
+   
+   **Usage:**
+   ```python
+   # Simple and accurate - RECOMMENDED for 90% of use cases
+   filters = {"os_type": "Windows 10"}              # Exact match only
+   filters = {"os_type": "Windows Server 2019"}     # No version confusion
+   filters = {"os_type": "CentOS Linux 7"}          # Specific distro
+   ```
+
+2. **Update Documentation with Three-Tier Approach** (30 min)
+   
+   Add to `FILTER_FORMAT_REFERENCE.md`:
+   
+   ```markdown
+   ### OS Filtering - Three Approaches (UPDATED v1.2.2)
+   
+   #### Tier 1: Exact Match (RECOMMENDED) ⭐
+   **Use when:** You know the specific OS name
+   **Accuracy:** Zero false positives
+   **Ease:** No regex knowledge needed
+   
+   filters = {"os_type": "Windows 10"}
+   filters = {"os_type": "Windows Server 2019"}
+   filters = {"os_type": "CentOS Linux 7"}
+   
+   #### Tier 2: CPE Substring (Quick but broad)
+   **Use when:** You want all variants (e.g., all Windows, all Cisco)
+   **Accuracy:** May include related systems
+   
+   filters = {"cpe": "microsoft:windows"}  # All Windows
+   filters = {"cpe": "cisco"}              # All Cisco devices
+   
+   #### Tier 3: CPE Regex (Power users - IMPROVED PATTERNS)
+   **Use when:** Complex pattern matching needed
+   **Accuracy:** High if pattern is correct
+   **Risk:** False positives if pattern too broad
+   
+   # ✅ GOOD patterns with boundaries:
+   filters = {"cpe": ".*windows_(10|11).*"}                  # Underscore
+   filters = {"cpe": ".*windows(?!_server).*(10|11).*"}      # Negative lookahead
+   filters = {"cpe": ".*:windows_server_201[6-9]:.*"}        # Colon boundaries
+   
+   # ❌ AVOID (cause false positives):
+   filters = {"cpe": ".*windows.*(10|11).*"}                 # Too broad
+   filters = {"cpe": ".*windows_server_201[6-9].*"}          # No boundaries
+   
+   **Why boundaries matter:**
+   - Windows Server 2019 has version "10.0.17763" → matches "10"
+   - Without boundaries, substring "10" matches everywhere
+   - Colon `:` or underscore `_` create clear boundaries in CPE strings
+   ```
+
+3. **Test Cases** (30 min)
+   - `os_type="Windows 10"` → Should exclude ALL Server editions
+   - `os_type="Windows Server 2019"` → Exact match only
+   - Improved regex `.*windows_(10|11).*` → Verify excludes Server
+   - Negative lookahead `.*windows(?!_server).*(10|11).*` → Test exclusion
+   - Boundary pattern `.*:windows_10:.*` → Exact via CPE format
+
+4. **Commit as v1.2.2**
+   - Tag release: "CPE False Positive Mitigation"
+   - Update HANDOFF.md with resolution
+   - Green light for plugin family investigation
+
+**Deliverables:**
+- [ ] `os_type` and `os_family` parameters (72-73 filters)
+- [ ] Updated `FILTER_FORMAT_REFERENCE.md` with three-tier approach
+- [ ] Improved regex patterns with boundary examples
+- [ ] 5 test cases with zero false positives
+- [ ] Git commit & tag v1.2.2
+
+**Why This First:**
+- Quick win (1-2 hours) builds momentum
+- Solves real UX problem discovered in testing
+- Prevents token waste in production
+- Gives users confidence before tackling plugin family complexity
+
+---
+
+### 🚨 PRIORITY 1: Plugin Family Filter Investigation
+
+**⚠️ BLOCKED UNTIL CPE False Positives Resolved**
 
 **Status**: ⏳ Pending Investigation | **Estimated**: 2-3 hours | **Priority**: HIGH
 
