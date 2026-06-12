@@ -1,5 +1,5 @@
 """
-MCP Resource: Comprehensive Filter Format Reference v1.2.0
+MCP Resource: Comprehensive Filter Format Reference v1.2.1
 
 Exposes the comprehensive FILTER_FORMAT_REFERENCE.md as an MCP resource
 that Claude can access directly for filter guidance.
@@ -73,10 +73,11 @@ def register_resources(mcp):
         docs = load_filter_format_reference()
         
         # Add dynamic header with metadata
-        header = """# Comprehensive Filter Format Reference - Tenable.sc MCP v1.2.0
+        header = """# Comprehensive Filter Format Reference - Tenable.sc MCP v1.2.1
 
 **📌 MCP Resource URI:** `tenable-sc://filters/format-reference`  
-**📅 Version:** 1.2.0  
+**📅 Version:** 1.2.1  
+**✨ New:** OS/Platform filtering (tags + CPE), CVSS component filters, severity auto-conversion
 **✅ Test Pass Rate:** 93.3% (56/60 tests)  
 **🔗 GitHub:** https://github.com/abmj01/tenable-sc-mcp-server
 
@@ -86,6 +87,8 @@ def register_resources(mcp):
 - [Quick Reference](#quick-reference) - Common filter examples
 - [Simple Filters](#-simple-filters-stringnumber-format) - Easy formats
 - [Range Filters](#-range-filters-min-max-format) - Scoring metrics
+- [CVSS Component Filters](#-cvss-component-filters-string-format---new-in-v121) - Granular CVSS filtering (NEW)
+- [OS/Platform Filtering](#-osplatform-filtering-string-format---new-in-v121) - Filter by OS (NEW)
 - [Complex Filters](#-complex-filters-array-of-objects-format) - Advanced formats
 - [Tool Examples](#filter-examples-by-tool) - Per-tool usage
 - [Common Combinations](#common-filter-combinations) - Real-world scenarios

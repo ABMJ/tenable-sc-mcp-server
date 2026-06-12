@@ -1,6 +1,12 @@
-# Filter Format Reference - Tenable.sc MCP Server v1.2.0
+# Filter Format Reference - Tenable.sc MCP Server v1.2.1
 
 This document provides comprehensive guidance on filter formats for all Tenable.sc MCP tools.
+
+**New in v1.2.1:**
+- ✨ OS/Platform filtering (tags + CPE)
+- ✨ CVSS component filters (12 new filters)
+- ✨ Severity auto-conversion (string → numeric)
+- ✨ "exploitable" alias for exploit_available
 
 ---
 
@@ -78,6 +84,340 @@ filters = {"epss_score": "0.5-1.0"}  # High exploitation probability
 filters = {"epss_score": "0.7-1.0"}  # Very high probability
 filters = {"epss_score": "0.9-1.0"}  # Critical probability
 ```
+
+### ✅ CVSS Component Filters (String Format) - NEW in v1.2.1
+
+These filters target individual CVSS v3 and VPR components for granular vulnerability filtering:
+
+#### CVSS v3 Attack Metrics
+
+```python
+# Attack Vector - how vulnerability is exploited
+filters = {"attack_vector": "Network"}      # Remotely exploitable
+filters = {"attack_vector": "Adjacent"}     # Adjacent network access
+filters = {"attack_vector": "Local"}        # Local access required
+filters = {"attack_vector": "Physical"}     # Physical access required
+
+# Attack Complexity - difficulty of exploitation
+filters = {"attack_complexity": "Low"}      # Easy to exploit
+filters = {"attack_complexity": "High"}     # Difficult to exploit
+
+# Privileges Required - what level of access attacker needs
+filters = {"privileges_required": "None"}   # No privileges needed
+filters = {"privileges_required": "Low"}    # Basic user privileges
+filters = {"privileges_required": "High"}   # Admin privileges required
+
+# User Interaction - does attack require user action
+filters = {"user_interaction": "None"}      # No user interaction
+filters = {"user_interaction": "Required"}  # User must take action
+
+# Scope - does vulnerability affect other components
+filters = {"scope": "Unchanged"}            # Affects only vulnerable component
+filters = {"scope": "Changed"}              # Affects other components
+```
+
+#### CVSS v3 Impact Metrics
+
+```python
+# Confidentiality Impact
+filters = {"confidentiality_impact": "None"}    # No confidentiality impact
+filters = {"confidentiality_impact": "Low"}     # Some information disclosed
+filters = {"confidentiality_impact": "High"}    # Complete information disclosure
+
+# Integrity Impact
+filters = {"integrity_impact": "None"}          # No integrity impact
+filters = {"integrity_impact": "Low"}           # Some data modification
+filters = {"integrity_impact": "High"}          # Complete data modification
+
+# Availability Impact
+filters = {"availability_impact": "None"}       # No availability impact
+filters = {"availability_impact": "Low"}        # Reduced performance
+filters = {"availability_impact": "High"}       # Complete denial of service
+```
+
+#### VPR Exploit Maturity
+
+```python
+# Exploit Maturity - maturity of available exploits
+filters = {"exploit_maturity": "Unproven"}      # No known exploits
+filters = {"exploit_maturity": "PoC"}           # Proof-of-concept exists
+filters = {"exploit_maturity": "Functional"}    # Functional exploit exists
+filters = {"exploit_maturity": "High"}          # Weaponized exploit available
+```
+
+#### CVSS v2 Components (Legacy)
+
+```python
+# Access Vector (CVSS v2)
+filters = {"access_vector": "Network"}
+filters = {"access_vector": "Adjacent"}
+filters = {"access_vector": "Local"}
+
+# Access Complexity (CVSS v2)
+filters = {"access_complexity": "Low"}
+filters = {"access_complexity": "Medium"}
+filters = {"access_complexity": "High"}
+
+# Authentication (CVSS v2)
+filters = {"authentication": "None"}
+filters = {"authentication": "Single"}
+filters = {"authentication": "Multiple"}
+```
+
+#### Combined CVSS Component Examples
+
+```python
+# Find easily exploitable critical vulnerabilities
+filters = {
+    "attack_vector": "Network",
+    "attack_complexity": "Low",
+    "privileges_required": "None",
+    "severity": "4"  # Critical
+}
+
+# Find high-impact vulnerabilities with functional exploits
+filters = {
+    "confidentiality_impact": "High",
+    "integrity_impact": "High",
+    "availability_impact": "High",
+    "exploit_maturity": "Functional"
+}
+
+# Critical path vulnerabilities (easy + high impact)
+filters = {
+    "attack_vector": "Network",
+    "attack_complexity": "Low",
+    "user_interaction": "None",
+    "confidentiality_impact": "High",
+    "exploit_maturity": "Functional"
+}
+```
+
+### ✅ OS/Platform Filtering (String Format) - NEW in v1.2.1
+
+Filter assets by operating system using two proven approaches:
+
+#### Option 1: Asset Tags (RECOMMENDED) ⭐
+
+**Best practice:** Maintain asset tags in Tenable.sc UI for flexible categorization.
+
+```python
+# Filter by tag category:value
+filters = {"tag": "Windows Hosts"}       # User-maintained tag
+filters = {"tag": "Linux Servers"}       # User-maintained tag
+filters = {"tag": "PCI Systems"}         # Any tag category/value
+filters = {"tag": "Production"}          # Environment tag
+filters = {"tag": "Core Database:yes"}   # Category:Value format
+```
+
+**Why use tags:**
+- ✅ Single fast API query
+- ✅ User controls grouping logic
+- ✅ Works for ANY categorization (OS, environment, compliance, department)
+- ✅ Already implemented - works TODAY
+- ✅ Follows Tenable.sc best practices
+
+**How to create tags:**
+1. Tenable.sc UI → Assets → Select assets
+2. Click "Tag" button
+3. Create/assign tags like "Windows Hosts", "Linux Servers"
+
+#### Option 2: CPE Filtering (Automatic) ✅
+
+**Proven approach:** Filter by CPE (Common Platform Enumeration) with smart operator auto-detection.
+
+**✅ VERIFIED WORKING** - Uses Tenable.sc UI's proven operators with automatic detection.
+
+##### 🎯 Smart Auto-Detection (You Don't Need to Know Operators!)
+
+The `cpe` filter **automatically detects** the right operator based on your input:
+
+```python
+# Format 1: Simple string → Auto-detects '~=' (contains)
+filters = {"cpe": "microsoft:windows"}   # All Windows systems
+filters = {"cpe": "linux"}               # All Linux systems  
+filters = {"cpe": "cisco"}               # All Cisco devices
+filters = {"cpe": "centos"}              # CentOS only
+
+# Format 2: Full CPE string → Auto-detects '=' (exact match)
+filters = {"cpe": "cpe:/o:microsoft:windows_10"}  # Exact Windows 10
+filters = {"cpe": "cpe:2.3:o:cisco:ios"}          # Exact Cisco IOS
+
+# Format 3: Regex pattern → Auto-detects 'pcre' (Perl regex)
+filters = {"cpe": ".*windows.*(10|11).*"}         # Windows 10 OR 11
+filters = {"cpe": ".*cisco.*(ios|asa).*"}         # Cisco IOS OR ASA
+filters = {"cpe": "^cpe:/o:.*:linux.*"}           # Any Linux OS
+```
+
+##### 📚 Three Operators Explained
+
+| Input Format | Auto-Detected Operator | Behavior | Example |
+|--------------|------------------------|----------|---------|
+| Simple string | `~=` (contains) | Partial match | `"windows"` → matches all Windows |
+| Full CPE (`cpe:...`) | `=` (exact) | Exact match | `"cpe:/o:microsoft:windows_10"` → only Windows 10 |
+| Regex pattern | `pcre` (Perl regex) | Pattern match | `".*windows.*(10\|11).*"` → Win 10 or 11 |
+
+**Detection rules:**
+- Contains regex chars (`.*, ^, $, |, [], ()`) → Uses `pcre`
+- Starts with `cpe:` → Uses `=` (exact)
+- Everything else → Uses `~=` (contains)
+
+##### 💡 Beginner Examples (Simple Strings)
+
+```python
+# Most common - just use plain text!
+filters = {"cpe": "windows"}              # All Windows (workstations + servers)
+filters = {"cpe": "microsoft:windows_10"} # All Windows 10 versions
+filters = {"cpe": "linux"}                # All Linux distributions
+filters = {"cpe": "paloaltonetworks"}     # All Palo Alto devices
+filters = {"cpe": "vmware"}               # All VMware products
+```
+
+##### 🎓 Advanced Examples (Regex Patterns)
+
+**Perl-compatible regex (PCRE) patterns for power users:**
+
+```python
+# Windows 10 OR Windows 11 (any version)
+filters = {"cpe": ".*windows.*(10|11).*"}
+
+# Cisco IOS OR ASA devices
+filters = {"cpe": ".*cisco.*(ios|asa).*"}
+
+# Linux kernel 3.10.x only
+filters = {"cpe": ".*linux.*3\\.10\\..*"}
+
+# Windows Server 2016-2019 only
+filters = {"cpe": ".*windows_server_201[6-9].*"}
+
+# Ubuntu 18 or 20 LTS
+filters = {"cpe": ".*ubuntu.*(18|20)\\.04.*"}
+
+# Any Red Hat or CentOS
+filters = {"cpe": ".*(redhat|centos).*"}
+```
+
+##### ⚠️ Common Regex Pitfalls
+
+**Problem:** CPE values include version numbers that can cause false positives.
+
+**Example 1 - Windows 10/11 confusion:**
+```python
+# ❌ TOO BROAD - matches Windows Server 2019 (version 10.0.17763)
+filters = {"cpe": ".*windows.*(10|11).*"}
+
+# ✅ BETTER - use underscore boundary
+filters = {"cpe": ".*windows_(10|11)([^0-9]|$).*"}
+
+# ✅ BEST - exact CPE matching
+filters = {"cpe": "cpe:/o:microsoft:windows_10"}
+```
+
+**Example 2 - Windows Server confusion:**
+```python
+# ❌ TOO BROAD - may match Windows 10 systems (contains "10")
+filters = {"cpe": ".*windows_server_201[6-9].*"}
+
+# ✅ BETTER - use colon separator
+filters = {"cpe": ".*:windows_server_201[6-9]:"}
+
+# ✅ BEST - simple string match
+filters = {"cpe": "microsoft:windows_server_2019"}
+```
+
+**Best Practices:**
+1. **Start simple:** Use plain strings like `"windows_10"` before trying regex
+2. **Test first:** Run without filters to see actual CPE values in your environment
+3. **Use boundaries:** Add `[^0-9]` or `:` to avoid substring matches
+4. **Exact when possible:** Full CPE strings (`cpe:/o:...`) are most reliable
+
+**Why use CPE:**
+- ✅ No tag maintenance required
+- ✅ Automatic OS detection from scan data
+- ✅ Standard format across Tenable products
+- ✅ **Proven working** - from Tenable.sc UI
+- ✅ Three power levels: simple, exact, regex
+- ✅ Smart auto-detection - no learning curve
+- ⚠️ Less flexible than tags for custom categorization
+- ⚠️ May miss assets without CPE data
+
+**Technical details:**
+When you use `filters={"cpe": "value"}`, the code automatically:
+1. Detects format of `"value"`
+2. Chooses operator: `~=` (contains), `=` (exact), or `pcre` (regex)
+3. Sends to API: `{"filterName": "cpe", "operator": "<detected>", "value": "value"}`
+
+This matches Tenable.sc UI's implementation.
+
+#### OS Filtering Examples
+
+```python
+# Example 1: Windows hosts with critical vulnerabilities (using tags)
+tsc_list_ips(
+    repository="Default",
+    filters={
+        "tag": "Windows Hosts",
+        "severity": "critical",
+        "asset_criticality": "7-10"
+    }
+)
+
+# Example 2: Linux systems with high VPR (using CPE)
+tsc_list_ips(
+    repository="Production",
+    filters={
+        "cpe": "linux",
+        "vpr_score": "8-10",
+        "exploit_available": "true"
+    }
+)
+
+# Example 3: Windows servers with network-exploitable vulns
+tsc_list_ips(
+    repository="Default",
+    filters={
+        "cpe": "microsoft:windows_server",
+        "attack_vector": "Network",
+        "attack_complexity": "Low",
+        "severity": "4"
+    }
+)
+
+# Example 4: Tagged production systems with critical issues
+tsc_list_ips(
+    repository="Default",
+    filters={
+        "tag": "Production",
+        "severity": "critical",
+        "aes_score": "700-1000"
+    }
+)
+
+# Example 5: CentOS systems with exploitable vulnerabilities
+tsc_list_ips(
+    repository="Default",
+    filters={
+        "cpe": "centos",
+        "exploit_available": "true",
+        "severity": "high"
+    }
+)
+```
+
+#### Comparison: Tags vs CPE vs Family Filter
+
+| Method | Filter Field | Operator | Format Example | Status |
+|--------|--------------|----------|----------------|--------|
+| **Tags** (BEST) | `tag` | `=` | `"Windows Hosts"` | ✅ **Verified Working** |
+| **CPE** (Good) | `cpe` | `~=` | `"microsoft:windows"` | ✅ **UI-Proven** |
+| **Family** (Legacy) | `family` | `=` | `[{"id": 24}]` | ✅ Working (filters vulns, not assets) |
+
+**Recommendation:** 
+- **Use tags** for custom categorization (100% reliable, most flexible)
+- **Use CPE** for automatic OS detection (proven working, no maintenance)
+- **Avoid family filter** for OS filtering (filters vulnerabilities, not assets directly)
+
+---
 
 ### ⚠️ Complex Filters (Array of Objects Format)
 

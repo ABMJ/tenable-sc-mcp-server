@@ -1,7 +1,7 @@
 # Tenable.sc MCP Server - Design Principles & Architecture Guidelines
 
-**Version**: 1.2.0  
-**Last Updated**: 2026-06-10  
+**Version**: 1.2.1  
+**Last Updated**: 2026-06-12  
 **Status**: Living Document - Core Principles Established
 
 ---
@@ -637,6 +637,14 @@ If failed, provide ERROR DETAILS with enough information for the developer to fi
 ---
 
 ## Version History
+
+### v1.2.1 (2026-06-12)
+- ✅ **CPE/OS Filtering**: Added smart operator detection for `cpe` filter (contains/exact/regex)
+- ✅ Added `os_cpe` as alias for `cpe` parameter (71 total filters)
+- ✅ Fixed MCP resource documentation generation (brace escaping in examples)
+- ✅ Enhanced documentation with regex pitfall guidance and best practices
+- ✅ Verified severity string-to-numeric conversion working correctly
+- ✅ Design Decision: Auto-detect CPE operators based on value format (no user configuration needed)
 
 ### v1.2.0 (2026-06-10)
 - ✅ **BREAKING**: Unified filters dict pattern (mandatory for all new tools)

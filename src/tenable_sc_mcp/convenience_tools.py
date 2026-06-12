@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 FILTER_DOCS_TEMPLATE = """
 FILTERS:
-This tool supports 55+ Tenable.sc analysis filters via **kwargs.
+This tool supports 71+ Tenable.sc analysis filters via **kwargs.
 For COMPLETE filter reference, fetch MCP resource: tenable-sc://filters/reference
 
 COMMON FILTERS (Quick Reference):
@@ -35,6 +35,9 @@ Asset Filters:
     repository="Production"        # Repository name or ID
     ip="10.1.20.10"               # Specific IP address
     dns_name="webserver01"        # Hostname
+    tag="Windows Hosts"           # Asset tag (RECOMMENDED for OS filtering)
+    cpe="microsoft:windows"       # CPE smart detection (~=, =, pcre operators)
+    os_cpe="linux"                # Alias for 'cpe' (common alternative name)
 
 Vulnerability Filters:
     severity="critical"           # critical/high/medium/low/info or 0-4
@@ -72,7 +75,7 @@ FILTER EXAMPLES:
 IMPORTANT NOTES:
     1. Scoring filters MUST use range format: "7-10" NOT ">7" or ">=7"
     2. Unknown filter parameters are silently ignored (check logs for warnings)
-    3. For detailed docs on all 55+ filters, see: tenable-sc://filters/reference
+    3. For detailed docs on all 70+ filters, see: tenable-sc://filters/reference
     4. Common mistakes:
        - "acr_score" → use "asset_criticality"
        - "hostname" → use "dns_name"
@@ -103,7 +106,7 @@ PORT_SCANNER_PLUGINS = {
     22964: "Service Detection",
 }
 
-# Universal filter mapping (55+ analysis filters)
+# Universal filter mapping (70 analysis filters - v1.2.1)
 COMMON_FILTERS = {
     # Asset Identification (8 filters)
     "asset_id": "assetID",
@@ -134,7 +137,8 @@ COMMON_FILTERS = {
     "iavm_id": "iavmID",
     "ms_bulletin_id": "msbulletinID",
     "xref": "xref",
-    "cpe": "cpe",
+    "cpe": "cpe",  # OS/Platform filter - smart operator detection (~=, =, pcre)
+    "os_cpe": "cpe",  # Alias for 'cpe' (common alternative name)
     "stig_severity": "stigSeverity",
     
     # Scoring (11 filters)
@@ -149,9 +153,26 @@ COMMON_FILTERS = {
     "cvss_v3_vector": "cvssV3Vector",
     "cvss_v4_vector": "cvssV4Vector",
     
-    # Threat Context (2 filters)
+    # CVSS v3 Component Metrics (8 filters) - Added in v1.2.1
+    "attack_vector": "cvssV3AttackVector",           # Network/Adjacent/Local/Physical
+    "attack_complexity": "cvssV3AttackComplexity",   # Low/High
+    "privileges_required": "cvssV3PrivilegesRequired",  # None/Low/High
+    "user_interaction": "cvssV3UserInteraction",     # None/Required
+    "scope": "cvssV3Scope",                          # Unchanged/Changed
+    "confidentiality_impact": "cvssV3ConfidentialityImpact",  # None/Low/High
+    "integrity_impact": "cvssV3IntegrityImpact",     # None/Low/High
+    "availability_impact": "cvssV3AvailabilityImpact",  # None/Low/High
+    
+    # CVSS v2 Component Metrics (3 filters) - Added in v1.2.1
+    "access_vector": "cvssV2AccessVector",           # Network/Adjacent/Local
+    "access_complexity": "cvssV2AccessComplexity",   # Low/Medium/High
+    "authentication": "cvssV2Authentication",        # None/Single/Multiple
+    
+    # Threat Context (4 filters)
     "exploit_available": "exploitAvailable",
+    "exploitable": "exploitAvailable",  # Alias for exploit_available - Added in v1.2.1
     "exploit_frameworks": "exploitFrameworks",
+    "exploit_maturity": "vprExploitMaturity",  # VPR component: Unproven/PoC/Functional/High - Added in v1.2.1
     
     # Temporal (10 filters)
     "first_seen": "firstSeen",
@@ -220,6 +241,64 @@ def validate_severity(severity: str) -> tuple[bool, str]:
             f"Valid values: {', '.join(valid)}"
         )
     return True, ""
+
+
+def detect_cpe_operator(value: str) -> str:
+    """
+    Auto-detect the appropriate CPE filter operator based on value format.
+    
+    Tenable.sc supports three CPE operators:
+    - '~=' (contains): Partial string matching
+    - '=' (exact): Exact CPE string matching
+    - 'pcre': Perl-compatible regular expression matching
+    
+    Args:
+        value: The CPE filter value provided by user
+    
+    Returns:
+        The appropriate operator: '~=', '=', or 'pcre'
+    
+    Examples:
+        >>> detect_cpe_operator("windows")
+        '~='
+        
+        >>> detect_cpe_operator("cpe:/o:microsoft:windows_10")
+        '='
+        
+        >>> detect_cpe_operator(".*windows.*(10|11).*")
+        'pcre'
+    """
+    # Detect PCRE regex patterns by looking for regex metacharacters
+    # PCRE metacharacters: . * + ? [ ] ( ) { } ^ $ | \
+    pcre_chars = [
+        '.*',      # Most common: match any characters
+        '.+',      # Match one or more characters
+        '^',       # Start anchor
+        '$',       # End anchor
+        '|',       # OR operator
+        '[',       # Character class start
+        ']',       # Character class end
+        '(',       # Group start
+        ')',       # Group end
+        '{',       # Quantifier start
+        '}',       # Quantifier end
+        '\\d',     # Digit shorthand
+        '\\w',     # Word character shorthand
+        '\\s',     # Whitespace shorthand
+    ]
+    
+    # Check for regex patterns
+    if any(pattern in value for pattern in pcre_chars):
+        return 'pcre'
+    
+    # Check for full CPE format (starts with 'cpe:' or 'cpe2.3:')
+    # Example: cpe:/o:microsoft:windows_10 or cpe:2.3:o:microsoft:windows_10
+    if value.startswith('cpe:'):
+        return '='
+    
+    # Default: partial string matching (most user-friendly)
+    # Example: "windows", "cisco", "linux", "microsoft:windows_10"
+    return '~='
 
 
 def validate_cve(cve_id: str) -> tuple[bool, str]:
@@ -352,6 +431,7 @@ def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
     
     Converts tool parameters to Tenable.sc analysis filter format.
     Automatically converts scoring filter operators to range format.
+    Automatically converts severity string names to numeric values.
     Validates parameters and warns about unknown filters.
     
     Args:
@@ -370,6 +450,26 @@ def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
         'cvss_v4_base_score': 10.0,   # CVSS v4: 0-10 scale
         'base_cvss_score': 10.0,      # CVSS v2: 0-10 scale
         'epss_score': 1.0,            # EPSS: 0-1 scale (probability)
+    }
+    
+    # Severity string to numeric conversion
+    SEVERITY_MAP = {
+        'critical': '4',
+        'high': '3',
+        'medium': '2',
+        'low': '1',
+        'info': '0',
+        'information': '0',
+    }
+    
+    # Exploit available value normalization
+    EXPLOIT_AVAILABLE_MAP = {
+        'yes': 'true',
+        'true': 'true',
+        '1': 'true',
+        'no': 'false',
+        'false': 'false',
+        '0': 'false',
     }
     
     filters = []
@@ -397,8 +497,30 @@ def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
             operator = "="
             filter_value = value
             
+            # Special handling for CPE filter - auto-detect operator based on value format
+            # Supports three modes:
+            #   1. Simple string (e.g., "windows", "cisco") → uses '~=' (contains)
+            #   2. Full CPE (e.g., "cpe:/o:microsoft:windows_10") → uses '=' (exact)
+            #   3. Regex pattern (e.g., ".*windows.*(10|11).*") → uses 'pcre' (Perl regex)
+            # Note: Both 'cpe' and 'os_cpe' parameters map to 'cpe' filter name
+            if param in ('cpe', 'os_cpe') and isinstance(filter_value, str):
+                operator = detect_cpe_operator(filter_value)
+                # No modification to filter_value - pass as-is to API
+            
+            # Convert severity string names to numeric values
+            elif param == 'severity' and isinstance(filter_value, str):
+                severity_lower = filter_value.lower().strip()
+                if severity_lower in SEVERITY_MAP:
+                    filter_value = SEVERITY_MAP[severity_lower]
+            
+            # Normalize exploit_available values
+            elif param in ('exploit_available', 'exploitable') and isinstance(filter_value, str):
+                exploit_lower = filter_value.lower().strip()
+                if exploit_lower in EXPLOIT_AVAILABLE_MAP:
+                    filter_value = EXPLOIT_AVAILABLE_MAP[exploit_lower]
+            
             # Convert scoring filters from operator format to range format
-            if param in SCORING_FILTERS and isinstance(filter_value, str):
+            elif param in SCORING_FILTERS and isinstance(filter_value, str):
                 max_score = SCORING_FILTERS[param]
                 filter_value = convert_score_operator_to_range(filter_value, max_score)
         

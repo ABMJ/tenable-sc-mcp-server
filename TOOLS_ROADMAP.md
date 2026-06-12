@@ -1,7 +1,7 @@
 # Tenable.sc Convenience Tools - Roadmap & User Guide
 
-**Status**: Week 1 - Session 2 Complete (Documentation Updated for v1.2.0)  
-**Last Updated**: 2026-06-10 (Session 2 - Unified Filters Architecture)
+**Status**: Week 1 - v1.2.1 Complete (CPE/OS Filtering + Documentation Fixes)  
+**Last Updated**: 2026-06-12 (Session 3 - CPE Filtering with Smart Operators)
 
 ---
 
@@ -20,7 +20,7 @@
 - [Tool 5: tsc_list_vulns_by_cve - CVE Search Across Infrastructure](#-tool-5-tsc_list_vulns_by_cve---cve-search-across-infrastructure)
 
 ### Part 2: Development Roadmap (Pending Tools)
-- [🚨 v1.2.1 - CVSS Component Filters (NEXT PRIORITY)](#-next-priority-v121---cvss-component-filters)
+- [🚨 Known Issue: Plugin Family Filter (INVESTIGATE BEFORE TOOL 6)](#-known-issue-plugin-family-filter-investigate-before-tool-6)
 - [📅 Week 1 - Core Foundation (2 Tools Remaining)](#-week-1---core-foundation-2-tools-remaining)
 - [Session 1.7: Tool 6 - Missing Patches](#-session-17-tool-6---missing-patches)
 - [Session 1.8: Tool 7 - Scan Status](#-session-18-tool-7---scan-status)
@@ -33,16 +33,17 @@
 
 ## 🎯 Quick Status
 
-**Completed**: 5/25 tools (20%) + Unified Filters Architecture (v1.2.0 Released)  
-**Current Phase**: v1.2.0 Released (Git commit d91cca7, tag v1.2.0)  
-**Next Session**: v1.2.1 - Add CVSS Component Filters (MANDATORY before Tool 6)
+**Completed**: 5/25 tools (20%) + Unified Filters Architecture + CPE/OS Filtering (v1.2.1 Released)  
+**Current Phase**: v1.2.1 Released (CPE filtering with smart operator detection)  
+**Next Session**: Tool 6 - Scan Status & Control (BLOCKED: Plugin family filter needs investigation)
 
-**v1.2.0 Architecture (NEW):**
-- ✅ Unified `filters: dict` parameter across all tools
-- ✅ Single source of truth: `COMMON_FILTERS` in `convenience_tools.py`
-- ✅ Zero tool edits when adding new filters
-- ✅ Fixed MCP `**kwargs` limitation bug
-- ⏳ All 4 tools refactored, awaiting comprehensive user testing
+**v1.2.1 Architecture (RELEASED - 2026-06-12):**
+- ✅ CPE/OS filtering with smart operator auto-detection (`~=`, `=`, `pcre`)
+- ✅ Added `os_cpe` as alias for `cpe` parameter (71 total filters)
+- ✅ Fixed MCP resource documentation generation (brace escaping)
+- ✅ Added regex pitfall guidance and best practices to documentation
+- ✅ Verified severity string-to-numeric conversion working correctly
+- ⚠️ Plugin family filter needs investigation before Tool 6 implementation
 
 ---
 
@@ -655,91 +656,66 @@ search for CVE-2021-44228 in repository "Patched Systems"
 
 ## 📅 WEEK 1 - CORE FOUNDATION (2 TOOLS REMAINING)
 
-### 🚨 NEXT PRIORITY: v1.2.1 - CVSS Component Filters
+### 🚨 KNOWN ISSUE: Plugin Family Filter (INVESTIGATE BEFORE TOOL 6)
 
-**⚠️ MUST BE COMPLETED BEFORE Tool 6 - DO NOT SKIP**
+**⚠️ MUST BE RESOLVED BEFORE Tool 6 - DO NOT SKIP**
 
-**Status**: ⏳ Pending | **Estimated**: 3-4 hours | **Priority**: CRITICAL
+**Status**: ⏳ Pending Investigation | **Estimated**: 2-3 hours | **Priority**: HIGH
 
-**Purpose:**
-Add individual CVSS component filters that users are already trying to use (seen in Docker logs).
+**Problem:**
+The `family` filter parameter is currently in `COMMON_FILTERS` but may not be working correctly with the Tenable.sc API. This needs investigation before implementing Tool 6 (scan status), which will rely on plugin family filtering.
 
-**What to Add:**
+**What Needs Investigation:**
 
+1. **Verify API Filter Name** (60-90 min)
+   - Check official Tenable.sc documentation
+   - Test actual API calls with `family` filter
+   - Determine if it's `family`, `pluginFamily`, `familyName`, or something else
+   - Document actual API behavior
+
+2. **Test Filter Behavior** (30-60 min)
+   - Try filtering by common families: "Windows", "Red Hat Local Security Checks", "General"
+   - Check if exact match required or partial match works
+   - Verify case sensitivity
+   - Document findings with examples
+
+3. **Update Code if Needed** (30 min)
+   - Fix `COMMON_FILTERS` mapping if incorrect
+   - Update `FILTER_FORMAT_REFERENCE.md` with correct usage
+   - Add examples to filter documentation
+
+4. **Add Tests** (30 min)
+   - Create 3-5 test cases for plugin family filtering
+   - Test with existing tools (Tool 2b, Tool 5)
+   - Verify results match expectations
+
+**Current Status:**
 ```python
-# Add to COMMON_FILTERS in convenience_tools.py:
-
-# CVSS v3 Components (8 filters) - NEW
-"attack_vector": "cvssV3AttackVector",  # Network/Adjacent/Local/Physical
-"attack_complexity": "cvssV3AttackComplexity",  # Low/High
-"privileges_required": "cvssV3PrivilegesRequired",  # None/Low/High
-"user_interaction": "cvssV3UserInteraction",  # None/Required
-"scope": "cvssV3Scope",  # Unchanged/Changed
-"confidentiality_impact": "cvssV3ConfidentialityImpact",  # None/Low/High
-"integrity_impact": "cvssV3IntegrityImpact",  # None/Low/High
-"availability_impact": "cvssV3AvailabilityImpact",  # None/Low/High
-
-# VPR Components (1 filter) - NEW
-"exploit_maturity": "vprExploitMaturity",  # Unproven/PoC/Functional/High
-
-# CVSS v2 Components (optional)
-"access_vector": "cvssV2AccessVector",  # Network/Adjacent/Local
-"access_complexity": "cvssV2AccessComplexity",  # Low/Medium/High
-"authentication": "cvssV2Authentication",  # None/Single/Multiple
+# In COMMON_FILTERS - may be incorrect
+"family": "family",  # Plugin family name - NEEDS VERIFICATION
 ```
 
-**Action Items:**
-1. **Research API filter names** (30-60 min)
-   - Check https://docs.tenable.com/security-center/6_8/Content/VulnerabilityAnalysisFilters.htm
-   - Test with Tenable.sc API to verify exact names
-   - Document findings in `CVSS_COMPONENTS_ANALYSIS.md`
+**Suspected Issues:**
+- May need to be `pluginFamily` or `familyName`
+- May require exact case-sensitive match
+- May not support partial matching like other filters
 
-2. **Add filters to code** (30 min)
-   - Update `COMMON_FILTERS` in `convenience_tools.py`
-   - Update `FILTER_FORMAT_REFERENCE.md` with examples
-   - Update `filter_reference.py` resource
-
-3. **Comprehensive testing** (2-3 hours)
-   - Add 10-15 tests to `COMPREHENSIVE_TEST_SUITE.md`
-   - Test all 5 existing tools with new filters
-   - Run complete 70+ test suite
-   - Verify ≥95% pass rate
-
-4. **Docker rebuild & commit**
-   - Rebuild Docker container
-   - Test via MCP client
-   - Commit as v1.2.1
-   - Tag and push to GitHub
-
-**Use Cases:**
-```python
-# Find easily exploitable critical vulnerabilities
-filters = {
-    "severity": "4",
-    "attack_vector": "Network",
-    "attack_complexity": "Low",
-    "exploit_maturity": "Functional"
-}
-
-# Find high-impact vulnerabilities requiring no privileges
-filters = {
-    "attack_vector": "Network",
-    "privileges_required": "None",
-    "confidentiality_impact": "High",
-    "integrity_impact": "High"
-}
-```
+**Action Plan:**
+1. Create `PLUGIN_FAMILY_INVESTIGATION.md` to track findings
+2. Test with Tenable.sc UI first to see how it works
+3. Use browser developer tools to see actual API calls
+4. Update code and docs based on findings
+5. Add tests to prevent regression
 
 **Files to Update:**
-- `src/tenable_sc_mcp/convenience_tools.py` - Add filters to `COMMON_FILTERS`
-- `FILTER_FORMAT_REFERENCE.md` - Add CVSS component section
-- `COMPREHENSIVE_TEST_SUITE.md` - Add 10-15 new tests
-- `HANDOFF.md` - Update status
-- `RELEASE_NOTES_v1.2.1.md` - Create release notes
+- `src/tenable_sc_mcp/convenience_tools.py` - Fix `COMMON_FILTERS` if needed
+- `FILTER_FORMAT_REFERENCE.md` - Add correct family filter usage
+- `PLUGIN_FAMILY_INVESTIGATION.md` - Document investigation findings
+- `HANDOFF.md` - Update with resolution details
 
-**See:** `CVSS_COMPONENTS_ANALYSIS.md` for detailed investigation notes
+**See:** Investigation should be completed in next session before starting Tool 6.
 
-**Module**: `convenience_tools.py` (core infrastructure, affects all tools)
+**Module**: `convenience_tools.py` (core infrastructure, affects Tool 6 and potentially others)
 
 ---
 

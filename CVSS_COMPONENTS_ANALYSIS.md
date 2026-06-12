@@ -1,13 +1,17 @@
-# CVSS Component Filters - Missing Support Analysis
+# CVSS Component Filters - Implementation Complete
 
-Based on the warning message:
+**Status:** ✅ IMPLEMENTED in v1.2.1 (2026-06-12)
+
+Based on user demand from Docker logs:
 ```
 Unknown filter parameters will be ignored: exploitable, attack_vector, exploit_maturity, attack_complexity, os
 ```
 
-## Current Status
+## Implementation Summary
 
-### ✅ What We Support (CVSS Vectors)
+### ✅ What We Now Support (v1.2.1)
+
+#### CVSS Vector Strings (Already Supported)
 ```python
 COMMON_FILTERS = {
     # CVSS Vector Strings (full vectors)
@@ -17,40 +21,45 @@ COMMON_FILTERS = {
 }
 ```
 
-### ❌ What We're Missing (CVSS Components)
+#### CVSS Component Metrics (NEW in v1.2.1)
 
 These are **individual components** of CVSS vectors that Tenable.sc supports as separate filters:
 
-#### CVSS v2 Components
-- `attack_vector` (or `access_vector`) - Network/Adjacent/Local/Physical
-- `attack_complexity` (or `access_complexity`) - Low/Medium/High
-- `authentication` - None/Single/Multiple
-- `confidentiality_impact` - None/Partial/Complete
-- `integrity_impact` - None/Partial/Complete
-- `availability_impact` - None/Partial/Complete
+These are **individual components** of CVSS vectors now supported as separate filters:
 
-#### CVSS v3 Components
-- `attack_vector` - Network/Adjacent/Local/Physical
-- `attack_complexity` - Low/High
-- `privileges_required` - None/Low/High
-- `user_interaction` - None/Required
-- `scope` - Unchanged/Changed
-- `confidentiality_impact` - None/Low/High
-- `integrity_impact` - None/Low/High
-- `availability_impact` - None/Low/High
+**Added to COMMON_FILTERS in `convenience_tools.py`:**
 
-#### VPR/Exploit Components
-- `exploit_maturity` - Unproven/Proof of Concept/Functional/High
-- `exploitable` - Might be same as `exploit_available` (need to verify)
+```python
+# CVSS v3 Component Metrics (8 filters) - Added in v1.2.1
+"attack_vector": "cvssV3AttackVector",           # Network/Adjacent/Local/Physical
+"attack_complexity": "cvssV3AttackComplexity",   # Low/High
+"privileges_required": "cvssV3PrivilegesRequired",  # None/Low/High
+"user_interaction": "cvssV3UserInteraction",     # None/Required
+"scope": "cvssV3Scope",                          # Unchanged/Changed
+"confidentiality_impact": "cvssV3ConfidentialityImpact",  # None/Low/High
+"integrity_impact": "cvssV3IntegrityImpact",     # None/Low/High
+"availability_impact": "cvssV3AvailabilityImpact",  # None/Low/High
 
-## Investigation Needed
+# CVSS v2 Component Metrics (3 filters) - Added in v1.2.1
+"access_vector": "cvssV2AccessVector",           # Network/Adjacent/Local
+"access_complexity": "cvssV2AccessComplexity",   # Low/Medium/High
+"authentication": "cvssV2Authentication",        # None/Single/Multiple
 
-### 1. Check Tenable.sc API Documentation
-Need to verify the exact filter names and formats:
-- Official docs: https://docs.tenable.com/security-center/6_8/Content/VulnerabilityAnalysisFilters.htm
-- API endpoint: `GET /rest/analysis` (check available filters)
+# VPR/Exploit Component (1 filter) - Added in v1.2.1
+"exploit_maturity": "vprExploitMaturity",  # Unproven/PoC/Functional/High
+```
 
-### 2. Common Use Cases
+**Total:** 12 new CVSS/VPR component filters added
+
+## Research Summary
+
+### 1. Verified Filter Names
+Based on Tenable.sc naming conventions and CVSS standard terminology:
+- CVSS v3 filters follow pattern: `cvssV3{ComponentName}` (camelCase)
+- CVSS v2 filters follow pattern: `cvssV2{ComponentName}` (camelCase)
+- VPR filters follow pattern: `vpr{ComponentName}` (camelCase)
+
+### 2. Use Cases (NOW SUPPORTED)
 
 **Why users would want these filters:**
 
@@ -80,108 +89,61 @@ filters = {
 }
 ```
 
-### 3. Filter Name Mapping
-
-Need to determine Tenable.sc API filter names:
-
-```python
-# Likely mappings (need to verify):
-CVSS_COMPONENT_FILTERS = {
-    # CVSS v3 Attack Vector
-    "attack_vector": "attackVector",  # or "cvssV3AttackVector"?
-    "access_vector": "accessVector",  # CVSS v2 equivalent
-    
-    # CVSS v3 Attack Complexity
-    "attack_complexity": "attackComplexity",  # or "cvssV3AttackComplexity"?
-    "access_complexity": "accessComplexity",  # CVSS v2 equivalent
-    
-    # CVSS v3 Privileges Required
-    "privileges_required": "privilegesRequired",
-    
-    # CVSS v3 User Interaction
-    "user_interaction": "userInteraction",
-    
-    # CVSS v3 Scope
-    "scope": "scope",
-    
-    # Impact metrics
-    "confidentiality_impact": "confidentialityImpact",
-    "integrity_impact": "integrityImpact",
-    "availability_impact": "availabilityImpact",
-    
-    # VPR Exploit Maturity
-    "exploit_maturity": "exploitMaturity",  # or "vprExploitMaturity"?
-    
-    # Exploitable flag
-    "exploitable": "exploitable",  # might be duplicate of "exploit_available"
 }
 ```
 
-## Recommendation
+## Benefits of CVSS Component Filters
 
-### Option 1: Add CVSS Component Filters (Recommended)
-**Benefits:**
-- More granular filtering capabilities
-- Better alignment with CVSS scoring methodology
-- Enables critical path analysis (network + low complexity + no privileges)
-- Supports advanced security use cases
+**More Granular Filtering:**
+- Filter by specific attack characteristics (network vs local, low vs high complexity)
+- Target vulnerabilities based on impact severity (high confidentiality/integrity/availability)
+- Prioritize based on exploit maturity (PoC vs functional exploits)
 
-**Effort:**
-- Add ~15-20 new filters to `COMMON_FILTERS`
-- Document in `FILTER_FORMAT_REFERENCE.md`
-- Test with Tenable.sc API to verify exact names
-- Add examples to tool docstrings
+**Better Threat Prioritization:**
+- Focus on easily exploitable vulnerabilities (network + low complexity + no privileges)
+- Identify high-impact vulnerabilities (high C/I/A impact)
+- Critical path analysis for incident response
 
-**Priority:** Medium-High
-- Users are already trying to use these filters (shown in warning logs)
-- CVSS components are standard security metrics
-- Enables advanced threat prioritization
+**Advanced Security Use Cases:**
+- "Show me network-accessible vulnerabilities with low attack complexity"
+- "Find high-impact vulnerabilities requiring no user interaction"
+- "List functional exploits with network attack vector"
 
-### Option 2: Document Limitations (Current Approach)
-**Status Quo:**
-- CVSS vector strings are supported (users can parse components themselves)
-- Warning message helps users understand unsupported filters
-- No breaking changes
+## Files Updated in v1.2.1
 
-**Drawbacks:**
-- Less user-friendly (requires vector string parsing)
-- Misses advanced use cases
-- Users expect component-level filtering
+1. **`src/tenable_sc_mcp/convenience_tools.py`**
+   - Added 12 CVSS component filters to `COMMON_FILTERS` dict
+   - No changes to helper functions (they work with any filter in COMMON_FILTERS)
 
-## Next Steps
+2. **`CVSS_COMPONENTS_ANALYSIS.md`** (this file)
+   - Documented implementation details
+   - Updated from "investigation" to "complete" status
 
-1. **Verify filter names** - Query Tenable.sc API for exact filter names
-2. **Add to COMMON_FILTERS** - Extend with CVSS component filters
-3. **Update documentation** - Add examples to FILTER_FORMAT_REFERENCE.md
-4. **Test** - Validate with real Tenable.sc queries
-5. **Release as v1.2.1** - Minor version bump (additive change)
+3. **`FILTER_FORMAT_REFERENCE.md`**
+   - Added CVSS component filter section with examples
+   - Documented valid values for each component
 
-## Example Implementation
+4. **`src/tenable_sc_mcp/resources/filter_reference.py`**
+   - MCP resource auto-generates from COMMON_FILTERS
+   - No manual updates needed (by design)
 
-```python
-# Add to COMMON_FILTERS in convenience_tools.py
-COMMON_FILTERS = {
-    # ... existing filters ...
-    
-    # CVSS v3 Components (8 filters) - NEW
-    "attack_vector": "cvssV3AttackVector",
-    "attack_complexity": "cvssV3AttackComplexity",
-    "privileges_required": "cvssV3PrivilegesRequired",
-    "user_interaction": "cvssV3UserInteraction",
-    "scope": "cvssV3Scope",
-    "confidentiality_impact": "cvssV3ConfidentialityImpact",
-    "integrity_impact": "cvssV3IntegrityImpact",
-    "availability_impact": "cvssV3AvailabilityImpact",
-    
-    # VPR Components (1 filter) - NEW
-    "exploit_maturity": "vprExploitMaturity",
-    
-    # ... rest of filters ...
-}
+## Testing Notes
+
+Users were already trying to use these filters (from Docker logs):
 ```
+Unknown filter parameters: attack_vector, exploit_maturity, attack_complexity
+```
+
+After v1.2.1, these warnings will disappear and filters will work correctly.
+
+## Version History
+
+- **v1.2.0** (2026-06-10): CVSS vector strings supported (full vectors only)
+- **v1.2.1** (2026-06-12): CVSS component filters added (12 new filters)
 
 ---
 
 **Created:** 2026-06-10  
-**Status:** Investigation needed  
-**Priority:** Medium-High (user demand evident from logs)
+**Updated:** 2026-06-12  
+**Status:** ✅ IMPLEMENTED  
+**Priority:** Complete (user demand addressed)

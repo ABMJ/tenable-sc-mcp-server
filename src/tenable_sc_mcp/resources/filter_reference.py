@@ -32,7 +32,7 @@ def generate_filter_reference() -> str:
         ],
         "CVE & Compliance": [
             "cve_id", "cve", "cce_id", "iavm_id", "ms_bulletin_id",
-            "xref", "cpe", "stig_severity"
+            "xref", "cpe", "os_cpe", "stig_severity"
         ],
         "Risk Scoring": [
             "base_cvss_score", "cvss_v3_base_score", "cvss_v4_base_score",
@@ -72,7 +72,7 @@ def generate_filter_reference() -> str:
     # Build markdown documentation
     md = """# Tenable.sc Analysis Filter Reference
 
-**Version:** 1.0 (Auto-generated from COMMON_FILTERS)  
+**Version:** 1.2 (CPE Smart Operator Support)  
 **Total Filters:** {total_filters}  
 **Resource URI:** `tenable-sc://filters/reference`
 
@@ -190,7 +190,8 @@ tsc_list_ips(asset_criticality="8-10",
                 "iavm_id": "IAVM identifier",
                 "ms_bulletin_id": "Microsoft Security Bulletin ID",
                 "xref": "Cross-reference",
-                "cpe": "Common Platform Enumeration",
+                "cpe": "Common Platform Enumeration - **Smart operator (~=, =, pcre)**",
+                "os_cpe": "OS CPE (alias for 'cpe') - **Smart operator (~=, =, pcre)**",
                 "stig_severity": "STIG severity level",
                 "base_cvss_score": "CVSS v2 base score (0-10) - **Use range format**",
                 "cvss_v3_base_score": "CVSS v3 base score (0-10) - **Use range format**",
@@ -293,6 +294,27 @@ tsc_list_vulns_by_ip_full("10.1.20.10", family="Windows")
 # Search by MS bulletin
 tsc_list_vulns_by_ip_full("10.1.20.10", ms_bulletin_id="MS17-010")
 ```
+
+### OS/Platform Filtering (CPE)
+```python
+# Simple string matching (auto-uses '~=' operator)
+tsc_list_ips(filters={{"cpe": "microsoft:windows"}})    # All Windows
+tsc_list_ips(filters={{"cpe": "linux"}})                # All Linux
+tsc_list_ips(filters={{"cpe": "cisco"}})                # All Cisco
+
+# Regex pattern matching (auto-uses 'pcre' operator)
+tsc_list_ips(filters={{"cpe": ".*windows.*(10|11).*"}})        # Win 10 OR 11
+tsc_list_ips(filters={{"cpe": ".*windows_server_201[6-9].*"}}) # Server 2016-2019
+
+# Exact CPE matching (auto-uses '=' operator)
+tsc_list_ips(filters={{"cpe": "cpe:/o:microsoft:windows_10"}})
+
+# Both 'cpe' and 'os_cpe' parameters work (aliases)
+tsc_list_ips(filters={{"os_cpe": ".*cisco.*(ios|asa).*"}})
+```
+
+**📘 For complete CPE documentation, examples, and operator details:**
+Fetch MCP resource: `tenable-sc://filters/format-reference` (Section: OS Filtering)
 
 ### Network-Based Queries
 ```python
