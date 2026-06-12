@@ -25,8 +25,15 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 4: Non-Existent CVE](#test-4-non-existent-cve-error-handling)
   - [Test 5: Cache HIT Behavior](#test-5-verify-cache-hit-behavior-repeat-test-1-1)
 
-### v1.2.1 Features
-- [CPE/OS Filtering Tests (7 Tests)](#cpe-os-filtering-tests-v121)
+### CPE Filter Tests (v1.2.1)
+- [CPE Filter Tests](#cpe-filter-tests)
+  - [Test 1: Basic CPE - Windows 10](#test-1-basic-cpe---windows-10)
+  - [Test 2: Basic CPE - Linux](#test-2-basic-cpe---linux)
+  - [Test 3: Basic CPE - Cisco](#test-3-basic-cpe---cisco)
+  - [Test 4: Regex CPE - Windows 10 OR 11](#test-4-regex-cpe---windows-10-or-11)
+  - [Test 5: Regex CPE - Cisco IOS OR ASA](#test-5-regex-cpe---cisco-ios-or-asa)
+  - [Test 6: Regex CPE - Windows Server 2016-2019](#test-6-regex-cpe---windows-server-2016-2019)
+  - [Test 7: CPE Documentation Access](#test-7-cpe-documentation-access)
 
 ### Testing & Performance
 - [Cache Performance Testing](#cache-performance-testing)
@@ -669,24 +676,25 @@ I am testing tsc_list_ips to list all IPs in repository "Default". Please format
 - Validate filters work correctly with real data
 - Compare token usage: first query (MISS) vs repeat (HIT)
 
----
+## CPE Filter Tests
 
-## CPE OS Filtering Tests (v1.2.1)
-
-**Feature:** OS/Platform filtering with smart operator auto-detection  
-**Version:** v1.2.1  
+**Feature Added:** v1.2.1  
+**Purpose:** Validate OS/Platform filtering with smart operator auto-detection  
 **Operators:** `~=` (contains), `=` (exact), `pcre` (regex)
 
-These tests validate the CPE filtering feature that automatically detects the appropriate operator based on the value format.
-
 ---
 
-### Test 1: Basic - Windows 10
-
-**Description:** Test simple string matching with contains operator
-
+### Test 1: Basic CPE - Windows 10
 ```
+I am testing tsc_list_ips with CPE filter to find Windows 10 systems. Please format your response as:
+
 use tenable-sc to list IPs in repository Default with cpe filter "microsoft:windows_10" and severity critical, show first 10 results
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about CPE operator detection and results]
+📦 RESULT: Total IPs: [count], Operator Used: [~=/=/pcre], First 5 IPs: [list]
 ```
 
 **Expected Result:**
@@ -695,104 +703,104 @@ use tenable-sc to list IPs in repository Default with cpe filter "microsoft:wind
 - ✅ No API errors
 - ⚠️ May include Server 2016/2019 (share Windows 10 codebase)
 
-**Why This Test:**
-- Validates basic CPE substring matching
-- Tests combined filtering (CPE + severity)
-- Verifies auto-detection of `~=` operator for simple strings
-
 ---
 
-### Test 2: Basic - Linux
-
-**Description:** Test Linux detection with scoring filters
-
+### Test 2: Basic CPE - Linux
 ```
+I am testing tsc_list_ips with CPE filter to find Linux systems with high risk scores. Please format your response as:
+
 use tenable-sc to list IPs with cpe "linux" where VPR score is 8-10 and ACR is 7-10 in repository Default
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about results and filter combination]
+📦 RESULT: Total IPs: [count], Operator Used: [~=/=/pcre], Distros Found: [list]
 ```
 
 **Expected Result:**
 - ✅ Uses `~=` operator
-- ✅ Returns all Linux distros (CentOS, Ubuntu, Oracle, RHEL)
-- ✅ All results have VPR ≥ 8 and ACR ≥ 7
+- ✅ Returns all Linux distros (CentOS, Ubuntu, Oracle)
+- ✅ All have VPR ≥ 8 and ACR ≥ 7
 - ℹ️ May return zero results if dataset lacks high-risk Linux systems
 
-**Why This Test:**
-- Validates CPE matching across multiple Linux variants
-- Tests combined scoring filters (VPR + ACR)
-- Verifies broad substring matching behavior
-
 ---
 
-### Test 3: Basic - Cisco
-
-**Description:** Test Cisco device filtering with exploit status
-
+### Test 3: Basic CPE - Cisco
 ```
+I am testing tsc_list_ips with CPE filter to find Cisco devices with exploitable critical vulnerabilities. Please format your response as:
+
 use tenable-sc to list IPs with cpe "cisco" where exploit_available is true and severity is critical in repository Default
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about Cisco devices and exploit status]
+📦 RESULT: Total IPs: [count], Operator Used: [~=/=/pcre], Device Types: [IOS/ASA/NX-OS list]
 ```
 
 **Expected Result:**
 - ✅ Uses `~=` operator
-- ✅ Returns all Cisco devices (IOS, ASA, NX-OS) with exploitable critical vulns
-- ✅ Boolean filter `exploit_available` converts "true" → "true" (API format)
-
-**Why This Test:**
-- Validates CPE matching for network devices
-- Tests boolean filter normalization
-- Verifies multi-filter combination (CPE + exploit + severity)
+- ✅ Returns all Cisco devices with exploitable critical vulns
+- ✅ Boolean filter `exploit_available` works correctly
 
 ---
 
-### Test 4: Regex - Windows 10 OR 11 (Power User)
-
-**Description:** Test regex pattern matching with PCRE operator
-
+### Test 4: Regex CPE - Windows 10 OR 11
 ```
+I am testing tsc_list_ips with regex CPE pattern for Windows 10 or 11. Please format your response as:
+
 use tenable-sc to list IPs with cpe ".*windows.*(10|11).*" in repository Default, show first 10 results
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about regex detection and any false positives]
+📦 RESULT: Total IPs: [count], Operator Used: [pcre], Win10: [count], Win11: [count], False Positives: [if any]
 ```
 
 **Expected Result:**
-- ✅ Uses `pcre` operator (auto-detected from regex metacharacters)
-- ✅ Returns Windows 10 and Windows 11 systems
+- ✅ Uses `pcre` operator (auto-detected from regex)
+- ✅ Returns Windows 10 and Windows 11
 - ⚠️ **Known Issue:** May include Server 2016/2019 (version "10.0.17763")
-- ℹ️ False positives expected due to pattern design (documented)
+- ℹ️ False positives expected - pattern too broad (documented)
 
-**Why This Test:**
-- Validates regex operator auto-detection
-- Tests PCRE pattern matching
-- Demonstrates false positive issue (pattern too broad)
-
-**Note:** For exact matching without false positives, use `os_type` filter in v1.2.2+
+**Note:** For exact matching, use `os_type` filter in v1.2.2+
 
 ---
 
-### Test 5: Regex - Cisco IOS OR ASA
-
-**Description:** Test regex exclusion of Nexus devices
-
+### Test 5: Regex CPE - Cisco IOS OR ASA
 ```
+I am testing tsc_list_ips with regex CPE pattern to find Cisco IOS or ASA devices only. Please format your response as:
+
 use tenable-sc to list IPs with cpe ".*cisco.*(ios|asa).*" where severity is critical in repository Default
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about selective Cisco matching]
+📦 RESULT: Total IPs: [count], Operator Used: [pcre], IOS: [count], ASA: [count], NX-OS Excluded: [yes/no]
 ```
 
 **Expected Result:**
 - ✅ Uses `pcre` operator
 - ✅ Returns ONLY Cisco IOS and ASA devices
 - ✅ Correctly excludes Nexus (NX-OS) devices
-- ✅ Severity filter applied correctly
-
-**Why This Test:**
-- Validates regex pattern exclusion logic
-- Tests selective matching within vendor products
-- Verifies regex doesn't over-match
+- ✅ Severity filter applied
 
 ---
 
-### Test 6: Regex - Windows Server 2016-2019
-
-**Description:** Test year range pattern with scoring filter
-
+### Test 6: Regex CPE - Windows Server 2016-2019
 ```
+I am testing tsc_list_ips with regex CPE pattern for Windows Server year range. Please format your response as:
+
 use tenable-sc to list IPs with cpe ".*windows_server_201[6-9].*" where ACR is 8-10 in repository Default
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about year range matching and exclusions]
+📦 RESULT: Total IPs: [count], Operator Used: [pcre], 2016: [c], 2017: [c], 2018: [c], 2019: [c]
 ```
 
 **Expected Result:**
@@ -800,58 +808,29 @@ use tenable-sc to list IPs with cpe ".*windows_server_201[6-9].*" where ACR is 8
 - ✅ Returns Server 2016, 2017, 2018, 2019 only
 - ✅ Correctly excludes Server 2012 and 2022
 - ⚠️ **Known Issue:** May include Windows 10 systems (substring "10" matches)
-- ℹ️ May return zero results if dataset lacks high-ACR Server systems
-
-**Why This Test:**
-- Validates year range regex pattern
-- Tests combined regex + scoring filter
-- Demonstrates pattern boundary importance
+- ℹ️ May return zero results if no high-ACR Server systems in dataset
 
 **Note:** For improved pattern, use `.*:windows_server_201[6-9]:.*` (colon boundaries)
 
 ---
 
-### Test 7: Documentation
-
-**Description:** Verify MCP resource documentation accessibility
-
+### Test 7: CPE Documentation Access
 ```
+I am testing MCP resource access for CPE filter documentation. Please format your response as:
+
 fetch the MCP resource tenable-sc://filters/format-reference and show me the CPE filtering section with the three operators and auto-detection details
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📦 RESULT: [Summary of what CPE documentation was found]
 ```
 
 **Expected Result:**
-- ✅ Shows v1.2.1 documentation
-- ✅ Explains three operators: `~=` (contains), `=` (exact), `pcre` (regex)
+- ✅ Shows v1.2.1 docs
+- ✅ Explains three operators: `~=`, `=`, `pcre`
 - ✅ Shows auto-detection rules with examples
 - ✅ Includes regex reference table
-- ℹ️ May reference `tenable-sc://filters/reference` for full details
+- ℹ️ May reference `tenable-sc://filters/reference` for compact version
 
-**Why This Test:**
-- Validates MCP resource generation (fixed in v1.2.1)
-- Verifies documentation completeness
-- Tests resource brace escaping fix
-
-**Alternative Resource:** `tenable-sc://filters/reference` (compact version)
+**Alternative:** Try `tenable-sc://filters/reference` if format-reference not found
 
 ---
-
-## CPE Testing Summary
-
-**Purpose:** Validate CPE/OS filtering with smart operator detection (v1.2.1 feature)
-
-**Key Learnings:**
-1. **Simple strings** → Auto-detects `~=` operator (contains)
-2. **Regex patterns** → Auto-detects `pcre` operator (pattern match)
-3. **Full CPE URIs** → Auto-detects `=` operator (exact match)
-4. **False positives** possible with broad regex patterns (documented)
-5. **Improved patterns** recommended: use boundaries (`_`, `:`, negative lookahead)
-
-**Known Issues (Documented):**
-- Test 4: Pattern `.*windows.*(10|11).*` matches Server 2019 (version 10.0.17763)
-- Test 6: Pattern `.*windows_server_201[6-9].*` may match Windows 10
-- **Resolution:** Use `os_type` filter in v1.2.2+ for exact matching, or improved regex patterns
-
-**Status:** All 7 tests passing with expected behavior (including documented false positives)
-
----
-
