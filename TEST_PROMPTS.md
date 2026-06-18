@@ -35,6 +35,23 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 6: Regex CPE - Windows Server 2016-2019](#test-6-regex-cpe---windows-server-2016-2019)
   - [Test 7: CPE Documentation Access](#test-7-cpe-documentation-access)
 
+### Operating System & Plugin Family Tests (v1.3.0)
+- [Operating System Filter Tests](#operating-system-filter-tests-v130)
+  - [Test 1: Discover Available Operating Systems](#test-1-discover-available-operating-systems)
+  - [Test 2: Exact Windows 10 Match](#test-2-exact-windows-10-match-zero-false-positives)
+  - [Test 3: Exact Server 2019 Match](#test-3-exact-server-2019-match-no-windows-10)
+  - [Test 4: Smart OS Lookup (Partial Match)](#test-4-smart-os-lookup-partial-match)
+  - [Test 5: Exact Linux Match](#test-5-exact-linux-match)
+  - [Test 6: Compare CPE vs Operating System](#test-6-compare-cpe-vs-operating-system-false-positive-check)
+- [Plugin Family Filter Tests](#plugin-family-filter-tests-v130)
+  - [Test 1: Discover Plugin Families](#test-1-discover-plugin-families)
+  - [Test 2: Family Filter by Name](#test-2-family-filter-by-name-smart-lookup)
+  - [Test 3: Family Filter by ID](#test-3-family-filter-by-id-direct-pass-through)
+  - [Test 4: Multiple Families (Mixed)](#test-4-multiple-families-mixed-name-and-id)
+  - [Test 5: Invalid Family Name](#test-5-invalid-family-name-error-handling)
+  - [Test 6: Search Plugin Families](#test-6-search-plugin-families-discovery-helper)
+- [New Tools (v1.3.0)](#quick-reference-new-tools-v130)
+
 ### Reference
 - [Visual Test Prompt Style Guide](#visual-test-prompt-style-guide)
 - [Notes & Best Practices](#notes--best-practices)
@@ -604,5 +621,360 @@ fetch the MCP resource tenable-sc://filters/format-reference and show me the CPE
 - ℹ️ May reference `tenable-sc://filters/reference` for compact version
 
 **Alternative:** Try `tenable-sc://filters/reference` if format-reference not found
+
+---
+
+## Operating System Filter Tests (v1.3.0)
+
+**Feature Added:** v1.3.0  
+**Purpose:** Validate exact OS matching with zero false positives (solves CPE regex issues)  
+**API Field:** `operatingSystem`  
+**Operator:** `=` (exact match)  
+**Discovery Tool:** `tsc_list_operating_systems`
+
+---
+
+### Test 1: Discover Available Operating Systems
+
+```
+I am testing tsc_list_operating_systems to discover all OS names in the environment. Please format your response as:
+
+use tenable-sc to list all operating systems, limit to 20 results
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about OS discovery]
+📦 RESULT: Total OS: [count], First 5 OS names with counts: [list]
+```
+
+**Expected Result:**
+- ✅ Returns list of exact OS names with asset counts
+- ✅ Sorted by count (descending) by default
+- ✅ Token budget: ~1,500-2,000 tokens
+- ✅ Cache TTL: 300s (5 min)
+- ℹ️ Use these exact names in operating_system filter
+
+**Link:** [Tool 6a: tsc_list_operating_systems](#tool-6a-tsc_list_operating_systems)
+
+---
+
+### Test 2: Exact Windows 10 Match (Zero False Positives)
+
+```
+I am testing tsc_list_ips with exact operating_system filter for Windows 10. Please format your response as:
+
+use tenable-sc to list IPs in repository Default with operating_system "Microsoft Windows 10 Pro Build 19045"
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about exact match accuracy]
+📦 RESULT: Total IPs: [count], All are Build 19045: [Yes/No], No Server editions: [Confirmed/Failed]
+```
+
+**Expected Result:**
+- ✅ Returns ONLY Windows 10 Pro Build 19045
+- ✅ Excludes all Windows Server editions (2016, 2019, 2022)
+- ✅ Excludes other Windows 10 builds (18363, 19044, etc.)
+- ✅ Zero false positives confirmed
+- ⚠️ May return 0 results if exact build not in dataset
+
+**Link:** [Tool 4: tsc_list_ips](#tool-4-ip-listing-tsc_list_ips)
+
+---
+
+### Test 3: Exact Server 2019 Match (No Windows 10)
+
+```
+I am testing tsc_list_ips with exact operating_system filter for Server 2019. Please format your response as:
+
+use tenable-sc to list IPs with operating_system "Microsoft Windows Server 2019 Standard Build 17763" where severity is critical
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about exclusion of Windows 10]
+📦 RESULT: Total IPs: [count], All are Server 2019: [Yes/No], No Win10 mixed in: [Confirmed/Failed]
+```
+
+**Expected Result:**
+- ✅ Returns ONLY Server 2019 Standard Build 17763
+- ✅ Excludes all Windows 10 editions
+- ✅ Combined with severity filter works correctly
+- ✅ Confirms v1.2.1 false positive issue resolved
+
+**Link:** [Tool 4: tsc_list_ips](#tool-4-ip-listing-tsc_list_ips)
+
+---
+
+### Test 4: Smart OS Lookup (Partial Match)
+
+```
+I am testing smart OS lookup with partial name "Windows 10". Please format your response as:
+
+use tenable-sc to list IPs with os_name "Windows 10" in repository Default, show first 10
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about smart matching]
+📦 RESULT: OS variants matched: [list], Total IPs: [count], No false positives: [Confirmed/Failed]
+```
+
+**Expected Result:**
+- ✅ Tool queries listos to find all "Windows 10" OS names
+- ✅ Matches: "Windows 10 Pro Build 19045", "Windows 10 Enterprise", etc.
+- ✅ Excludes: "Windows Server 2019", "Windows 11", etc.
+- ✅ Aggregates IPs across all matched OS variants
+- ✅ Zero false positives (no Server editions)
+
+**Link:** [Tool 4: tsc_list_ips](#tool-4-ip-listing-tsc_list_ips)
+
+---
+
+### Test 5: Exact Linux Match
+
+```
+I am testing exact operating_system filter with Oracle Linux. Please format your response as:
+
+use tenable-sc to list IPs with os_exact "Oracle Linux Server 8.9" where ACR is 7-10
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about Linux precision]
+📦 RESULT: Total IPs: [count], All Oracle 8.9: [Yes/No], No other versions: [Confirmed/Failed]
+```
+
+**Expected Result:**
+- ✅ Returns ONLY Oracle Linux Server 8.9
+- ✅ Excludes Oracle 8.4, 8.7, 9.0, etc.
+- ✅ Combined with ACR filter works correctly
+- ⚠️ May return 0 results if specific version not in dataset
+
+**Link:** [Tool 4: tsc_list_ips](#tool-4-ip-listing-tsc_list_ips)
+
+---
+
+### Test 6: Compare CPE vs Operating System (False Positive Check)
+
+```
+I am testing to compare CPE regex false positives with exact operating_system matching. Please format your response as:
+
+First query: use tenable-sc to list IPs with cpe ".*windows.*(10|11).*" in Default
+Second query: use tenable-sc to list IPs with os_name "Windows 10" in Default
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS for both queries]
+🔢 TOKENS: CPE: [count], OS: [count]
+📝 SUMMARY: [comparison of false positives between methods]
+📦 RESULT: CPE Total: [count] (includes Server: [Y/N]), OS Total: [count] (Server excluded: [Y/N])
+```
+
+**Expected Result:**
+- ⚠️ CPE query includes Server 2016/2019 (false positives)
+- ✅ operating_system query excludes all Server editions (zero false positives)
+- ✅ Demonstrates v1.3.0 improvement over v1.2.1
+- ℹ️ Confirms exact matching superiority
+
+**Links:**
+- [CPE Test 4](#test-4-regex-cpe---windows-10-or-11)
+- [OS Test 4](#test-4-smart-os-lookup-partial-match)
+
+---
+
+## Plugin Family Filter Tests (v1.3.0)
+
+**Feature Fixed:** v1.3.0  
+**Breaking Change:** Now uses numeric IDs (v1.2.1 was broken)  
+**API Field:** `family`  
+**Format:** Array of ID objects: `[{"id": "20"}]`  
+**Discovery Tool:** `tsc_list_plugin_families`
+
+---
+
+### Test 1: Discover Plugin Families
+
+```
+I am testing tsc_list_plugin_families to discover all available plugin families. Please format your response as:
+
+use tenable-sc to list all plugin families
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about family discovery]
+📦 RESULT: Total families: [count], First 10 families with IDs: [list]
+```
+
+**Expected Result:**
+- ✅ Returns all plugin families (150+ total)
+- ✅ Shows both ID and name for each family
+- ✅ Token budget: ~800-1,200 tokens
+- ✅ Cache TTL: 600s (10 min - static data)
+- ℹ️ Use these IDs OR names in family filter
+
+**Link:** [Tool 6b: tsc_list_plugin_families](#tool-6b-tsc_list_plugin_families)
+
+---
+
+### Test 2: Family Filter by Name (Smart Lookup)
+
+```
+I am testing family filter with smart name lookup. Please format your response as:
+
+use tenable-sc to list vulnerabilities for IP 10.1.20.10 with family "Windows", show first 10
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about name→ID conversion]
+📦 RESULT: Family ID used: [20], Total vulns: [count], All Windows family: [Yes/No]
+```
+
+**Expected Result:**
+- ✅ Tool converts "Windows" → ID "20"
+- ✅ API receives: `[{"id": "20"}]`
+- ✅ Returns only Windows plugin family vulnerabilities
+- ✅ Family cache used (600s TTL)
+- ℹ️ Smart lookup working as designed
+
+**Link:** [Tool 2b: tsc_list_vulns_by_ip_full](#full-details-view-tool-2---primary-test)
+
+---
+
+### Test 3: Family Filter by ID (Direct Pass-Through)
+
+```
+I am testing family filter with direct ID (no lookup). Please format your response as:
+
+use tenable-sc to list vulnerabilities for IP 10.1.20.10 with family "30", show first 10
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about ID pass-through]
+📦 RESULT: Family ID used: [30], Total vulns: [count], All General family: [Yes/No]
+```
+
+**Expected Result:**
+- ✅ Tool recognizes numeric ID, uses directly
+- ✅ API receives: `[{"id": "30"}]`
+- ✅ No cache lookup needed (already ID)
+- ✅ Returns only General plugin family vulnerabilities
+
+**Link:** [Tool 2b: tsc_list_vulns_by_ip_full](#full-details-view-tool-2---primary-test)
+
+---
+
+### Test 4: Multiple Families (Mixed Name and ID)
+
+```
+I am testing family filter with multiple families (mixed name and ID). Please format your response as:
+
+use tenable-sc to list vulnerabilities for IP 10.1.20.10 with family ["Windows", "30", "SCADA"], show first 20
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about mixed conversion]
+📦 RESULT: Family IDs used: [20, 30, 36], Total vulns: [count], Breakdown by family: [counts]
+```
+
+**Expected Result:**
+- ✅ Converts "Windows" → 20, "30" → 30, "SCADA" → 36
+- ✅ API receives: `[{"id": "20"}, {"id": "30"}, {"id": "36"}]`
+- ✅ Returns vulnerabilities from all three families
+- ✅ Demonstrates smart mixed-mode handling
+
+**Link:** [Tool 2b: tsc_list_vulns_by_ip_full](#full-details-view-tool-2---primary-test)
+
+---
+
+### Test 5: Invalid Family Name (Error Handling)
+
+```
+I am testing family filter error handling with invalid name. Please format your response as:
+
+use tenable-sc to list vulnerabilities for IP 10.1.20.10 with family "NonexistentFamily"
+
+✅/❌ TEST STATUS: [PASS if gracefully handled, FAIL if error]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about error handling]
+📦 RESULT: Warning logged: [Yes/No], Query proceeded without family filter: [Yes/No]
+```
+
+**Expected Result:**
+- ✅ Tool logs WARNING about unknown family name
+- ✅ Filter is skipped (not applied)
+- ✅ Query proceeds with other filters
+- ✅ Returns all vulnerabilities (family filter omitted)
+- ℹ️ Graceful degradation, not hard error
+
+**Link:** [Tool 2b: tsc_list_vulns_by_ip_full](#full-details-view-tool-2---primary-test)
+
+---
+
+### Test 6: Search Plugin Families (Discovery Helper)
+
+```
+I am testing plugin family search functionality. Please format your response as:
+
+use tenable-sc to list plugin families with search term "Windows"
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about search results]
+📦 RESULT: Families matching "Windows": [list with IDs]
+```
+
+**Expected Result:**
+- ✅ Returns filtered list of families matching "Windows"
+- ✅ Expected: Windows (20), Windows : Microsoft Bulletins (10), Windows : User management (29)
+- ✅ Case-insensitive partial match working
+- ℹ️ Helpful for discovering exact family names before filtering
+
+**Link:** [Tool 6b: tsc_list_plugin_families](#tool-6b-tsc_list_plugin_families)
+
+---
+
+## Quick Reference: New Tools (v1.3.0)
+
+### Tool 6a: tsc_list_operating_systems
+
+**Purpose:** Discover available OS names for exact matching
+
+**Usage:**
+```
+use tenable-sc to list all operating systems, limit 20
+use tenable-sc to list operating systems sorted by name
+```
+
+**Returns:** OS names with counts, pagination support
+
+**Token Budget:** ~1,500-2,000 tokens  
+**Cache TTL:** 300s (5 min)  
+**Module:** `tools/asset_discovery.py`
+
+---
+
+### Tool 6b: tsc_list_plugin_families
+
+**Purpose:** Discover plugin family IDs and names
+
+**Usage:**
+```
+use tenable-sc to list all plugin families
+use tenable-sc to list plugin families with search "Windows"
+```
+
+**Returns:** Family IDs with names
+
+**Token Budget:** ~800-1,200 tokens  
+**Cache TTL:** 600s (10 min)  
+**Module:** `tools/admin/plugins.py`
 
 ---

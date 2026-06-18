@@ -1,8 +1,8 @@
 # Tenable.sc MCP Server - Design Principles & Architecture Guidelines
 
-**Version**: 1.2.1  
-**Last Updated**: 2026-06-12  
-**Status**: Living Document - Core Principles Established
+**Version**: 1.3.0 (planned)  
+**Last Updated**: 2026-06-18  
+**Status**: Living Document - Added Smart Lookup and Helper Tool Patterns
 
 ---
 
@@ -15,6 +15,8 @@
   - [3. Token Optimization](#3-token-optimization)
   - [4. Intelligent Caching](#4-intelligent-caching)
   - [5. Fail-Safe Error Handling](#5-fail-safe-error-handling)
+  - [6. Smart Lookup Pattern](#6-smart-lookup-pattern-v130)
+  - [7. Helper Tool Pattern](#7-helper-tool-pattern-v130)
 - [Tool Development Standards](#tool-development-standards)
 - [Architecture Patterns](#architecture-patterns)
 - [Testing & Validation](#testing--validation)
@@ -636,7 +638,286 @@ If failed, provide ERROR DETAILS with enough information for the developer to fi
 
 ---
 
+### 6. Smart Lookup Pattern (v1.3.0)
+
+**Status**: ✅ **RECOMMENDED - Enhances UX and prevents false positives**
+
+#### The Problem
+
+Some API filters require exact values (OS names, plugin family IDs) but users naturally provide partial names or keywords:
+
+```python
+# User provides natural language
+filters = {"operating_system": "Windows 10"}  # Partial match desired
+
+# API requires exact match
+"operatingSystem" = "Microsoft Windows 10 Pro Build 19045"  # Exact string
+```
+
+**Problems with exact-only matching:**
+- ❌ User must know exact OS name format from Tenable.sc
+- ❌ Cannot do "all Windows 10" without knowing all builds
+- ❌ Poor UX requiring manual discovery step
+- ❌ Plugin family names not supported (only IDs work)
+
+#### The Solution: Smart Lookup with Discovery Tools
+
+**Pattern:**
+1. User provides natural language input (partial name, keyword)
+2. Tool queries discovery endpoint (cached)
+3. Tool finds all matching values
+4. Tool applies exact filters for each match
+5. Tool aggregates results
+
+**Example Implementation (Operating System):**
+
+```python
+def handle_operating_system_filter(os_value: str) -> list[dict]:
+    """
+    Smart OS lookup: partial name → exact matches → zero false positives.
+    
+    Args:
+        os_value: User's partial OS name (e.g., "Windows 10")
+    
+    Returns:
+        List of exact OS filter objects
+    """
+    # Step 1: Query discovery tool (cached 300s)
+    all_os = _query_listos_cached()
+    
+    # Step 2: Find all matching OS names (case-insensitive partial match)
+    matches = [
+        os for os in all_os 
+        if os_value.lower() in os["name"].lower()
+    ]
+    
+    # Step 3: Build exact filters for each match
+    return [
+        {
+            "filterName": "operatingSystem",
+            "operator": "=",
+            "value": f"'{match['name']}'"  # Exact match with quotes
+        }
+        for match in matches
+    ]
+    
+    # Tenable.sc API auto-aggregates results (OR logic)
+```
+
+**Example Implementation (Plugin Family):**
+
+```python
+def get_plugin_family_id(family_input: str) -> str | None:
+    """
+    Smart family lookup: name OR ID → always returns valid ID.
+    
+    Args:
+        family_input: Family name ("Windows") or ID ("20")
+    
+    Returns:
+        Plugin family ID string or None if not found
+    """
+    # Quick check: already an ID?
+    if family_input.isdigit():
+        return family_input
+    
+    # Lookup by name (cached 600s - static data)
+    families = _query_plugin_families_cached()
+    for family in families:
+        if family["name"].lower() == family_input.lower():
+            return family["id"]
+    
+    # Graceful degradation
+    logger.warning(f"Unknown plugin family: {family_input}")
+    return None  # Caller skips this filter
+```
+
+#### Key Benefits
+
+✅ **Better UX:** Natural language input, no manual discovery needed  
+✅ **Zero False Positives:** Exact matching prevents unintended matches  
+✅ **Backward Compatible:** Accepts exact values unchanged  
+✅ **Cache-Friendly:** Discovery endpoints cached separately (300s-600s)  
+✅ **Graceful Degradation:** Unknown values logged + skipped (not errors)
+
+#### When to Use
+
+**Use Smart Lookup When:**
+- API requires exact IDs/names but users provide keywords
+- Multiple exact values map to one user intent ("Windows 10" → 5 builds)
+- Discovery endpoint available and cacheable
+- False positives are unacceptable (security context)
+
+**Don't Use When:**
+- Filter already supports partial matching (like `dns_name ~= "web"`)
+- Lookup cost exceeds benefit (uncacheable, slow)
+- User expects regex-like behavior (use `pcre` instead)
+
+#### Related Patterns
+
+- **Helper Tool Pattern (Principle 7):** Discovery tools as standalone
+- **Intelligent Caching (Principle 4):** Longer TTL for static lookup data
+- **Fail-Safe Error Handling (Principle 5):** Graceful unknown value handling
+
+**Examples:**
+- `tsc_list_ips(filters={"operating_system": "Windows 10"})` → finds all Win10 builds
+- `tsc_list_vulns_by_ip_full(filters={"family": "Windows"})` → converts to ID 20
+
+---
+
+### 7. Helper Tool Pattern (v1.3.0)
+
+**Status**: ✅ **RECOMMENDED - Improves discoverability and testability**
+
+#### The Problem
+
+Smart Lookup Pattern (Principle 6) requires discovery endpoints (listos, plugin families) but users don't know:
+- What values are available (all OS names, all family names)
+- How to spell exact names ("Microsoft Windows Server 2019" vs "Windows Server 2019")
+- What IDs map to which names (family ID 20 = "Windows")
+
+**Without helper tools:**
+- ❌ Users must guess filter values
+- ❌ Smart lookup internals not testable
+- ❌ Discovery logic buried in filter handlers (not reusable)
+
+#### The Solution: Standalone Discovery Tools
+
+**Pattern:**
+1. Create dedicated MCP tool for discovery endpoint
+2. Make tool public and standalone (not just internal helper)
+3. Cache results aggressively (static/semi-static data)
+4. Smart lookup handlers reuse the same tool internally
+
+**Example Implementation:**
+
+```python
+# File: tools/asset_discovery.py
+
+@mcp.tool()
+def tsc_list_operating_systems(
+    repository: str | None = None,
+    sort_by: str = "count",  # count|name
+    limit: int = 200,
+) -> dict[str, Any]:
+    """
+    List all operating system names in the environment.
+    
+    Use this to discover exact OS names before filtering with operating_system.
+    
+    Returns:
+        - ok: True/False
+        - operating_systems: List of {"name": str, "count": int}
+        - summary: {total, returned, sort_by}
+    
+    Token Budget: ~1,500-2,000 tokens
+    Cache TTL: 300s (5 minutes)
+    """
+    # Call internal cached helper (shared with smart lookup)
+    results = _query_listos_cached(repository=repository)
+    
+    # Sort and paginate
+    if sort_by == "count":
+        results.sort(key=lambda x: x["count"], reverse=True)
+    else:
+        results.sort(key=lambda x: x["name"])
+    
+    return {
+        "ok": True,
+        "operating_systems": results[:limit],
+        "summary": {
+            "total": len(results),
+            "returned": min(limit, len(results)),
+            "sort_by": sort_by
+        }
+    }
+
+# Internal helper (shared cache)
+@lru_cache(maxsize=128)
+def _query_listos_cached(repository: str | None = None) -> list[dict]:
+    """Cached listos query - 300s TTL via Redis."""
+    # Implementation details...
+    pass
+```
+
+**Internal Reuse:**
+
+```python
+# File: convenience_tools.py
+
+def handle_operating_system_filter(os_value: str) -> list[dict]:
+    """Smart OS lookup reuses same cached data as tsc_list_operating_systems."""
+    # Use same internal helper (shares cache)
+    all_os = _query_listos_cached()
+    
+    # Find matches and build filters
+    matches = [os for os in all_os if os_value.lower() in os["name"].lower()]
+    return [build_exact_filter(match) for match in matches]
+```
+
+#### Key Benefits
+
+✅ **Discoverable:** Users can find tool via MCP catalog  
+✅ **Testable:** Standalone tool = independent testing  
+✅ **Reusable:** Same cache/logic for UI and internal lookups  
+✅ **Documented:** Explicit token budget and cache TTL  
+✅ **Cache-Efficient:** Single cache shared across use cases
+
+#### Implementation Checklist
+
+**For each helper tool:**
+1. ✅ Create as public `@mcp.tool()` (not private function)
+2. ✅ Add to appropriate module (`asset_discovery.py`, `plugins.py`)
+3. ✅ Document token budget + cache TTL in docstring
+4. ✅ Implement sorting and pagination
+5. ✅ Share cache with internal smart lookup handlers
+6. ✅ Add test prompts to `TEST_PROMPTS.md`
+7. ✅ Reference in filter documentation
+
+#### When to Use
+
+**Use Helper Tool When:**
+- Discovery endpoint returns static/semi-static data (cacheable)
+- Users need to know available values before filtering
+- Smart lookup pattern (Principle 6) already implemented
+- Endpoint useful standalone (not just internal dependency)
+
+**Don't Use When:**
+- Data changes too frequently (cache ineffective)
+- Discovery query too expensive (>5s response time)
+- Only needed internally (pure implementation detail)
+
+#### Examples (v1.3.0)
+
+**Tool 6a: `tsc_list_operating_systems`**
+- Discovery: All OS names with counts
+- Cache: 300s (semi-static, changes on new scans)
+- Token Budget: ~1,500-2,000 tokens
+- Used by: `operating_system` filter smart lookup
+
+**Tool 6b: `tsc_list_plugin_families`**
+- Discovery: All plugin family IDs + names
+- Cache: 600s (static data, rarely changes)
+- Token Budget: ~800-1,200 tokens
+- Used by: `family` filter smart lookup
+
+**Related Patterns:**
+- **Smart Lookup Pattern (Principle 6):** Helper tools enable smart lookups
+- **Self-Documenting APIs (Principle 2):** MCP resources reference helpers
+- **Intelligent Caching (Principle 4):** Longer TTL for static discovery data
+
+---
+
 ## Version History
+
+### v1.3.0 (2026-06-18) - PLANNED
+- ✅ **Smart Lookup Pattern**: Added Principle 6 for natural language filter inputs
+- ✅ **Helper Tool Pattern**: Added Principle 7 for discoverable standalone tools
+- 🚧 **Operating System Exact Matching**: New `operating_system` filter (zero false positives)
+- 🚧 **Plugin Family Fix**: Smart name→ID conversion (fixes v1.2.1 broken behavior)
+- 🚧 **Helper Tools**: `tsc_list_operating_systems`, `tsc_list_plugin_families`
+- 🚧 **Filter Count**: 71 → 74 filters (added `operating_system`, `os_name`, `os_exact`)
+- 📝 **Documentation**: Complete implementation plan in `OS_AND_PLUGIN_FAMILY_FIX.md`
 
 ### v1.2.1 (2026-06-12)
 - ✅ **CPE/OS Filtering**: Added smart operator detection for `cpe` filter (contains/exact/regex)

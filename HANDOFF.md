@@ -1,8 +1,9 @@
 # Tenable.sc MCP Server - Handoff Document
 
-**Last Updated:** 2026-06-12 20:30  
+**Last Updated:** 2026-06-18 18:00  
 **Project Status:** ✅ v1.2.1 Released (CPE/OS Filtering + Documentation Fixes)  
-**Next Session Priority:** Tool 6 - Scan Status (BLOCKED: Plugin family filter needs investigation)
+**Next Session Priority:** v1.3.0 Implementation - OS Filtering & Plugin Family Fix  
+**Implementation Plan:** See [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md) for complete details
 
 ---
 
@@ -18,6 +19,53 @@
 | **Filter Count** | ✅ 71 filters | Added `cpe` and `os_cpe` |
 | **Testing** | ⏳ User Testing | 7 test cases provided for validation |
 | **Git Commit** | ⏳ Pending | Ready after test validation |
+| **v1.3.0 Plan** | ✅ Ready | See OS_AND_PLUGIN_FAMILY_FIX.md |
+
+---
+
+## 🚀 Next Session: v1.3.0 Implementation
+
+**CRITICAL:** Read [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md) before starting implementation!
+
+**What:** OS Filtering Enhancement + Plugin Family Fix  
+**Estimated Time:** 6-8 hours  
+**Breaking Changes:** Plugin family filter (v1.2.1 was broken, v1.3.0 fixes it)
+
+### Quick Summary
+
+Two critical issues discovered through user testing and API analysis:
+
+1. **CPE False Positives** - Regex patterns cause unintended matches
+   - Example: `.*windows.*(10|11).*` matches Server 2019
+   - Solution: Add `operating_system` filter for exact matching
+
+2. **Plugin Family Broken** - Current code uses NAME, API needs numeric ID
+   - Example: `family="Windows"` fails, needs `family=[{"id": "20"}]`
+   - Solution: Smart name→ID lookup with cache
+
+### Implementation Phases
+
+1. **Phase 1 (2-3h):** Core filter infrastructure
+   - Add 3 OS filter aliases to COMMON_FILTERS
+   - Implement 6 helper functions in convenience_tools.py
+   - Update build_filters() with special handling
+   - **NO HARDCODING** - all lookups via cached API calls
+
+2. **Phase 2 (2-3h):** Helper tools
+   - `tsc_list_operating_systems()` - Discover OS names
+   - `tsc_list_plugin_families()` - Discover family IDs
+
+3. **Phase 3 (1-2h):** Documentation updates
+   - FILTER_FORMAT_REFERENCE.md (two-tier OS approach)
+   - PLUGIN_FAMILY_INVESTIGATION.md (new file)
+   - MCP resource filter_reference.py
+   - DESIGN_PRINCIPLES.md (smart lookup pattern)
+
+4. **Phase 4 (1-2h):** Testing (11 new test cases)
+
+5. **Phase 5 (30min):** Container rebuild and deployment
+
+**Start Here:** [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md) - Complete implementation guide
 
 ---
 
@@ -130,42 +178,48 @@ filters = {"cpe": "cpe:/o:microsoft:windows_10"}
 - ✅ Severity string conversion: "critical" → "4" (verified working)
 - ✅ Boolean normalization: "Yes" → "true", "No" → "false"
 
-### Known Issues
+### Known Issues (Resolved in v1.3.0 Plan)
 
-**1. Plugin Family Filter (BLOCKING TOOL 6) ⚠️**
+**1. Plugin Family Filter (RESOLVED) ✅**
 
-**Status:** Needs investigation before implementing Tool 6
+**Status:** Solution designed, implementation plan ready
 
-**Problem:** The `family` filter parameter may not work correctly with simple string values:
+**Problem:** The `family` filter parameter was broken - used NAME but API requires numeric ID:
 ```python
-# May not work as expected
-filters = {"family": "Windows"}  # Unknown if this is correct format
+# v1.2.1 (broken)
+filters = {"family": "Windows"}  # API rejects this
 ```
 
-**Suspected Issues:**
-- API might require exact plugin family ID: `{"id": 24}`
-- Name might be case-sensitive or require exact match
-- Could be `pluginFamily` instead of `family` in API
+**Root Cause:** API requires: `[{"id": "20"}]` array format with numeric IDs
 
-**Required Action:**
-1. Investigate actual Tenable.sc API behavior for plugin family filtering
-2. Test with Tenable.sc UI and inspect network calls
-3. Document correct usage pattern
-4. Update `COMMON_FILTERS` if needed
-5. Add tests before implementing Tool 6
+**Solution:** Smart name→ID lookup with cache (see [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md))
+- Accept name OR ID from user
+- Auto-lookup via cached `/rest/pluginFamily` call
+- Convert to API format automatically
+- Helper tool: `tsc_list_plugin_families()`
 
-**Created:** Section in `TOOLS_ROADMAP.md` for next session investigation
+**2. CPE Regex False Positives (RESOLVED) ✅**
 
-**2. Regex False Positives (Documented, Not a Bug) ℹ️**
+**Status:** Solution designed, implementation plan ready
 
-Regex patterns can match unintended systems due to CPE version strings:
-
-**Example:**
+**Problem:** Regex patterns match unintended systems:
 - Pattern: `.*windows.*(10|11).*`
 - Intended: Windows 10 and 11
 - Actual: Also matches Server 2019 (version 10.0.17763)
 
-**Resolution:** Documented in `FILTER_FORMAT_REFERENCE.md` with solutions. Not a code bug - user education issue.
+**Solution:** Add `operating_system` filter for exact matching (see [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md))
+- New filter: `operating_system` (exact string match)
+- Smart partial matching: "Windows 10" → finds all Win10 variants
+- Zero false positives guaranteed
+- Helper tool: `tsc_list_operating_systems()`
+
+**Implementation:** Both issues resolved in v1.3.0 (plan ready, awaiting implementation)
+
+**IMPORTANT:** When implementing v1.3.0, remember to update the filter count in:
+- `src/tenable_sc_mcp/resources/filter_reference.py` - Update from 71 to 74 filters
+- MCP resource header comment and documentation
+- Add three new OS filter entries: `operating_system`, `os_name`, `os_exact`
+- Update plugin family filter documentation with smart lookup behavior
 
 ---
 
