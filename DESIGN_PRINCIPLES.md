@@ -908,6 +908,482 @@ def handle_operating_system_filter(os_value: str) -> list[dict]:
 
 ---
 
+## Development Workflow & Contribution Guidelines
+
+**Purpose:** Define how code changes flow from development to production while keeping `main` branch always production-ready.
+
+### Branch Strategy
+
+We use a **GitHub Flow variant** with two permanent branches:
+
+```
+main (production-ready, protected)
+  └── develop (integration branch)
+       ├── feature/tool-name
+       ├── bugfix/issue-description
+       └── docs/documentation-updates
+```
+
+#### Branch Types
+
+| Branch | Purpose | Merges To | Lifetime |
+|--------|---------|-----------|----------|
+| `main` | Production releases, tagged versions | N/A (protected) | Permanent |
+| `develop` | Integration, feature testing | `main` | Permanent |
+| `feature/*` | New tools, enhancements | `develop` | 1-5 days |
+| `bugfix/*` | Non-critical bug fixes | `develop` | 1-3 days |
+| `hotfix/*` | Critical production fixes | `main` + `develop` | Hours |
+| `docs/*` | Documentation only | `develop` or `main` | 1-2 days |
+| `release/*` | Release preparation | `main` | 1-2 days |
+
+### Workflow Patterns
+
+#### Pattern 1: Feature Development
+
+**Use Case:** Adding new tools, filters, or non-breaking enhancements
+
+```bash
+# 1. Branch from develop
+git checkout develop
+git pull origin develop
+git checkout -b feature/os-exact-matching
+
+# 2. Develop with frequent commits
+git add src/tenable_sc_mcp/tools/asset_discovery.py
+git commit -m "feat(tools): Add tsc_list_operating_systems tool"
+
+# 3. Push and create PR to develop
+git push -u origin feature/os-exact-matching
+gh pr create --base develop --title "feat: OS exact matching filter"
+
+# 4. After review and approval, merge to develop
+# 5. Delete feature branch
+git branch -d feature/os-exact-matching
+```
+
+**Key Rules:**
+- ✅ Always branch from `develop`, never from `main`
+- ✅ Keep feature branches short-lived (1-5 days max)
+- ✅ Commit early and often
+- ✅ Pull from `develop` daily to stay current
+- ✅ Run tests locally before pushing
+
+#### Pattern 2: Release Workflow
+
+**Use Case:** Promoting tested features from `develop` to production
+
+```bash
+# 1. Create release branch from develop
+git checkout develop
+git pull origin develop
+git checkout -b release/v1.4.0
+
+# 2. Bump version in pyproject.toml
+# Edit: version = "1.4.0"
+git add pyproject.toml
+git commit -m "chore: Bump version to 1.4.0"
+
+# 3. Final testing and bug fixes ONLY (no new features)
+pytest tests/
+git commit -m "fix: Edge case in OS matching"
+
+# 4. Create PR to main
+gh pr create --base main --title "Release v1.4.0" --body "..."
+
+# 5. After approval, merge to main
+git checkout main
+git merge --no-ff release/v1.4.0
+git tag -a v1.4.0 -m "Release v1.4.0: <summary>"
+git push origin main --tags
+
+# 6. Merge back to develop (critical!)
+git checkout develop
+git merge --no-ff release/v1.4.0
+git push origin develop
+
+# 7. Delete release branch
+git branch -d release/v1.4.0
+
+# 8. Create GitHub release
+gh release create v1.4.0 --title "v1.4.0" --notes-file RELEASE_NOTES.md
+```
+
+**Version Numbering (Semantic Versioning):**
+- **Major (x.0.0):** Breaking changes, API incompatibility
+- **Minor (1.x.0):** New features, backward compatible  
+- **Patch (1.2.x):** Bug fixes only, no new features
+
+#### Pattern 3: Hotfix Workflow
+
+**Use Case:** Critical bug in production requiring immediate fix
+
+```bash
+# 1. Branch from main (not develop!)
+git checkout main
+git pull origin main
+git checkout -b hotfix/cache-leak
+
+# 2. Fix with minimal changes
+git commit -m "fix: Prevent Redis connection leak"
+
+# 3. Test thoroughly
+pytest tests/
+
+# 4. Merge to main immediately
+git checkout main
+git merge --no-ff hotfix/cache-leak
+git tag -a v1.2.2 -m "Hotfix v1.2.2: Cache leak"
+git push origin main --tags
+
+# 5. Merge to develop (prevent regression!)
+git checkout develop
+git merge --no-ff hotfix/cache-leak
+git push origin develop
+
+# 6. Delete hotfix branch
+git branch -d hotfix/cache-leak
+
+# 7. Create GitHub release
+gh release create v1.2.2 --title "v1.2.2 - HOTFIX" --notes "..."
+```
+
+### Commit Message Conventions
+
+We follow **Conventional Commits** for semantic, searchable history.
+
+#### Format
+
+```
+<type>(<scope>): <subject>
+
+<body> (optional)
+
+<footer> (optional)
+```
+
+#### Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `feat` | New feature | `feat(tools): Add OS listing tool` |
+| `fix` | Bug fix | `fix(cache): Resolve memory leak` |
+| `docs` | Documentation only | `docs: Update filter reference` |
+| `style` | Code style (no logic change) | `style: Apply black formatting` |
+| `refactor` | Code refactoring | `refactor: Extract filter helpers` |
+| `perf` | Performance improvement | `perf: Optimize cache lookups` |
+| `test` | Tests added/updated | `test: Add OS matching unit tests` |
+| `chore` | Build/tooling changes | `chore: Update Docker base image` |
+| `ci` | CI/CD changes | `ci: Add GitHub Actions workflow` |
+
+#### Scopes (Optional)
+
+Use component names: `tools`, `filters`, `cache`, `client`, `docs`, `tests`
+
+**Examples:**
+```bash
+git commit -m "feat(tools): Add user IoE summarization"
+git commit -m "fix(filters): Resolve family ID lookup"
+git commit -m "docs(readme): Clarify installation steps"
+git commit -m "refactor(cache): Use connection pooling"
+```
+
+### Pull Request Guidelines
+
+#### PR Template
+
+```markdown
+## Description
+Brief summary of changes and motivation.
+
+## Type of Change
+- [ ] New feature (non-breaking)
+- [ ] Bug fix (non-breaking)
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Related Issues
+Closes #123
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+
+## Checklist
+- [ ] Code follows design principles
+- [ ] Self-review completed
+- [ ] Documentation updated
+- [ ] Tests pass locally
+- [ ] Commit messages follow conventions
+```
+
+#### Review Process
+
+1. **Author** creates PR with clear description
+2. **Reviewer** checks:
+   - Code follows design principles (filters dict, caching, etc.)
+   - Test coverage adequate
+   - Documentation updated
+   - No security vulnerabilities
+   - Token optimization maintained
+3. **Approval** required before merge
+4. **Merge** via GitHub (squash or merge commit)
+5. **Delete branch** after merge
+
+### Branch Protection Rules
+
+#### Main Branch (Production)
+
+**GitHub Settings → Branches → Add rule for `main`:**
+
+- ✅ Require pull request before merging
+- ✅ Require approvals: 1 (increase for teams)
+- ✅ Dismiss stale approvals when new commits pushed
+- ✅ Require status checks to pass before merging
+- ✅ Require branches to be up to date before merging
+- ✅ Require conversation resolution before merging
+- ✅ Restrict who can push to matching branches (maintainers only)
+- ❌ Allow force pushes: **Disabled**
+- ❌ Allow deletions: **Disabled**
+
+#### Develop Branch (Integration)
+
+**GitHub Settings → Branches → Add rule for `develop`:**
+
+- ✅ Require pull request before merging
+- ✅ Require approvals: 1
+- ✅ Require status checks to pass
+- ❌ Dismiss stale approvals (optional, more flexible than main)
+- ❌ Require branches to be up to date (optional, speeds up merges)
+
+### CI/CD Integration (Recommended)
+
+Example GitHub Actions workflow for automated testing:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync --all-extras
+      
+      - name: Run tests
+        run: pytest tests/ --cov
+      
+      - name: Lint
+        run: ruff check .
+      
+      - name: Type check
+        run: mypy src/
+```
+
+**Automated Checks:**
+- All tests must pass (>80% coverage)
+- No linting errors (ruff)
+- No type errors (mypy)
+- Security scans pass (Dependabot)
+
+### Release Checklist
+
+Before releasing a new version:
+
+- [ ] All features merged to `develop` and tested
+- [ ] Create release branch from `develop`
+- [ ] Bump version in `pyproject.toml`
+- [ ] Update documentation (README, FILTER_REFERENCE, etc.)
+- [ ] Run full test suite locally
+- [ ] Build and test Docker image
+- [ ] Create PR to `main` with comprehensive release notes
+- [ ] Get approval and merge to `main`
+- [ ] Tag release: `git tag -a v<version> -m "Release v<version>"`
+- [ ] Push tags: `git push --tags`
+- [ ] Create GitHub Release with detailed notes
+- [ ] Merge release branch back to `develop`
+- [ ] Delete release branch
+- [ ] Announce release (if applicable)
+
+### Best Practices Summary
+
+**DO:**
+- ✅ Keep `main` production-ready at all times
+- ✅ Use `develop` for integration and testing
+- ✅ Create feature branches for all changes
+- ✅ Write clear, conventional commit messages
+- ✅ Test before pushing
+- ✅ Update documentation with code changes
+- ✅ Request code reviews for all PRs
+- ✅ Tag all releases with semantic versioning
+- ✅ Merge release branches back to `develop`
+
+**DON'T:**
+- ❌ Commit directly to `main` or `develop`
+- ❌ Keep feature branches alive >5 days
+- ❌ Merge without code review
+- ❌ Push failing tests
+- ❌ Skip documentation updates
+- ❌ Use force push (except on your own feature branches)
+- ❌ Forget to merge hotfixes to both `main` and `develop`
+
+### Repository Visibility & Access Control
+
+**Making Repository Public (Read-Only for Users):**
+
+This repository is designed to be **public for usage but restricted for contributions**.
+
+#### GitHub Settings Configuration
+
+**Settings → General → Danger Zone:**
+- ✅ Make repository public (allows users to clone and use)
+
+**Settings → Collaborators and teams:**
+- Only add trusted maintainers as collaborators
+- Do NOT accept outside collaborators
+
+**Settings → Moderation options:**
+- ✅ Limit interactions to repository collaborators only (optional)
+
+**Settings → Pull Requests:**
+- ❌ Allow forking: **Disabled** (prevents users from creating PRs)
+
+**Alternative (Recommended): Allow forks but restrict PRs**
+
+If you want users to be able to fork for their own modifications but not submit PRs:
+
+**Settings → Pull Requests:**
+- ✅ Allow forking (users can customize for themselves)
+- Use `.github/PULL_REQUEST_TEMPLATE.md` with clear message:
+
+```markdown
+# ⚠️ Pull Requests Not Accepted
+
+This repository does not accept external pull requests.
+
+**For bug reports:** Open an issue instead
+**For feature requests:** Open an issue for discussion
+**For personal use:** Fork the repository and modify as needed
+
+Maintainer-only repository. External contributions are not accepted at this time.
+```
+
+Then manually close all external PRs with a polite message.
+
+#### How Users Can Use the MCP Server
+
+**For End Users (Non-Developers):**
+
+Users can consume the MCP server without repository access:
+
+1. **Docker Hub / GitHub Container Registry:**
+   - Publish Docker images to public registry
+   - Users pull pre-built images: `docker pull ghcr.io/abmj/tenable-sc-mcp:latest`
+   - No code access needed, pure consumption
+
+2. **PyPI Package (Optional):**
+   - Publish as Python package: `pip install tenable-sc-mcp`
+   - Users install and run without seeing code
+
+3. **GitHub Releases:**
+   - Publish binary releases (if applicable)
+   - Users download pre-built artifacts
+
+**For Users Who Want to Self-Host:**
+
+Make README.md crystal clear:
+
+```markdown
+## Installation (Users)
+
+### Option 1: Docker (Recommended)
+```bash
+docker pull ghcr.io/abmj/tenable-sc-mcp:latest
+docker run -e TSC_HOST=... -e TSC_ACCESS_KEY=... ghcr.io/abmj/tenable-sc-mcp:latest
+```
+
+### Option 2: From Source (Read-Only)
+```bash
+git clone https://github.com/ABMJ/tenable-sc-mcp-server.git
+cd tenable-sc-mcp-server
+# Follow installation instructions
+```
+
+**Note:** This repository does not accept pull requests. For issues or feature requests, please open a GitHub issue.
+```
+
+#### Repository Settings Summary
+
+**To achieve "public for use, private for development":**
+
+```
+GitHub Settings:
+  [✅] Public repository
+  [✅] Issues enabled (for bug reports)
+  [❌] Discussions disabled (or enabled for support only)
+  [❌] Projects disabled
+  [❌] Wiki disabled
+  [✅] Allow forking (users can customize privately)
+  [✅] Branch protection on main (requires maintainer approval)
+  [✅] Branch protection on develop (requires maintainer approval)
+  [✅] CODEOWNERS file (auto-assigns you to all PRs)
+```
+
+**Create `.github/CODEOWNERS`:**
+```
+# All files owned by maintainer
+* @ABMJ
+```
+
+This auto-assigns all PRs to you, and with branch protection, you control all merges.
+
+#### Enforcement Strategy
+
+1. **Technical:** Branch protection prevents direct pushes
+2. **Social:** Clear CONTRIBUTING.md stating no external contributions
+3. **Process:** Close external PRs politely with explanation
+
+**Example CONTRIBUTING.md:**
+
+```markdown
+# Contributing
+
+This is a **maintainer-only** repository.
+
+## For Users
+
+- **Bug Reports:** Open an issue with reproduction steps
+- **Feature Requests:** Open an issue for discussion
+- **Questions:** Open an issue or check existing documentation
+
+## For Contributors
+
+External pull requests are **not accepted** at this time.
+
+This is a personal/internal project maintained by @ABMJ.
+
+If you find this useful and want to modify it, please fork the repository
+and maintain your own version.
+```
+
+---
+
 ## Version History
 
 ### v1.3.0 (2026-06-18) - PLANNED
