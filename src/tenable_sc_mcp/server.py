@@ -17,15 +17,6 @@ from .cache import (
     get_ttl_for_resource,
     get_ttl_for_analysis,
     initialize_cache,
-    get_cache,
-)
-from .convenience_tools import (
-    validate_ip,
-    validate_severity,
-    build_filters,
-    parse_plugin_19506_output,
-    format_vulnerability_summary,
-    AUTH_PLUGINS,
 )
 
 
@@ -549,7 +540,7 @@ def tsc_cache_clear(pattern: str | None = None) -> dict[str, Any]:
 # ============================================================================
 
 # Import and register all convenience tools from modules
-from .tools import register_all_tools
+from .tools import register_all_tools  # noqa: E402
 
 # Re-export convenience tool functions for backwards compatibility with tests
 # These are populated after register_all_tools() is called
@@ -568,7 +559,7 @@ def _get_tool(name: str):
 # ============================================================================
 
 # Import and register all MCP resources (filter docs, etc.)
-from .resources import register_resources
+from .resources import register_resources  # noqa: E402
 
 # Resources are registered during module initialization via register_resources(mcp)
 # This provides documentation like tenable-sc://filters/reference for LLM consumption

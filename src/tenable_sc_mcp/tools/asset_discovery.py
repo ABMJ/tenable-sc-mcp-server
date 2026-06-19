@@ -230,7 +230,7 @@ def register_tools(mcp):
             
             # DEBUG: Log filters being sent to API
             import json
-            print(f"DEBUG: Filters being sent to Tenable.sc API:")
+            print("DEBUG: Filters being sent to Tenable.sc API:")
             print(json.dumps(filter_list, indent=2))
             
             # Build query for sumip analysis tool with proper nested structure

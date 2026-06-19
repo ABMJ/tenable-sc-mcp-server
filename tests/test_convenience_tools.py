@@ -2,7 +2,6 @@
 Tests for convenience tools.
 """
 
-import pytest
 from tenable_sc_mcp.convenience_tools import (
     validate_ip,
     validate_severity,
@@ -371,7 +370,7 @@ def test_pagination_validation_exceeds_max():
 def test_pagination_validation_negative():
     """Test pagination validation for negative values."""
     start = -1
-    end = 50
+    _ = 50  # end value - not used in this test
     assert start < 0  # Should be rejected
 
 

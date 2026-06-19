@@ -5,8 +5,6 @@ These tests verify the complete implementation of Week 1 Session 1.5 tools.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from tenable_sc_mcp import server
 from tenable_sc_mcp import convenience_tools
 
 
@@ -15,7 +13,6 @@ class TestTool4InputValidation:
     
     def test_no_parameters_error(self):
         """Test that missing all parameters returns error"""
-        from tenable_sc_mcp.tools.asset_discovery import register_tools
         
         # We'll test the validation logic directly since we can't call the tool without MCP
         # The tool should require at least one of: repository, asset_group, or ip

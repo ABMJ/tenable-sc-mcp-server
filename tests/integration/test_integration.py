@@ -317,7 +317,7 @@ def test_cache_hit_rate_under_load(client):
     test_total = test_hits + test_misses
     test_hit_rate = test_hits / test_total if test_total > 0 else 0
     
-    print(f"\nTest Results:")
+    print("\nTest Results:")
     print(f"  Total calls: {test_total}")
     print(f"  Hits: {test_hits}")
     print(f"  Misses: {test_misses}")
@@ -362,7 +362,7 @@ def test_response_time_improvement(client):
     avg_cached = sum(cached_times) / len(cached_times)
     speedup = avg_uncached / avg_cached if avg_cached > 0 else float('inf')
     
-    print(f"\nResponse Time Analysis:")
+    print("\nResponse Time Analysis:")
     print(f"  Uncached (avg): {avg_uncached*1000:.2f}ms")
     print(f"  Cached (avg): {avg_cached*1000:.2f}ms")
     print(f"  Speedup: {speedup:.1f}x")

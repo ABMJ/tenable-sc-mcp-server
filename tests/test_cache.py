@@ -9,7 +9,6 @@ from tenable_sc_mcp.cache import (
     get_ttl_for_resource,
     get_ttl_for_analysis,
     _normalize_query_for_cache,
-    DEFAULT_TTL_SECONDS,
 )
 
 

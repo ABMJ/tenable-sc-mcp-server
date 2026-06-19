@@ -4,8 +4,7 @@ Integration tests for Tool 2: tsc_list_vulns_by_ip_summary and tsc_list_vulns_by
 These tests verify the complete implementation of Week 1 Session 1.2 tools.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 from tenable_sc_mcp import server
 from tenable_sc_mcp import convenience_tools
 

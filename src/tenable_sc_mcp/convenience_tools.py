@@ -10,7 +10,7 @@ Token Savings: 75-94% reduction compared to raw API calls.
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 
 # ============================================================================
