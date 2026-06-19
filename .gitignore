@@ -8,4 +8,9 @@ __pycache__/
 .env
 .env.*
 *.env
-.env
+
+# macOS resource forks
+._*
+
+# OpenCode local settings
+.claude/

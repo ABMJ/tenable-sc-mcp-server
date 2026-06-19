@@ -1132,29 +1132,48 @@ Closes #123
 
 ### Branch Protection Rules
 
-#### Main Branch (Production)
+**⚠️ IMPORTANT:** GitHub now uses **Rulesets** (not "Branch protection rules").  
+For detailed setup instructions, see: **`BRANCH_PROTECTION_SETUP.md`** or **`QUICK_RULESET_SETUP.md`**
 
-**GitHub Settings → Branches → Add rule for `main`:**
+#### Main Branch (Production) - Ruleset Configuration
 
-- ✅ Require pull request before merging
-- ✅ Require approvals: 1 (increase for teams)
-- ✅ Dismiss stale approvals when new commits pushed
-- ✅ Require status checks to pass before merging
-- ✅ Require branches to be up to date before merging
-- ✅ Require conversation resolution before merging
-- ✅ Restrict who can push to matching branches (maintainers only)
-- ❌ Allow force pushes: **Disabled**
-- ❌ Allow deletions: **Disabled**
+**Quick Setup:** Go to `https://github.com/ABMJ/tenable-sc-mcp-server/settings/rules`
 
-#### Develop Branch (Integration)
+**Ruleset Configuration:**
+- **Ruleset Name:** `Protect main branch`
+- **Enforcement Status:** Active
+- **Target Branches:** Include by pattern → `main`
+- **Bypass List:** Empty (no exceptions - maximum protection)
 
-**GitHub Settings → Branches → Add rule for `develop`:**
+**Rules to Enable:**
+- ✅ **Require a pull request before merging**
+  - Required approvals: 1 (increase for teams)
+  - Dismiss stale pull request approvals when new commits are pushed
+  - Require approval of the most recent reviewable push
+- ✅ **Block force pushes** (prevents history rewriting)
+- ✅ **Restrict deletions** (prevents branch deletion)
+- ✅ **Require linear history** (optional - keeps history clean)
+- ✅ **Require status checks to pass** (if CI/CD is configured)
 
-- ✅ Require pull request before merging
-- ✅ Require approvals: 1
-- ✅ Require status checks to pass
-- ❌ Dismiss stale approvals (optional, more flexible than main)
-- ❌ Require branches to be up to date (optional, speeds up merges)
+**Result:** No one (including you) can push directly to main. All changes require PR + approval.
+
+#### Develop Branch (Integration) - Ruleset Configuration
+
+**Ruleset Configuration:**
+- **Ruleset Name:** `Protect develop branch`
+- **Enforcement Status:** Active
+- **Target Branches:** Include by pattern → `develop`
+- **Bypass List:** Empty or maintainer-only (your choice)
+
+**Rules to Enable:**
+- ✅ **Require a pull request before merging** (1 approval)
+- ✅ **Block force pushes**
+- ✅ **Restrict deletions**
+- ⚠️ **Status checks** (optional - can be more lenient than main)
+
+**Note:** Develop can be slightly more flexible than main (e.g., allow emergency pushes via bypass list)
+
+**For Complete Step-by-Step Instructions:** See `BRANCH_PROTECTION_SETUP.md` or `QUICK_RULESET_SETUP.md`
 
 ### CI/CD Integration (Recommended)
 
@@ -1247,117 +1266,100 @@ Before releasing a new version:
 
 **Making Repository Public (Read-Only for Users):**
 
-This repository is designed to be **public for usage but restricted for contributions**.
+This repository is designed to be **public for MCP server usage** but **restricted for code development**.
+
+**Goal:** Users can USE the MCP server (via Docker/PyPI), but only maintainers can modify the codebase.
 
 #### GitHub Settings Configuration
 
 **Settings → General → Danger Zone:**
-- ✅ Make repository public (allows users to clone and use)
+- ✅ **Make repository public** (already done - allows users to view/clone/fork)
 
 **Settings → Collaborators and teams:**
 - Only add trusted maintainers as collaborators
 - Do NOT accept outside collaborators
 
-**Settings → Moderation options:**
-- ✅ Limit interactions to repository collaborators only (optional)
-
 **Settings → Pull Requests:**
-- ❌ Allow forking: **Disabled** (prevents users from creating PRs)
+- ✅ **Allow forking** (recommended - users can customize privately)
+- Users who fork can modify for their own use
+- With branch protection (Rulesets), only you can approve PRs
 
-**Alternative (Recommended): Allow forks but restrict PRs**
+**Settings → Features:**
+- ✅ **Issues enabled** (for bug reports and feature requests)
+- ❌ **Wiki disabled** (use docs/ directory instead)
+- ❌ **Projects disabled** (optional - use if helpful)
+- ❌ **Discussions disabled** (optional - use Issues instead)
 
-If you want users to be able to fork for their own modifications but not submit PRs:
-
-**Settings → Pull Requests:**
-- ✅ Allow forking (users can customize for themselves)
-- Use `.github/PULL_REQUEST_TEMPLATE.md` with clear message:
-
-```markdown
-# ⚠️ Pull Requests Not Accepted
-
-This repository does not accept external pull requests.
-
-**For bug reports:** Open an issue instead
-**For feature requests:** Open an issue for discussion
-**For personal use:** Fork the repository and modify as needed
-
-Maintainer-only repository. External contributions are not accepted at this time.
-```
-
-Then manually close all external PRs with a polite message.
-
-#### How Users Can Use the MCP Server
-
-**For End Users (Non-Developers):**
-
-Users can consume the MCP server without repository access:
-
-1. **Docker Hub / GitHub Container Registry:**
-   - Publish Docker images to public registry
-   - Users pull pre-built images: `docker pull ghcr.io/abmj/tenable-sc-mcp:latest`
-   - No code access needed, pure consumption
-
-2. **PyPI Package (Optional):**
-   - Publish as Python package: `pip install tenable-sc-mcp`
-   - Users install and run without seeing code
-
-3. **GitHub Releases:**
-   - Publish binary releases (if applicable)
-   - Users download pre-built artifacts
-
-**For Users Who Want to Self-Host:**
-
-Make README.md crystal clear:
-
-```markdown
-## Installation (Users)
-
-### Option 1: Docker (Recommended)
-```bash
-docker pull ghcr.io/abmj/tenable-sc-mcp:latest
-docker run -e TSC_HOST=... -e TSC_ACCESS_KEY=... ghcr.io/abmj/tenable-sc-mcp:latest
-```
-
-### Option 2: From Source (Read-Only)
-```bash
-git clone https://github.com/ABMJ/tenable-sc-mcp-server.git
-cd tenable-sc-mcp-server
-# Follow installation instructions
-```
-
-**Note:** This repository does not accept pull requests. For issues or feature requests, please open a GitHub issue.
-```
-
-#### Repository Settings Summary
-
-**To achieve "public for use, private for development":**
-
-```
-GitHub Settings:
-  [✅] Public repository
-  [✅] Issues enabled (for bug reports)
-  [❌] Discussions disabled (or enabled for support only)
-  [❌] Projects disabled
-  [❌] Wiki disabled
-  [✅] Allow forking (users can customize privately)
-  [✅] Branch protection on main (requires maintainer approval)
-  [✅] Branch protection on develop (requires maintainer approval)
-  [✅] CODEOWNERS file (auto-assigns you to all PRs)
-```
-
-**Create `.github/CODEOWNERS`:**
+**Create `.github/CODEOWNERS` (auto-assigns you to all PRs):**
 ```
 # All files owned by maintainer
 * @ABMJ
 ```
 
-This auto-assigns all PRs to you, and with branch protection, you control all merges.
+**Create `.github/PULL_REQUEST_TEMPLATE.md` (clarifies contribution policy):**
+```markdown
+# ⚠️ Pull Requests Not Accepted
+
+This repository does not accept external pull requests.
+
+**For bug reports:** Open an issue instead  
+**For feature requests:** Open an issue for discussion  
+**For personal use:** Fork the repository and modify as needed
+
+Maintainer-only repository. External contributions are not accepted at this time.
+```
+
+#### How Users Can Use the MCP Server
+
+**Recommended Distribution Methods:**
+
+1. **Docker Hub / GitHub Container Registry (Primary):**
+   - Publish Docker images: `ghcr.io/abmj/tenable-sc-mcp:latest`
+   - Users install via: `docker pull ghcr.io/abmj/tenable-sc-mcp:latest`
+   - No code access needed - pure consumption
+
+2. **GitHub Releases (Recommended):**
+   - Tag releases: `git tag -a v1.4.0 -m "Release v1.4.0"`
+   - Create GitHub Releases with release notes
+   - Users can download specific versions
+
+3. **PyPI Package (Optional - Future):**
+   - Publish as: `pip install tenable-sc-mcp`
+   - Users install without seeing code
+
+4. **Source Installation (Self-Hosting):**
+   - Users can clone the public repo
+   - Follow README.md installation instructions
+   - Clarify: "Read-only - PRs not accepted"
+
+#### Repository Settings Summary
+
+**Current Configuration (Post-Setup):**
+
+```
+Repository Status:
+  [✅] Public repository (users can view, clone, fork)
+  [✅] Main branch protected via Ruleset (requires PR + approval)
+  [✅] Develop branch protected via Ruleset (requires PR + approval)
+  [✅] Issues enabled (bug reports, feature requests)
+  [✅] Forking allowed (users can customize privately)
+  [✅] CODEOWNERS file (@ABMJ auto-assigned to PRs)
+
+Result:
+  ✅ Users can USE the MCP server (Docker, source install)
+  ✅ Users can FORK for personal modifications
+  ✅ Users can report ISSUES for bugs/features
+  ❌ Users CANNOT push directly to main/develop
+  ❌ External PRs require YOUR approval (you control codebase)
+```
 
 #### Enforcement Strategy
 
-1. **Technical:** Branch protection prevents direct pushes
+**Three-Layer Protection:**
+
+1. **Technical:** Branch Rulesets prevent direct pushes (configured above)
 2. **Social:** Clear CONTRIBUTING.md stating no external contributions
-3. **Process:** Close external PRs politely with explanation
+3. **Process:** Close external PRs politely with standard message
 
 **Example CONTRIBUTING.md:**
 
