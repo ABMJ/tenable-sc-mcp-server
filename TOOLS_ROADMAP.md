@@ -267,35 +267,93 @@ This roadmap tracks planned features and tools for the Tenable.sc MCP Server. Fo
 
 ### Week 2: Essential Queries (10 tools)
 
-Tools focused on security operations and vulnerability management.
+**1. Tool 6: `tsc_list_missing_patches_windows`**
+- **Purpose**: MS bulletin-based patch gap analysis for Windows systems
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/scanning.py`
 
-**Planned Tools**:
-1. **tsc_list_vulnerabilities** - Browse all vulnerabilities with filters
-2. **tsc_search_plugins** - Search Nessus plugins by keyword/CVE
-3. **tsc_list_assets** - Comprehensive asset inventory
-4. **tsc_get_compliance_results** - Compliance scan results
-5. **tsc_list_repositories** - Repository management
-6. **tsc_list_asset_groups** - Asset group inventory
-7. **tsc_get_scan_results** - Detailed scan result analysis
-8. **tsc_list_scans** - Scan inventory and scheduling
-9. **tsc_vulnerability_timeline** - Temporal vulnerability analysis
-10. **tsc_asset_vulnerability_matrix** - Asset-vuln correlation
+**2. Tool 7: `tsc_scan_status`**
+- **Purpose**: Real-time scan monitoring with filters (time, launcher, status)
+- **Token Budget**: 1,500-3,000 | **Module**: `tools/scanning.py`
 
-### Week 3: Advanced Features (8 tools)
+**3. Tool 8: `tsc_compliance_status_by_ip`**
+- **Purpose**: Summary + failed compliance checks with remediation guidance (PCI-DSS, NIST, CIS, ISO 27001, HIPAA)
+- **Token Budget**: 3,000-5,000 | **Module**: `tools/compliance.py`
 
-Advanced analytics, reporting, and management tools.
+**4. Tool 9: `tsc_resources_status`** (Admin Only)
+- **Purpose**: Nessus/NNM/WAS/Proxy status with force_refresh flag
+- **Token Budget**: 1,500-3,000 | **Module**: `tools/admin/resources.py`
 
-**Planned Tools**:
-1. **tsc_generate_report** - On-demand report generation
-2. **tsc_dashboard_data** - Dashboard metrics and KPIs
-3. **tsc_risk_metrics** - Organization-wide risk analysis
-4. **tsc_patch_priority** - AI-driven patch prioritization
-5. **tsc_asset_criticality_analysis** - ACR score breakdowns
-6. **tsc_compliance_dashboard** - Compliance posture view
-7. **tsc_scan_coverage_analysis** - Coverage gap identification
-8. **tsc_vulnerability_trends** - Trend analysis over time
+**5. Tool 10: `tsc_list_ports`**
+- **Purpose**: List open ports with combined scanner + vulnerability data
+- **Token Budget**: 1,500-3,000 | **Module**: `tools/network.py`
 
-**Total Planned**: 20 additional tools (bringing total to 25 tools)
+**6. Tool 11: `tsc_list_software`**
+- **Purpose**: List installed software with full filtering (performance optimization vs IP profile)
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/inventory.py`
+
+**7. Tool 12: `tsc_list_services`**
+- **Purpose**: List running services with full filtering (performance optimization vs IP profile)
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/inventory.py`
+
+**8. Tool 13: `tsc_credential_audit`**
+- **Purpose**: Credential success/failure audit per IP using plugin 19506 + auth plugins
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/scanning.py`
+
+**9. Tool 14: `tsc_list_ips_by_vuln`**
+- **Purpose**: Reverse lookup - list IPs affected by specific vulnerability (plugin ID or CVE)
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/vulnerability_lookup.py`
+
+**10. Tool 15: `tsc_list_cves_by_ip`**
+- **Purpose**: List all CVEs affecting a specific IP
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/vulnerability_lookup.py`
+
+### Week 3: Advanced Features (15 tools)
+
+**11. Tool 16: `tsc_list_scan_results`**
+- **Purpose**: Detailed scan result analysis
+- **Token Budget**: 3,000-5,000 | **Module**: `tools/scanning.py`
+
+**12. Tool 17: `tsc_list_ips_by_repo`**
+- **Purpose**: List all IPs in a repository or asset group (performance optimization)
+- **Token Budget**: 1,500-3,000 | **Module**: `tools/asset_discovery.py`
+
+**13. Tool 18: `tsc_get_os_by_ip`**
+- **Purpose**: Get OS details per IP/asset (performance optimization vs IP profile)
+- **Token Budget**: 1,000-2,000 | **Module**: `tools/asset_discovery.py`
+
+**14. Tool 19: `tsc_profile_ips_bulk`**
+- **Purpose**: Bulk IP profiling for multiple IPs at once
+- **Token Budget**: 5,000-10,000 | **Module**: `tools/ip_profiling.py`
+
+**15. Tool 20: `tsc_list_acr_by_ip`**
+- **Purpose**: ACR (Asset Criticality Rating) scores per IP
+- **Token Budget**: 1,500-3,000 | **Module**: `tools/asset_discovery.py`
+
+**16. Tool 21: `tsc_list_ips_by_acr_range`**
+- **Purpose**: List IPs within ACR value/range (e.g., score >= 8)
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/asset_discovery.py`
+
+**17. Tool 22: `tsc_asset_group_membership`**
+- **Purpose**: List all asset groups an IP belongs to (performance optimization vs IP profile)
+- **Token Budget**: 1,000-2,000 | **Module**: `tools/asset_discovery.py`
+
+**18. Tool 23: `tsc_top_vulnerable_assets`**
+- **Purpose**: Most vulnerable IPs ranked by severity count
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/vulnerability_lookup.py`
+
+**19. Tool 24: `tsc_plugin_update_status`** (Admin Only)
+- **Purpose**: Plugin feed status monitoring
+- **Token Budget**: 1,000-2,000 | **Module**: `tools/admin/resources.py`
+
+**20. Tool 25: `tsc_license_usage`** (Admin Only)
+- **Purpose**: License usage statistics
+- **Token Budget**: 1,000-2,000 | **Module**: `tools/admin/resources.py`
+
+**21. Tool 26: `tsc_repo_status`** (Admin Only)
+- **Purpose**: Combined repository tool - config + utilization + capacity + trending
+- **Token Budget**: 2,000-4,000 | **Module**: `tools/admin/resources.py`
+
+**Total Planned**: 26 tools (5 completed + 21 remaining)
 
 ---
 
