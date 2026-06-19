@@ -1,0 +1,19 @@
+# CODEOWNERS
+# All files in this repository are owned by the maintainer
+# This auto-assigns all PRs to @ABMJ for review
+
+# All files
+* @ABMJ
+
+# Documentation
+*.md @ABMJ
+
+# Source code
+src/ @ABMJ
+
+# Configuration
+*.toml @ABMJ
+*.yml @ABMJ
+*.yaml @ABMJ
+Dockerfile @ABMJ
+docker-compose.yml @ABMJ
