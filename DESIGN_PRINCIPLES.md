@@ -1265,6 +1265,88 @@ git branch -d release/v1.4.0
 gh release create v1.4.0 --title "v1.4.0" --notes-file RELEASE_NOTES.md
 ```
 
+#### Pattern 3: Tenable Exchange Listing Updates
+
+**Use Case:** Updating marketplace listing when adding new tools, resources, or prompts
+
+**File:** `tenable-sc-mcp-server.md` (root directory)
+
+**When to Update:**
+- ✅ Adding new MCP tools (Tools 6-26)
+- ✅ Adding new MCP resources (e.g., `tenable-sc://new-resource`)
+- ✅ Adding MCP prompts (if/when implemented)
+- ❌ Bug fixes, refactoring, documentation updates
+- ❌ Version bumps, performance improvements
+- ❌ Internal code changes
+
+**Rule of Thumb:**
+> "Does this change what tools/features users can access?"
+> - **Yes** → Update Exchange listing
+> - **No** → Don't touch it
+
+**Update Process:**
+
+```bash
+# 1. After implementing new tool (e.g., Tool 6)
+nano tenable-sc-mcp-server.md
+
+# 2. Add to tools_exposed section (YAML front matter)
+tools_exposed:
+  # ... existing 15 tools ...
+  
+  - name: "tsc_list_missing_patches_windows"  # NEW
+    description: "MS bulletin-based patch gap analysis for Windows systems"
+  - name: "tsc_scan_status"  # NEW
+    description: "Real-time scan monitoring with filters"
+
+# 3. Commit and push
+git add tenable-sc-mcp-server.md
+git commit -m "docs: Update Exchange listing with Tools 6-7"
+git push origin main
+
+# 4. Verify on Tenable Exchange (5-10 min sync delay)
+# Visit: https://exchange.tenable.com/cyberagents
+# Search: "Tenable.sc MCP Server"
+```
+
+**Update Schedule (Based on Roadmap):**
+
+| Version | Tools Added | Update Required? |
+|---------|-------------|------------------|
+| v1.3.0 | None (bug fixes only) | ❌ No |
+| v1.4.0 | None (internal feature) | ⚠️ Maybe (if prompts added) |
+| v2.0.0 | Tools 6-26 (21 new tools) | ✅ **YES** |
+
+**Exchange File Sections:**
+
+```yaml
+# YAML Front Matter (lines 1-53)
+tools_exposed:        # Update when adding MCP tools
+  - name: "tool_name"
+    description: "..."
+
+resources_exposed:    # Update when adding MCP resources
+  - name: "resource_uri"
+    description: "..."
+
+prompts_exposed: []   # Update when adding MCP prompts
+
+# Markdown Content (lines 55-76)
+## What it does       # Update if purpose changes
+## How it works       # Update if architecture changes
+```
+
+**Tenable May Update:**
+- `tier: "unreviewed"` → `tier: "community"` (after review)
+- Tag updates for discoverability
+- Description typo fixes
+
+**Important Notes:**
+1. This file is for **Tenable Exchange marketplace listing** only
+2. Don't update for every commit - only when user-facing features change
+3. Tenable Exchange syncs every 5-10 minutes after push
+4. File must remain in repository root for Exchange integration
+
 **Version Numbering (Semantic Versioning):**
 - **Major (x.0.0):** Breaking changes, API incompatibility
 - **Minor (1.x.0):** New features, backward compatible  
