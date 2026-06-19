@@ -20,6 +20,13 @@
 - [Tool Development Standards](#tool-development-standards)
 - [Architecture Patterns](#architecture-patterns)
 - [Testing & Validation](#testing--validation)
+- [Development Workflow & Contribution Guidelines](#development-workflow--contribution-guidelines)
+  - [Branch Strategy](#branch-strategy)
+  - [Workflow Patterns](#workflow-patterns)
+    - [Pattern 1: Feature Development](#pattern-1-feature-development)
+    - [Pattern 2: Release Workflow](#pattern-2-release-workflow)
+    - [Pattern 3: Tenable Exchange Listing Updates](#pattern-3-tenable-exchange-listing-updates)
+    - [Pattern 4: Hotfix Workflow](#pattern-4-hotfix-workflow)
 - [Version History](#version-history)
 
 ---
@@ -1352,7 +1359,7 @@ prompts_exposed: []   # Update when adding MCP prompts
 - **Minor (1.x.0):** New features, backward compatible  
 - **Patch (1.2.x):** Bug fixes only, no new features
 
-#### Pattern 3: Hotfix Workflow
+#### Pattern 4: Hotfix Workflow
 
 **Use Case:** Critical bug in production requiring immediate fix
 
