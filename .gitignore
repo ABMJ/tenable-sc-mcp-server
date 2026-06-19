@@ -22,3 +22,6 @@ docker_security_results.json
 
 # OpenCode local settings
 .claude/
+
+# Private documents
+.private/
