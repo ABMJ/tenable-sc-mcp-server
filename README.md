@@ -9,66 +9,66 @@
 
 **Use of this tool is subject to the terms and conditions identified below, and is not subject to any license agreement you may have with Tenable.**
 
-Production-ready MCP server for Tenable Security Center Plus with intelligent caching for 90% token savings and 1000x faster responses.
+Production-ready Model Context Protocol (MCP) server for Tenable Security Center Plus with intelligent caching, delivering 90% token savings and 1000x faster responses.
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 ### Getting Started
-- [🎯 Status Overview](#-status-overview)
+- [Status Overview](#status-overview)
 - [Quick Start (Docker Compose)](#quick-start-docker-compose)
 - [Configuration](#configuration)
-- [Usage](#usage)
+- [MCP Client Configuration](#mcp-client-configuration)
 
 ### Features & Tools
-- [✨ Key Features](#-key-features)
-- [🛠️ Available Tools](#️-available-tools)
-- [📊 Convenience Tools](#-convenience-tools-intelligent-caching--token-optimization)
+- [Key Features](#key-features)
+- [Available Tools](#available-tools)
+- [Supported API Resources](#supported-api-resources)
 
 ### Technical Details
-- [🔧 How It Works](#-how-it-works)
-- [🏗️ Architecture](#️-architecture)
-- [🧪 Testing](#-testing)
-- [🔍 Troubleshooting](#-troubleshooting)
+- [Architecture](#architecture)
+- [Caching System](#caching-system)
+- [Filter System](#filter-system)
+- [Security Model](#security-model)
 
-### Development
-- [🚀 Development](#-development)
-- [📝 Contributing](#-contributing)
-- [🔒 Security](#-security)
-- [📜 License](#-license)
+### Operations
+- [Installation & Deployment](#installation--deployment)
+- [Multiple Instances](#multiple-tenable-sc-instances)
+- [Troubleshooting](#troubleshooting)
+
+### Development & Support
+- [Documentation](#documentation)
+- [Compatibility](#compatibility)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🎯 Status Overview
+## Status Overview
 
-| Component | Status | Performance | Tests |
-|-----------|--------|-------------|-------|
-| **Tool 1: IP Profile** | ✅ Refactored (v1.2) | 83-90% token savings | ⏳ Testing |
-| **Tool 2: Vulnerability Lists** | ✅ Refactored (v1.2) | 58-92% token savings | ⏳ Testing |
-| **Tool 4: IP Discovery** | ✅ Refactored (v1.2) | 400-3,700 tokens | ⏳ Testing |
-| **Tool 5: CVE Search** | ✅ Refactored (v1.2) | 85% token savings | ⏳ Testing |
-| **Core API Tools** | ✅ Stable | Cached responses | ✅ Passing |
-| **Redis Cache** | ✅ Production | <1ms cached, 57%+ hit rate | ✅ Passing |
-| **Docker Deployment** | ✅ Ready | Single `.env` config | ✅ Passing |
+| Component | Status | Version | Performance |
+|-----------|--------|---------|-------------|
+| **Convenience Tools** | ✅ Production Ready | v1.2.2 | 58-92% token savings |
+| **Core API Tools** | ✅ Stable | v1.2.2 | Fully cached |
+| **Redis Cache** | ✅ Production | v1.2.2 | <1ms cached, 57%+ hit rate |
+| **Docker Deployment** | ✅ Ready | v1.2.2 | Single `.env` config |
+| **CI/CD Pipeline** | ✅ Passing | v1.2.2 | Automated testing |
 
-**Latest**: v1.2.0 Unified Filters Architecture (2026-06-10) • All 4 convenience tools refactored • Awaiting user testing
+**Latest Release**: [v1.2.2](https://github.com/ABMJ/tenable-sc-mcp-server/releases/tag/v1.2.2) (2026-06-19) - Production-ready with unified filter architecture
 
-**Breaking Change**: v1.2.0 introduces unified `filters` dict parameter (see [Filter Documentation](#filter-documentation-system))
-
-**Progress**: Week 1 Session 2 Complete - Documentation Updated
+**Current Roadmap**: Planning v1.3.0 (OS/Plugin Family filter fixes) and v1.4.0 (multi-client API key support)
 
 ---
 
 ## Quick Start (Docker Compose)
 
-**Deploy in 2 steps** - Configure and run:
+Deploy in 2 steps - configure and run:
 
 ### Step 1: Create Configuration
 
-Create a `.env` file in the project directory with your Tenable.sc credentials and Docker settings:
+Create a `.env` file in the project directory:
 
-**Option 1: Copy from template (Recommended)**
 ```bash
 # Navigate to project directory
 cd tenable-sc-mcp-server
@@ -80,13 +80,8 @@ cp .env.example .env
 nano .env  # or use your preferred editor
 ```
 
-**Option 2: Create from scratch**
+**Required configuration:**
 ```bash
-# Navigate to project directory
-cd tenable-sc-mcp-server
-
-# Create .env file
-cat > .env <<'EOF'
 # Docker Compose Configuration
 LOCAL_UID=1000
 LOCAL_GID=1000
@@ -102,11 +97,6 @@ TSC_CACHE_ENABLED=true
 TSC_CACHE_BACKEND=redis
 TSC_CACHE_REDIS_HOST=redis
 TSC_CACHE_REDIS_PORT=6379
-EOF
-
-# Set your user IDs automatically
-sed -i "s/LOCAL_UID=1000/LOCAL_UID=$(id -u)/" .env
-sed -i "s/LOCAL_GID=1000/LOCAL_GID=$(id -g)/" .env
 ```
 
 **Important:** Replace `your-sc-server.com`, `your-access-key`, and `your-secret-key` with your actual Tenable.sc credentials.
@@ -124,9 +114,6 @@ docker-compose up -d
 docker ps --filter "name=tenable-sc-mcp"
 ```
 
-> **Note:** Use `docker compose` (without hyphen) if you have Docker Compose v2 plugin installed.
-> Use `docker-compose` (with hyphen) for legacy installations.
-
 **Expected output:**
 ```
 tenable-sc-mcp         Up X minutes   0.0.0.0:8000->8000/tcp
@@ -135,9 +122,11 @@ tenable-sc-mcp-redis   Up X minutes   0.0.0.0:6379->6379/tcp (healthy)
 
 **Your MCP server is now running at:** `http://<your-ip>:8000/mcp`
 
+> **Note:** Use `docker compose` (without hyphen) if you have Docker Compose v2 plugin installed.
+
 ---
 
-## Features
+## Key Features
 
 ### Performance Optimization
 - **90% token savings** - Intelligent caching reduces API calls dramatically
@@ -145,87 +134,77 @@ tenable-sc-mcp-redis   Up X minutes   0.0.0.0:6379->6379/tcp (healthy)
 - **Multi-tier caching** - In-memory + Redis backends with smart TTLs
 - **Automatic cache invalidation** - Write operations clear related cache entries
 
-### Architecture
-```
-MCP Client (OpenCode / Claude Desktop)
-           |
-           v
- tenable-sc-mcp server (HTTP/Stdio)
-           |
-           v
-    [ Redis Cache ] ← 90% cache hit rate
-           |
-           v
-  Tenable.sc REST API
-```
-
 ### Production Ready
 - **Container-first design** - Docker Compose with Redis included
 - **Least-privilege model** - Uses Tenable.sc RBAC and API keys
 - **Resource catalog** - Exposes all documented Tenable.sc endpoints
 - **Zero data storage** - Stateless proxy with optional caching
 
+### Security & Compliance
+- **No credential storage** - Environment variables only
+- **RBAC enforcement** - All Tenable.sc permissions apply
+- **SSL/TLS support** - Configurable certificate verification
+- **Audit trail** - All operations logged
+
 ---
 
-## What It Exposes
-
-Generic MCP tools for all Tenable.sc resources:
+## Available Tools
 
 ### Core Tools
+
+**Resource Management:**
 - `tsc_catalog` - Browse 100+ available Tenable.sc resources
 - `tsc_current_user` - Verify API user identity and permissions
 - `tsc_resource_action` - Unified CRUD interface (`list`, `get`, `create`, `update`, `delete`)
+- `tsc_resource_docs` - Get documentation for specific resources
 
-### Convenience Tools (High-Level Queries)
-Optimized tools with intelligent caching for common security workflows:
-
-**Tool 1: IP Profile** (`tsc_profile_ip_efficient`)
-- Complete security assessment for a single IP address
-- Returns host identity, vulnerability summary, scan status, software, services, and asset groups
-- **Token Efficiency**: ~2,500 tokens (vs ~15,000 raw) = **83% reduction**
-- **Use Case**: Incident response, compliance audits, credential validation
-
-**Tool 2a: Vulnerability Summary** (`tsc_list_vulns_by_ip_summary`)
-- Quick vulnerability counts by severity for an IP
-- **Token Efficiency**: ~700 tokens (vs ~6,000 raw) = **88% reduction**
-- **Use Case**: Dashboard metrics, quick checks, scoping
-
-**Tool 2b: Vulnerability Details** (`tsc_list_vulns_by_ip_full`)
-- Complete vulnerability records with full metadata and remediation info
-- Pagination support (10-200 records per query)
-- **Token Efficiency**: ~5,000 tokens for 50 records (vs ~12,000 raw) = **58% reduction**
-- **Use Case**: Remediation planning, detailed investigation, ticketing
-
-**Tool 4: IP Discovery** (`tsc_list_ips`)
-- List all IPs in repositories or asset groups with powerful filtering
-- Reverse lookup to find where an IP exists
-- Supports 55+ analysis filters (ACR, severity, exploits, VPR, CVSS)
-- **Token Range**: 400-3,700 tokens depending on result size
-- **Use Case**: Asset discovery, high-risk identification, CMDB sync
-
-**Tool 5: CVE Search** (`tsc_list_vulns_by_cve`)
-- Search for specific CVE across entire infrastructure (emergency outbreak response)
-- List all affected assets with IP, hostname, severity, port, protocol
-- Supports ALL 55+ Tenable.sc filters for complex queries (e.g., "critical assets with ACR > 7 running Windows that have CVE-X")
-- Automatic remediation summary extraction with steps, references, vendor advisories
-- Optional full plugin output (may be 500+ lines)
-- **Token Efficiency**: ~1,000-2,000 tokens (vs ~10,000 raw) = **85% reduction**
-- **Use Case**: Emergency CVE outbreak response, patch verification, risk prioritization
-
-📚 **Full Documentation**: See [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) for complete usage guide
-
-### Specialized Tools
+**Advanced Operations:**
 - `tsc_analyze` - Run analysis queries (cached for performance)
 - `tsc_request` - Direct access to any Tenable.sc endpoint
 - `tsc_download` - Binary/text download helper
 - `tsc_upload_file` - Multipart file upload helper
 
-### Cache Management
+**Cache Management:**
 - `tsc_cache_stats` - View hit rate, total keys, performance metrics
 - `tsc_cache_clear` - Clear all cache or by pattern (e.g., `repository:*`)
 
-### Legacy Aliases (Deprecated)
-- `tsc_list`, `tsc_get`, `tsc_create`, `tsc_update`, `tsc_delete` - Use `tsc_resource_action` instead
+### Convenience Tools (Intelligent Caching)
+
+High-level tools optimized for common security workflows. For detailed usage, examples, and best practices, see **[USER_GUIDE.md](USER_GUIDE.md)**.
+
+**Tool 1: IP Profiling** (`tsc_profile_ip_efficient`)
+- Complete security assessment for a single IP address
+- Returns host identity, vulnerability summary, scan status, software, services, asset groups
+- **Token Efficiency**: ~2,500 tokens (vs ~15,000 raw) = **83% reduction**
+- **Cache TTL**: 180s (vulnerabilities), 300s (static data)
+
+**Tool 2a: Vulnerability Summary** (`tsc_list_vulns_by_ip_summary`)
+- Quick vulnerability counts by severity for an IP
+- **Token Efficiency**: ~700 tokens (vs ~6,000 raw) = **88% reduction**
+- **Cache TTL**: 180s
+
+**Tool 2b: Vulnerability Details** (`tsc_list_vulns_by_ip_full`)
+- Complete vulnerability records with full metadata and remediation info
+- Pagination support (10-200 records per query)
+- **Token Efficiency**: ~5,000 tokens for 50 records (vs ~12,000 raw) = **58% reduction**
+- **Cache TTL**: 180s
+
+**Tool 4: IP Discovery** (`tsc_list_ips`)
+- List all IPs in repositories or asset groups with 55+ filters
+- Reverse lookup to find where an IP exists
+- Supports ACR, severity, exploits, VPR, CVSS filtering
+- **Token Range**: 400-3,700 tokens depending on result size
+- **Cache TTL**: 120s
+
+**Tool 5: CVE Search** (`tsc_list_vulns_by_cve`)
+- Search for specific CVE across entire infrastructure
+- List all affected assets with IP, hostname, severity, port, protocol
+- Supports ALL 55+ Tenable.sc filters for complex queries
+- Automatic remediation summary extraction
+- **Token Efficiency**: ~1,000-2,000 tokens (vs ~10,000 raw) = **85% reduction**
+- **Cache TTL**: 240s
+
+**📚 Complete Documentation:** See **[USER_GUIDE.md](USER_GUIDE.md)** for comprehensive usage guide with examples and best practices.
 
 ---
 
@@ -256,9 +235,9 @@ TSC_MAX_RETRIES=3
 | `TSC_TIMEOUT_SECONDS` | No | `300` | HTTP timeout per request |
 | `TSC_MAX_RETRIES` | No | `3` | Retry attempts for failures |
 
-### Cache Configuration (v0.2.0+)
+### Cache Configuration
 
-Cache is **enabled by default** and runs automatically:
+Cache is **enabled by default** with Redis backend in Docker Compose:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -267,106 +246,9 @@ Cache is **enabled by default** and runs automatically:
 | `TSC_CACHE_REDIS_HOST` | `redis` | Redis hostname |
 | `TSC_CACHE_REDIS_PORT` | `6379` | Redis port |
 
-**When using Docker Compose**, caching is pre-configured with Redis. No additional setup required.
+**When using Docker Compose**, caching is pre-configured. No additional setup required.
 
----
-
-## Installation & Deployment
-
-### Option 1: Docker Compose (Recommended)
-
-**Complete production deployment with Redis caching:**
-
-```bash
-# Clone or navigate to project directory
-cd tenable-sc-mcp-server
-
-# Create configuration
-cat > ~/.tenable-sc-mcp.env <<'EOF'
-TSC_URL=https://your-sc-server.com
-TSC_ACCESS_KEY=your-access-key
-TSC_SECRET_KEY=your-secret-key
-TSC_VERIFY_SSL=true
-EOF
-
-# Build and start (MCP server + Redis)
-docker build -t tenable-sc-mcp:latest .
-docker-compose up -d
-
-# Check status
-docker-compose ps
-docker-compose logs -f tenable-sc-mcp
-```
-
-> **Using Docker Compose v2?** Replace `docker-compose` with `docker compose` (without hyphen).
-
-**Maintenance commands:**
-```bash
-# View logs
-docker-compose logs -f
-
-# Restart containers
-docker-compose restart
-
-# Stop containers
-docker-compose down
-
-# Rebuild after code changes
-docker-compose down
-docker build -t tenable-sc-mcp:latest .
-docker-compose up -d
-```
-
-### Option 2: Standalone Docker Container
-
-**Run MCP server without Redis (in-memory cache only):**
-
-```bash
-# Build image
-docker build -t tenable-sc-mcp:latest .
-
-# Run as background service
-docker run -d \
-  --name tenable-sc-mcp \
-  --restart unless-stopped \
-  -p 0.0.0.0:8000:8000 \
-  -v ~/.tenable-sc-mcp.env:/config/tsc.env:ro \
-  -e TSC_CACHE_BACKEND=memory \
-  tenable-sc-mcp:latest \
-  --transport streamable-http \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --env-file /config/tsc.env \
-  --allow-remote-hosts
-
-# Check status
-docker ps
-docker logs tenable-sc-mcp
-```
-
-### Option 3: Local Python Install
-
-**For development or testing without Docker:**
-
-```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install
-pip install .
-
-# Set environment variables
-export TSC_URL="https://securitycenter.example.com"
-export TSC_ACCESS_KEY="your-access-key"
-export TSC_SECRET_KEY="your-secret-key"
-
-# Run with stdio
-tenable-sc-mcp --transport stdio
-
-# Or run with HTTP
-tenable-sc-mcp --transport streamable-http --host 0.0.0.0 --port 8000
-```
+For detailed caching behavior and performance metrics, see **[CACHING_DEEP_DIVE.md](CACHING_DEEP_DIVE.md)**.
 
 ---
 
@@ -419,7 +301,38 @@ Add to Claude Desktop MCP settings:
 
 ---
 
-## Caching Deep Dive
+## Architecture
+
+### System Design
+
+```
+MCP Client (OpenCode / Claude Desktop)
+           |
+           v
+ tenable-sc-mcp server (HTTP/Stdio)
+           |
+           v
+    [ Redis Cache ] ← 90% cache hit rate
+           |
+           v
+  Tenable.sc REST API
+```
+
+### Design Principles
+
+All tools follow mandatory patterns defined in **[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)**:
+
+1. **Unified Filters Dict** - Single `filters` parameter accepts all 55+ filters
+2. **Token Optimization** - Target 80%+ reduction vs raw API
+3. **Smart Caching** - Independent TTLs based on data volatility
+4. **Error Handling** - Comprehensive with helpful messages
+5. **Documentation** - Detailed docstrings with examples
+
+For complete architecture details, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+
+---
+
+## Caching System
 
 ### How It Works
 
@@ -455,83 +368,31 @@ Different resource types have optimized cache lifetimes:
 - Vulnerability queries (`vulndetails`): 3 minutes
 - Real-time status (`listening`, `event`): 1 minute
 
-This smart TTL system improves cache hit rates from 16% to 60-80%.
-
-### Cache Tools
-
-**View cache statistics:**
-```
-Ask: "show me cache statistics"
-Result: Hit rate, misses, total keys, performance metrics
-```
-
-**Clear cache:**
-```
-Ask: "clear the cache"
-Result: All cache entries removed
-```
-
-**Clear specific resources:**
-```
-Ask: "clear repository cache"
-Result: Only repository-related entries removed
-```
+For complete caching documentation, see **[CACHING_DEEP_DIVE.md](CACHING_DEEP_DIVE.md)**.
 
 ---
 
-## Filter Documentation System
+## Filter System
 
-**New in v1.2:** Unified filters dict architecture with comprehensive MCP resource documentation.
+### Overview
 
-### Breaking Change in v1.2.0
+**New in v1.2.0:** Unified filters dict architecture with comprehensive documentation.
 
 All convenience tools now use a **unified `filters` dict parameter** instead of explicit filter parameters:
 
 ```python
-# ❌ OLD (v1.1 and earlier) - DEPRECATED
-tsc_list_vulns_by_cve("CVE-2021-44228", asset_criticality="7-10", severity="critical")
-
 # ✅ NEW (v1.2+) - Use filters dict
-tsc_list_vulns_by_cve("CVE-2021-44228", filters={"asset_criticality": "7-10", "severity": "critical"})
+tsc_list_vulns_by_cve("CVE-2021-44228", filters={
+    "asset_criticality": "7-10",
+    "severity": "critical"
+})
 ```
 
 **Why this change?**
 - Single `filters` parameter provides access to all 55+ filters
 - Consistent interface across all tools
 - Zero tool edits when adding new filters
-- Better MCP protocol compatibility (avoids `**kwargs` limitation)
-
-### Why This Matters
-
-Convenience tools support 55+ analysis filters (asset_criticality, vpr_score, severity, etc.). 
-The MCP server provides self-documenting filter reference that LLMs can fetch to understand:
-- Correct parameter names (e.g., `asset_criticality` not `acr_score`)
-- Required formats (e.g., `"7-10"` range format, not `">7"` operators)
-- All available filters grouped by category
-- Practical examples and common mistakes
-
-### How to Access
-
-**MCP Resources Available:**
-
-1. **Comprehensive Filter Format Reference (v1.2.0)** - **RECOMMENDED**
-   - **URI:** `tenable-sc://filters/format-reference`
-   - **Content:** Complete filter format guide with examples, test results, troubleshooting
-   - **File:** `FILTER_FORMAT_REFERENCE.md`
-   - **Test Coverage:** Based on 60-test validation suite (93.3% pass rate)
-   - **Size:** ~12,000 words
-   
-2. **Auto-Generated Filter Reference (Legacy)**
-   - **URI:** `tenable-sc://filters/reference`
-   - **Content:** Auto-generated from COMMON_FILTERS dict
-   - **Use Case:** Quick filter name/category lookup
-
-**For Claude/OpenCode:** Fetch the comprehensive reference at startup:
-```
-/resources/tenable-sc://filters/format-reference
-```
-
-MCP clients can fetch these resources at startup or on-demand to get complete filter documentation.
+- Better MCP protocol compatibility
 
 ### Key Filter Rules
 
@@ -553,55 +414,144 @@ tool_name(..., filters={"filter_name": "value", "another_filter": "value"})
 - `cve`: CVE identifier
 - `plugin_id`: Nessus plugin ID
 
-**Examples:**
+### MCP Resources
 
-```python
-# Find critical assets with high VPR vulnerabilities
-tsc_list_ips(
-    repository="Production",
-    filters={
-        "asset_criticality": "8-10",
-        "vpr_score": "7-10",
-        "severity": "critical"
-    }
-)
+The MCP server provides self-documenting filter references:
 
-# Search for CVE across high-risk assets only
-tsc_list_vulns_by_cve(
-    "CVE-2021-44228",
-    filters={
-        "asset_criticality": "7-10",
-        "exploit_available": "Yes"
-    }
-)
+1. **Comprehensive Filter Format Reference (v1.2.0)** - **RECOMMENDED**
+   - **URI:** `tenable-sc://filters/format-reference`
+   - **Content:** Complete filter format guide with examples and test results
+   - **File:** [FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)
 
-# Get IP vulnerabilities with multiple filters
-tsc_list_vulns_by_ip_full(
-    "10.1.20.10",
-    filters={
-        "severity": "critical",
-        "exploit_available": "Yes",
-        "port": 443
-    }
-)
-```
+2. **Auto-Generated Filter Reference**
+   - **URI:** `tenable-sc://filters/reference`
+   - **Use Case:** Quick filter name/category lookup
 
-### Filter Validation
+For complete filter documentation and examples, see **[USER_GUIDE.md](USER_GUIDE.md)** and **[FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)**.
 
-The server logs warnings for unknown filter parameters:
+---
+
+## Security Model
+
+### RBAC Enforcement
+
+The MCP server **does not bypass Tenable.sc permissions**:
+
+- Uses your API keys to authenticate as a Tenable.sc user
+- All Tenable.sc RBAC rules apply (roles, org membership, repo access)
+- Unauthorized calls return Tenable.sc API errors
+- Run `tsc_current_user` to verify identity
+
+**Best practice:** Create a dedicated least-privilege API user in Tenable.sc.
+
+### Security Guidelines
+
+- ❌ **Never commit API keys** to git or bake into Docker images
+- ✅ Use container secrets or env files (mode `0600`)
+- ✅ Set `TSC_VERIFY_SSL=true` in production
+- ⚠️ The MCP HTTP endpoint has no built-in authentication
+  - Bind only to trusted networks (use `127.0.0.1` for local)
+  - Use firewall rules or SSH tunnels for remote access
+  - Consider OAuth proxy if exposing publicly
+
+For security policy and vulnerability reporting, see **[SECURITY.md](SECURITY.md)**.
+
+---
+
+## Installation & Deployment
+
+### Option 1: Docker Compose (Recommended)
+
+Complete production deployment with Redis caching:
+
 ```bash
-docker logs tenable-sc-mcp 2>&1 | grep "Unknown filter"
+# Clone or navigate to project directory
+cd tenable-sc-mcp-server
+
+# Create configuration
+cat > ~/.tenable-sc-mcp.env <<'EOF'
+TSC_URL=https://your-sc-server.com
+TSC_ACCESS_KEY=your-access-key
+TSC_SECRET_KEY=your-secret-key
+TSC_VERIFY_SSL=true
+EOF
+
+# Build and start (MCP server + Redis)
+docker build -t tenable-sc-mcp:latest .
+docker-compose up -d
+
+# Check status
+docker-compose ps
+docker-compose logs -f tenable-sc-mcp
 ```
 
-If you see warnings, check the filter reference resource or COMMON_FILTERS in `convenience_tools.py`.
+**Maintenance commands:**
+```bash
+# View logs
+docker-compose logs -f
 
-### Documentation
+# Restart containers
+docker-compose restart
 
-- **Design Principles:** See DESIGN_PRINCIPLES.md (mandatory patterns for tool development)
-- **Complete Filter Reference:** Fetch `tenable-sc://filters/reference` MCP resource
-- **Architecture Details:** See ARCHITECTURE.md section 4
-- **Code Reference:** `src/tenable_sc_mcp/convenience_tools.py` (COMMON_FILTERS dict)
-- **Migration Guide:** See REFACTOR_SUMMARY.md for v1.1 → v1.2 changes
+# Stop containers
+docker-compose down
+
+# Rebuild after code changes
+docker-compose down
+docker build -t tenable-sc-mcp:latest .
+docker-compose up -d
+```
+
+### Option 2: Standalone Docker Container
+
+Run MCP server without Redis (in-memory cache only):
+
+```bash
+# Build image
+docker build -t tenable-sc-mcp:latest .
+
+# Run as background service
+docker run -d \
+  --name tenable-sc-mcp \
+  --restart unless-stopped \
+  -p 0.0.0.0:8000:8000 \
+  -v ~/.tenable-sc-mcp.env:/config/tsc.env:ro \
+  -e TSC_CACHE_BACKEND=memory \
+  tenable-sc-mcp:latest \
+  --transport streamable-http \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --env-file /config/tsc.env \
+  --allow-remote-hosts
+
+# Check status
+docker ps
+docker logs tenable-sc-mcp
+```
+
+### Option 3: Local Python Install
+
+For development or testing without Docker:
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install
+pip install .
+
+# Set environment variables
+export TSC_URL="https://securitycenter.example.com"
+export TSC_ACCESS_KEY="your-access-key"
+export TSC_SECRET_KEY="your-secret-key"
+
+# Run with stdio
+tenable-sc-mcp --transport stdio
+
+# Or run with HTTP
+tenable-sc-mcp --transport streamable-http --host 0.0.0.0 --port 8000
+```
 
 ---
 
@@ -615,47 +565,7 @@ The server exposes **100+ Tenable.sc resources** including:
 **Advanced Resources:**
 `alert`, `acceptRiskRule`, `recastRiskRule`, `dashboardComponent`, `report`, `auditFile`, `lce`, `scanner`, `scanZone`
 
-**Full catalog:** Run `tsc_catalog` or see <https://docs.tenable.com/security-center/api/index.htm>
-
----
-
-## Example Tool Calls
-
-### List repositories
-```json
-{
-  "action": "list",
-  "resource": "repository"
-}
-```
-
-### Get specific scan
-```json
-{
-  "action": "get",
-  "resource": "scan",
-  "object_id": "12"
-}
-```
-
-### Run analysis query (cached!)
-```json
-{
-  "query": {
-    "type": "vuln",
-    "tool": "vulndetails",
-    "sourceType": "cumulative"
-  }
-}
-```
-
-### Launch scan
-```json
-{
-  "method": "POST",
-  "path": "/scan/12/launch"
-}
-```
+**Full catalog:** Run `tsc_catalog` or see [Tenable.sc API Documentation](https://docs.tenable.com/security-center/api/index.htm)
 
 ---
 
@@ -697,6 +607,8 @@ docker run -d --name tenable-sc-mcp-lab \
 **Connect clients to:**
 - Production: `http://server:8001/mcp`
 - Lab: `http://server:8002/mcp`
+
+**Future:** v1.4.0 will support multi-client API keys within a single server instance. See **[MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)** for planned architecture.
 
 ---
 
@@ -744,30 +656,34 @@ curl http://your-server-ip:8000/mcp
 # Expected: "Client must accept text/event-stream"
 ```
 
----
-
-## RBAC Model
-
-The MCP server **does not bypass Tenable.sc permissions**:
-
-- Uses your API keys to authenticate as a Tenable.sc user
-- All Tenable.sc RBAC rules apply (roles, org membership, repo access)
-- Unauthorized calls return Tenable.sc API errors
-- Run `tsc_current_user` to verify identity
-
-**Best practice:** Create a dedicated least-privilege API user in Tenable.sc.
+For more troubleshooting help, see **[SUPPORT.md](SUPPORT.md)** or [open an issue](https://github.com/ABMJ/tenable-sc-mcp-server/issues).
 
 ---
 
-## Security Notes
+## Documentation
 
-- ❌ **Never commit API keys** to git or bake into Docker images
-- ✅ Use container secrets or env files (mode `0600`)
-- ✅ Set `TSC_VERIFY_SSL=true` in production
-- ⚠️ The MCP HTTP endpoint has no built-in authentication
-  - Bind only to trusted networks (use `127.0.0.1` for local)
-  - Use firewall rules or SSH tunnels for remote access
-  - Consider OAuth proxy if exposing publicly
+### User Documentation
+- **[USER_GUIDE.md](USER_GUIDE.md)** - Complete tool usage guide with examples
+- **[FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)** - Filter system documentation
+- **[CACHING_DEEP_DIVE.md](CACHING_DEEP_DIVE.md)** - Caching behavior and performance
+- **[TEST_PROMPTS.md](TEST_PROMPTS.md)** - Ready-to-use test queries
+
+### Developer Documentation
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
+- **[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)** - Tool development patterns
+- **[TOOLS_ROADMAP.md](TOOLS_ROADMAP.md)** - Feature roadmap and future tools
+- **[HANDOFF.md](HANDOFF.md)** - LLM-friendly development handoff
+
+### Project Documentation
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[SECURITY.md](SECURITY.md)** - Security policy and vulnerability reporting
+- **[SUPPORT.md](SUPPORT.md)** - Support resources and troubleshooting
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** - Community guidelines
+
+### External Resources
+- [Tenable.sc API Documentation](https://docs.tenable.com/security-center/api/index.htm)
+- [MCP Protocol Specification](https://modelcontextprotocol.io/)
+- [OpenCode Documentation](https://opencode.ai/docs)
 
 ---
 
@@ -784,42 +700,24 @@ The MCP server **does not bypass Tenable.sc permissions**:
 
 ---
 
-## Documentation
+## Contributing
 
-- **🚀 Tools User Guide:** [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) - Available tools, usage examples, performance expectations
-- **🧪 Test Prompts:** [TEST_PROMPTS.md](TEST_PROMPTS.md) - Ready-to-use test queries with cache monitoring
-- **📊 Caching Guide:** [CACHING_DEEP_DIVE.md](CASHING_DEEP_DIVE.md) - How caching works and performance metrics
-- **📝 Session Notes:** [week1_session_3_2026-06-06_1415.md](week1_session_3_2026-06-06_1415.md) - Latest development session
-- **🌟 All Tools Documentation:** [docs/TOOLS.md](docs/TOOLS.md) - Complete MCP tool reference
-- **API Reference:** <https://docs.tenable.com/security-center/api/index.htm>
-- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Security Policy:** [SECURITY.md](SECURITY.md)
-- **Support:** [SUPPORT.md](SUPPORT.md)
+We welcome contributions! Please see **[CONTRIBUTING.md](CONTRIBUTING.md)** for:
+- Development setup instructions
+- Code style guidelines
+- Testing requirements
+- Pull request process
 
----
-
-## Feedback & Support
-
-- **Bug reports:** [New Issue](https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=bug_report.yml)
-- **Feature requests:** [New Issue](https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=feature_request.yml)
-- **All issues:** [Issue Tracker](https://github.com/ABMJ/tenable-sc-mcp-server/issues)
-
-Include: Release version (e.g., `v0.2.0`), deployment mode (`stdio`/`streamable-http`), and exact error/tool call.
-
----
-
-## Design Philosophy
-
-**Simplicity:** Direct HTTP calls instead of SDK wrappers for minimal overhead  
-**Generality:** Generic resource tools adapt to new Tenable.sc features automatically  
-**Performance:** Intelligent caching reduces load on both client and Tenable.sc  
-**Standards:** Uses MCP protocol for compatibility across AI assistants
+**Quick links:**
+- [Report a bug](https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=bug_report.yml)
+- [Request a feature](https://github.com/ABMJ/tenable-sc-mcp-server/issues/new?template=feature_request.yml)
+- [View all issues](https://github.com/ABMJ/tenable-sc-mcp-server/issues)
 
 ---
 
 ## License
 
-GNU GPL v3.0 - See [LICENSE](LICENSE) or <https://choosealicense.com/licenses/gpl-3.0/>
+GNU GPL v3.0 - See [LICENSE](LICENSE) or [choosealicense.com/licenses/gpl-3.0](https://choosealicense.com/licenses/gpl-3.0/)
 
 ---
 
@@ -833,3 +731,14 @@ TSC_ACCESS_KEY=your-access-key
 TSC_SECRET_KEY=your-secret-key
 TSC_VERIFY_SSL=true
 EOF
+
+docker build -t tenable-sc-mcp:latest .
+docker-compose up -d
+docker-compose logs -f
+```
+
+**Your server is ready at:** `http://<your-ip>:8000/mcp`
+
+---
+
+**Need help?** Check [SUPPORT.md](SUPPORT.md) or [open an issue](https://github.com/ABMJ/tenable-sc-mcp-server/issues).
