@@ -17,9 +17,6 @@ htmlcov/
 # Docker/Security reports
 docker_security_results.json
 
-# Private internal documentation
-.private/
-
 # macOS resource forks
 ._*
 
