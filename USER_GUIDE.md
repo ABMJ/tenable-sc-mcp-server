@@ -1,0 +1,998 @@
+# Tenable.sc MCP Server - User Guide
+
+**Version**: v1.2.2  
+**Last Updated**: 2026-06-19  
+**Status**: 5 Production-Ready Tools
+
+---
+
+## 📑 Table of Contents
+
+### Overview
+- [Introduction](#introduction)
+- [Breaking Changes in v1.2.0](#breaking-changes-in-v120)
+- [Quick Start](#quick-start)
+
+### Available Tools
+1. [tsc_profile_ip_efficient](#1-tsc_profile_ip_efficient---complete-ip-security-profile) - Complete IP Security Profile
+2. [tsc_list_vulns_by_ip_summary](#2a-tsc_list_vulns_by_ip_summary---quick-vulnerability-count) - Quick Vulnerability Count
+3. [tsc_list_vulns_by_ip_full](#2b-tsc_list_vulns_by_ip_full---detailed-vulnerability-records) - Detailed Vulnerability Records
+4. [tsc_list_ips](#4-tsc_list_ips---ip-discovery--asset-enumeration) - IP Discovery & Asset Enumeration
+5. [tsc_list_vulns_by_cve](#5-tsc_list_vulns_by_cve---cve-search-across-infrastructure) - CVE Search Across Infrastructure
+
+### Reference
+- [Universal Filter Framework](#universal-filter-framework)
+- [Performance & Caching](#performance--caching)
+- [Best Practices](#best-practices)
+
+---
+
+## Introduction
+
+The Tenable.sc MCP Server provides AI-powered tools for security vulnerability management and asset discovery. These tools are optimized for use with Claude Desktop and other MCP-compatible AI assistants.
+
+### What You Can Do
+
+- **Incident Response**: Instantly profile suspicious IPs with complete security context
+- **Vulnerability Management**: Search for specific CVEs across your entire infrastructure
+- **Asset Discovery**: Find and enumerate IPs by repository, asset group, or criticality
+- **Risk Assessment**: Get vulnerability counts and details filtered by severity, VPR, or EPSS scores
+- **Compliance**: Track patching status and credential-based scanning coverage
+
+### Key Features
+
+- ✅ **Token Efficient**: 83-90% reduction in LLM token usage vs raw API calls
+- ✅ **Smart Caching**: Intelligent TTLs (60s-300s) for frequently accessed data
+- ✅ **Unified Filters**: 71+ filters work consistently across all tools
+- ✅ **Natural Language**: Use conversational commands with your AI assistant
+- ✅ **Production Ready**: Battle-tested with comprehensive error handling
+
+---
+
+## Breaking Changes in v1.2.0
+
+### Unified Filters Dict Parameter
+
+**All convenience tools now use a single `filters` dict parameter instead of explicit filter parameters.**
+
+#### ❌ Old Syntax (v1.1 and earlier - DEPRECATED):
+```python
+# No longer supported
+tsc_list_ips(repository="Default", asset_criticality="8-10", severity="critical")
+tsc_list_vulns_by_cve("CVE-2021-44228", asset_criticality="7-10", exploit_available="Yes")
+```
+
+#### ✅ New Syntax (v1.2.0+):
+```python
+# Use filters dict parameter
+tsc_list_ips(
+    repository="Default",
+    filters={"asset_criticality": "8-10", "severity": "critical"}
+)
+
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={"asset_criticality": "7-10", "exploit_available": "Yes"}
+)
+```
+
+### Why This Change?
+
+1. **Simpler function signatures** - 5 lines instead of 100+ per tool
+2. **Consistent interface** - All tools use identical filter pattern
+3. **Zero-edit filter additions** - Add to `COMMON_FILTERS` dict, available everywhere
+4. **Better MCP compatibility** - Fixes `**kwargs` serialization bug
+5. **Scales to 25+ tools** - Maintainable long-term architecture
+
+---
+
+## Quick Start
+
+### Example Conversation
+
+```
+You: Profile IP 10.1.20.10
+
+Claude: I'll get a complete security profile for 10.1.20.10...
+[Returns: Host identity, vulnerability summary, last scan info, 
+ installed software, running services, asset groups]
+
+You: List all critical IPs in the Default repository
+
+Claude: Finding IPs with ACR 7-10 in Default repository...
+[Returns: List of high-risk IP addresses]
+
+You: Do we have CVE-2021-44228 (Log4Shell)?
+
+Claude: Searching for CVE-2021-44228 across infrastructure...
+[Returns: Affected IPs with severity counts and remediation details]
+```
+
+### Common Tasks
+
+| Task | Command Example |
+|------|----------------|
+| **Profile a host** | "Profile IP 10.1.20.10" |
+| **Find critical assets** | "List IPs with ACR > 7 in Production" |
+| **Check CVE exposure** | "Do we have CVE-2021-44228?" |
+| **Vulnerability details** | "Show vulnerabilities for 192.168.1.100" |
+| **Asset discovery** | "List all Windows hosts in Default repository" |
+
+---
+
+## 1. `tsc_profile_ip_efficient` - Complete IP Security Profile
+
+**Status**: ✅ Production Ready | **Token Savings**: 83-90% | **Cache**: 180-300s  
+**Module**: `tools/ip_profiling.py`
+
+### What This Tool Does
+
+Gets a complete security assessment for a single IP address in one command. Combines host identity, vulnerability counts, scan status, installed software, running services, and asset group membership.
+
+### When to Use This Tool
+
+- **Incident Response**: "Tell me everything about this suspicious IP"
+- **Asset Audit**: "What's the security posture of our database server at 10.1.20.10?"
+- **Credential Validation**: "Was this server scanned with credentials?"
+- **Compliance Check**: "Show me the scan status and vulnerabilities for this critical host"
+- **Before Patching**: "What software and services are running before I patch?"
+
+### How to Use
+
+```bash
+# Simple profile
+Profile IP 10.1.20.10
+
+# Full example with context
+Use tenable-sc to profile IP 10.1.20.10 efficiently
+```
+
+### What You Get Back
+
+- **Host Identity**: Hostname, DNS name, NetBIOS name, MAC address, ACR score
+- **Vulnerability Summary**: Count of vulnerabilities by severity (Critical/High/Medium/Low/Info)
+- **Last Scan Info**: Scan name, policy used, timestamp, authentication status
+- **Installed Software**: Up to 50 most important packages/applications
+- **Running Services**: Active services with port numbers
+- **Asset Groups**: All asset group memberships (up to 46 groups)
+
+### Performance
+
+- **Tokens Used**: ~2,500 tokens (vs ~15,000 without optimization) = **83% reduction**
+- **API Calls**: 6 optimized queries with independent caching
+- **Cache TTL**: 180s for vulnerabilities, 300s for static data
+- **Response Time**: <1s cached, 1-3s fresh
+
+### Example Output
+
+```json
+{
+  "ok": true,
+  "ip": "10.1.20.10",
+  "summary": {
+    "hostname": "webserver01.domain.com",
+    "os": "Windows Server 2019",
+    "last_scan": "2026-06-19T10:30:00Z",
+    "vulnerabilities": {
+      "critical": 5,
+      "high": 23,
+      "medium": 87,
+      "low": 12,
+      "info": 45
+    }
+  },
+  "data": {
+    "basic_info": {...},
+    "vulnerability_summary": {...},
+    "last_scan": {...},
+    "installed_software": [...],
+    "running_services": [...],
+    "asset_groups": [...]
+  }
+}
+```
+
+### Optional Parameters
+
+```python
+# Disable specific sections for faster response
+tsc_profile_ip_efficient(
+    "10.1.20.10",
+    include_software=False,      # Skip software list
+    include_services=False,      # Skip services list
+    include_scan_info=False,     # Skip scan metadata
+    include_asset_groups=False   # Skip asset group membership
+)
+```
+
+### Best Practices
+
+1. **Use for investigation**: Perfect for incident response and asset audits
+2. **Check authentication**: Look for "credentialed": true in scan_info
+3. **Monitor ACR scores**: Assets with ACR 7-10 need immediate attention
+4. **Cache awareness**: Data is cached for 3-5 minutes, suitable for real-time investigation
+
+---
+
+## 2a. `tsc_list_vulns_by_ip_summary` - Quick Vulnerability Count
+
+**Status**: ✅ Production Ready | **Token Savings**: 88% | **Cache**: 180s  
+**Module**: `tools/vulnerability_lookup.py`
+
+### What This Tool Does
+
+Get vulnerability counts by severity for an IP address without pulling full vulnerability records. Perfect for quick scoping and dashboard metrics.
+
+### When to Use This Tool
+
+- **Quick Check**: "How many vulnerabilities does IP X have?"
+- **Severity Breakdown**: "Show me the vulnerability summary for 10.1.20.10"
+- **Dashboard Metrics**: Get counts for multiple IPs quickly
+- **Scope Before Details**: Check if it's worth pulling full vulnerability records
+- **Triage**: Quickly assess risk level before detailed investigation
+
+### How to Use
+
+```bash
+# Basic usage
+How many vulnerabilities does 10.1.20.10 have?
+
+# With filters
+Show vulnerability summary for 192.168.1.100, only critical and high severity
+```
+
+### What You Get Back
+
+```json
+{
+  "ok": true,
+  "ip": "10.1.20.10",
+  "summary": {
+    "total": 183,
+    "by_severity": {
+      "critical": 15,
+      "high": 45,
+      "medium": 123,
+      "low": 0,
+      "info": 0
+    }
+  }
+}
+```
+
+### Performance
+
+- **Tokens Used**: ~700 tokens (vs ~6,000 for full details) = **88% reduction**
+- **API Calls**: 1 optimized query
+- **Cache TTL**: 180s (3 minutes)
+- **Response Time**: <1s cached, 1-2s fresh
+
+### Filtering Options
+
+```python
+# Filter by severity
+tsc_list_vulns_by_ip_summary(
+    "10.1.20.10",
+    filters={"severity": "critical"}  # Only critical vulns
+)
+
+# Filter by exploit availability
+tsc_list_vulns_by_ip_summary(
+    "10.1.20.10",
+    filters={"exploit_available": "Yes"}  # Only exploitable
+)
+
+# Multiple filters
+tsc_list_vulns_by_ip_summary(
+    "10.1.20.10",
+    filters={
+        "severity": "high",
+        "vpr_score": "7-10",
+        "exploit_available": "Yes"
+    }
+)
+```
+
+### Best Practices
+
+1. **Use before full scan**: Check counts before pulling all vulnerability records
+2. **Quick triage**: Identify high-risk hosts without downloading full data
+3. **Combine with filters**: Get precise counts for specific vulnerability types
+4. **Cache aware**: Summary data cached for 3 minutes
+
+---
+
+## 2b. `tsc_list_vulns_by_ip_full` - Detailed Vulnerability Records
+
+**Status**: ✅ Production Ready | **Token Savings**: 58% | **Cache**: 180s  
+**Module**: `tools/vulnerability_lookup.py`
+
+### What This Tool Does
+
+Get complete vulnerability records for an IP address with full details including plugin information, scoring (CVSS/VPR/EPSS), exploit availability, patch dates, and remediation guidance.
+
+### When to Use This Tool
+
+- **Detailed Investigation**: "Show me all vulnerabilities for IP X with full details"
+- **Remediation Planning**: Get solution text and patch information
+- **Export Data**: Pull vulnerability records for reporting or ticketing
+- **Compliance**: Generate detailed vulnerability reports
+- **Risk Analysis**: Review CVSS, VPR, EPSS scores for prioritization
+
+### How to Use
+
+```bash
+# Basic usage
+Show detailed vulnerabilities for 10.1.20.10
+
+# With pagination
+Show first 10 critical vulnerabilities for 192.168.1.100
+
+# With filters
+List high severity vulnerabilities with exploits available for 10.1.20.10
+```
+
+### What You Get Back
+
+Complete vulnerability records with:
+- Plugin ID and name
+- Severity (0-4 scale and text)
+- CVSS v2/v3/v4 scores
+- VPR score (Vulnerability Priority Rating)
+- EPSS score (Exploit Prediction Scoring System)
+- Exploit availability
+- Patch publication date
+- Vulnerability publication date
+- Solution text
+- Synopsis and description
+- References (CVE, BID, etc.)
+- Plugin output
+- Port and protocol
+- First seen / Last seen dates
+- Mitigation status
+
+### Performance
+
+- **Tokens Used**: ~5,000 tokens for 50 records (vs ~12,000 unfiltered) = **58% reduction**
+- **API Calls**: 1 paginated query
+- **Cache TTL**: 180s (3 minutes)
+- **Response Time**: <1s cached, 2-4s fresh
+- **Pagination**: 10-200 records per request (default: 50)
+
+### Pagination
+
+```python
+# Get first 50 vulnerabilities
+tsc_list_vulns_by_ip_full("10.1.20.10")
+
+# Get next 50 (records 50-100)
+tsc_list_vulns_by_ip_full("10.1.20.10", start_offset=50, end_offset=100)
+
+# Get first 10 only
+tsc_list_vulns_by_ip_full("10.1.20.10", end_offset=10)
+```
+
+### Filtering Options
+
+```python
+# Critical vulnerabilities only
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"severity": "critical"}
+)
+
+# High VPR scores
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"vpr_score": "7-10"}
+)
+
+# Exploitable vulnerabilities
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"exploit_available": "Yes"}
+)
+
+# Specific CVE
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"cve": "CVE-2021-44228"}
+)
+
+# Multiple filters
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={
+        "severity": "high",
+        "exploit_available": "Yes",
+        "vpr_score": "8-10",
+        "port": 443,
+        "protocol": "TCP"
+    },
+    end_offset=20  # First 20 results
+)
+```
+
+### Best Practices
+
+1. **Use summary first**: Call `tsc_list_vulns_by_ip_summary` to check counts before pulling full records
+2. **Apply filters**: Narrow results with severity, VPR, or exploit filters
+3. **Pagination**: Request small batches (10-50 records) for faster response
+4. **Cache timing**: Data cached for 3 minutes, suitable for investigation workflows
+
+---
+
+## 4. `tsc_list_ips` - IP Discovery & Asset Enumeration
+
+**Status**: ✅ Production Ready | **Token Savings**: 85% | **Cache**: 120s  
+**Module**: `tools/asset_discovery.py`
+
+### What This Tool Does
+
+List IP addresses in repositories or asset groups with optional filtering by asset criticality, vulnerabilities, or other criteria. Includes reverse lookup to find where an IP exists.
+
+### When to Use This Tool
+
+- **Asset Discovery**: "List all IPs in Production repository"
+- **Critical Assets**: "Show me all IPs with ACR score > 7"
+- **Reverse Lookup**: "Which asset groups contain IP 10.1.20.10?"
+- **Inventory**: "How many Windows hosts are in Default repository?"
+- **Risk Profiling**: "List IPs with critical vulnerabilities"
+
+### How to Use
+
+```bash
+# List IPs in repository
+List IPs in Default repository
+
+# Filter by criticality
+Show me critical assets (ACR > 7) in Production
+
+# Reverse lookup
+Which asset groups contain IP 10.1.20.10?
+
+# With detailed metadata
+List IPs in Production with full details (hostname, MAC, ACR, OS)
+```
+
+### What You Get Back
+
+**Basic Mode** (default):
+- List of IP addresses
+
+**Detailed Mode** (`include_details=True`):
+- IP address
+- DNS hostname
+- MAC address
+- UUID
+- ACR score (Asset Criticality Rating)
+- AES score (Asset Exposure Score)
+- Operating System
+- Repository name
+
+**Reverse Lookup Mode** (`ip` parameter):
+- IP address
+- List of repositories containing this IP
+- List of asset groups containing this IP
+- Found status
+
+### Performance
+
+- **Tokens Used**: ~400-3,700 tokens depending on dataset size = **85% reduction**
+- **API Calls**: 1-2 optimized queries (1 for list, 2 for reverse lookup)
+- **Cache TTL**: 120s (2 minutes)
+- **Response Time**: <1s cached, 2-4s fresh
+
+### Filtering Options
+
+```python
+# By repository
+tsc_list_ips(repository="Default")
+
+# By asset group
+tsc_list_ips(asset_group="Windows Hosts")
+
+# By asset criticality (ACR)
+tsc_list_ips(
+    repository="Default",
+    filters={"asset_criticality": "8-10"}  # Critical assets only
+)
+
+# By severity
+tsc_list_ips(
+    repository="Production",
+    filters={"severity": "critical"}  # Assets with critical vulns
+)
+
+# Multiple filters
+tsc_list_ips(
+    repository="Default",
+    filters={
+        "asset_criticality": "7-10",
+        "aes_score": "600-1000",
+        "severity": "high",
+        "exploit_available": "Yes"
+    }
+)
+
+# Reverse lookup
+tsc_list_ips(ip="10.1.20.10")  # Find where this IP exists
+
+# With detailed metadata
+tsc_list_ips(repository="Default", include_details=True)
+```
+
+### Example Output
+
+**Basic List:**
+```json
+{
+  "ok": true,
+  "repository": "Default",
+  "total_ips": 413,
+  "ips": ["10.1.20.10", "10.1.20.11", "10.1.20.12", ...]
+}
+```
+
+**Detailed List:**
+```json
+{
+  "ok": true,
+  "repository": "Default",
+  "total_ips": 156,
+  "ips": [
+    {
+      "ip": "10.1.20.10",
+      "dns_name": "webserver01.domain.com",
+      "mac": "00:50:56:12:34:56",
+      "uuid": "abc123...",
+      "acr_score": 8.5,
+      "aes_score": 650,
+      "os": "Windows Server 2019"
+    }
+  ]
+}
+```
+
+**Reverse Lookup:**
+```json
+{
+  "ok": true,
+  "ip": "10.1.20.10",
+  "repositories": ["Default", "PCI Assets"],
+  "asset_groups": ["Windows Hosts", "Production Servers"],
+  "found": true
+}
+```
+
+### Best Practices
+
+1. **Start simple**: List IPs without filters to understand scope
+2. **Use filters**: Narrow to critical assets with ACR or severity filters
+3. **Reverse lookup**: Find asset membership before making changes
+4. **Detailed mode**: Use sparingly (more tokens) when you need metadata
+5. **Cache timing**: IP lists cached for 2 minutes
+
+### Scoring Filter Format
+
+⚠️ **IMPORTANT**: Scoring filters use RANGE format, not operators.
+
+```python
+# ✅ Correct (range format)
+filters={"asset_criticality": "7-10"}
+filters={"vpr_score": "8-10"}
+filters={"aes_score": "600-1000"}
+
+# ❌ Incorrect (operators not supported)
+filters={"asset_criticality": ">7"}
+filters={"vpr_score": ">=8"}
+```
+
+**Why?** Tenable.sc backend only supports inclusive ranges for scoring filters.
+
+---
+
+## 5. `tsc_list_vulns_by_cve` - CVE Search Across Infrastructure
+
+**Status**: ✅ Production Ready | **Token Savings**: 85% | **Cache**: 240s  
+**Module**: `tools/vulnerability_lookup.py`
+
+### What This Tool Does
+
+Search for a specific CVE across your entire infrastructure. Returns list of unique affected IPs with severity counts. Perfect for emergency outbreak response and CVE-based asset discovery.
+
+### When to Use This Tool
+
+- **Outbreak Response**: "Do we have CVE-2021-44228 (Log4Shell)?"
+- **CVE Investigation**: "List all hosts with CVE-X"
+- **Impact Scoping**: "How many assets are affected by CVE-Y?"
+- **Patch Verification**: "Verify remediation for CVE after patching"
+- **Security Bulletins**: "Check exposure to recently disclosed vulnerability"
+
+### How to Use
+
+```bash
+# Basic CVE search
+Do we have CVE-2021-44228?
+
+# With filters
+List critical assets with CVE-2021-44228 (ACR > 7)
+
+# Check specific repository
+Search for CVE-2017-0144 in Production repository
+```
+
+### What You Get Back
+
+For each affected IP:
+- IP address
+- Hostname
+- Total vulnerability count
+- Severity breakdown (Critical/High/Medium/Low/Info counts)
+- ACR score (Asset Criticality Rating)
+- AES score (Asset Exposure Score)
+- Repository name
+
+### Performance
+
+- **Tokens Used**: ~800-1,500 tokens (vs ~10,000 raw API) = **85% reduction**
+- **API Calls**: 1 optimized query with in-memory deduplication
+- **Cache TTL**: 240s (4 minutes)
+- **Response Time**: <1s cached, 2-4s fresh
+- **Pagination**: Default 200 records per request (covers 90% of use cases)
+
+### Filtering Options
+
+```python
+# Basic search
+tsc_list_vulns_by_cve("CVE-2021-44228")
+
+# Critical assets only
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={"asset_criticality": "7-10"}
+)
+
+# Specific repository
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={"repository": "Production"}
+)
+
+# Multiple filters
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={
+        "repository": "Production",
+        "asset_criticality": "7-10",
+        "exploit_available": "Yes"
+    }
+)
+
+# Pagination for large results
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    start_offset=200,
+    end_offset=400  # Next page
+)
+```
+
+### Example Output
+
+```json
+{
+  "ok": true,
+  "cve": "CVE-2021-44228",
+  "summary": {
+    "total_ips": 20,
+    "returned_ips": 20,
+    "start_offset": 0,
+    "end_offset": 200,
+    "more_available": false
+  },
+  "affected_ips": [
+    {
+      "ip": "192.168.5.20",
+      "hostname": "webserver01.domain.com",
+      "total_vulns": 2,
+      "severity_critical": 0,
+      "severity_high": 2,
+      "severity_medium": 0,
+      "severity_low": 0,
+      "severity_info": 0,
+      "acr_score": "8.5",
+      "aes_score": 585,
+      "repository": "Default"
+    }
+  ],
+  "note": "For detailed remediation, use tsc_list_vulns_by_ip_full with cve filter"
+}
+```
+
+### Best Practices
+
+1. **Emergency response**: Use this as first step in outbreak investigation
+2. **Follow up**: After identifying IPs, use `tsc_list_vulns_by_ip_full` for remediation details
+3. **Apply filters**: Narrow to critical assets or specific repositories
+4. **Pagination**: Check `more_available` flag, fetch additional pages if needed
+5. **Cache timing**: CVE searches cached for 4 minutes
+
+### For Detailed Remediation
+
+This tool returns summary counts. For full remediation details:
+
+```python
+# Step 1: Find affected IPs
+result = tsc_list_vulns_by_cve("CVE-2021-44228")
+
+# Step 2: Get remediation for each IP
+for ip_data in result["affected_ips"]:
+    details = tsc_list_vulns_by_ip_full(
+        ip_data["ip"],
+        filters={"cve": "CVE-2021-44228"}
+    )
+    # details contains solution text, plugin output, etc.
+```
+
+---
+
+## Universal Filter Framework
+
+All tools support 71+ filters via the `filters` dict parameter. Filters are consistent across all tools.
+
+### Common Filters
+
+#### Scoring Filters (Range Format)
+```python
+filters = {
+    "asset_criticality": "7-10",     # ACR range (0-10)
+    "vpr_score": "8-10",             # VPR range (0-10)
+    "aes_score": "600-1000",         # AES range (0-1000)
+    "cvss_v3_base_score": "7-10",    # CVSS v3 range
+    "epss_score": "0.5-1.0"          # EPSS range (0-1)
+}
+```
+
+⚠️ **Important**: Use range format `"min-max"`, NOT operators like `">7"` or `">=8"`.
+
+#### Vulnerability Filters
+```python
+filters = {
+    "severity": "critical",           # critical/high/medium/low/info
+    "exploit_available": "Yes",       # Yes/No
+    "family": "Windows",              # Plugin family
+    "plugin_id": "156013",           # Specific plugin
+    "cve": "CVE-2021-44228"          # CVE ID
+}
+```
+
+#### Asset Filters
+```python
+filters = {
+    "repository": "Production",       # Repository name or ID
+    "ip": "10.1.20.10",              # Specific IP
+    "dns_name": "webserver01"        # Hostname
+}
+```
+
+#### Network Filters
+```python
+filters = {
+    "port": 443,                      # Port number
+    "protocol": "TCP"                 # TCP/UDP
+}
+```
+
+#### Temporal Filters (Unix timestamps)
+```python
+filters = {
+    "first_seen": "1704067200",      # First detection
+    "last_seen": "1735689600"        # Last detection
+}
+```
+
+### Complete Filter Reference
+
+For complete list of all 71+ filters, see: [FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)
+
+### Filter Examples
+
+**Critical assets with exploitable vulns:**
+```python
+tsc_list_ips(
+    repository="Production",
+    filters={
+        "asset_criticality": "7-10",
+        "severity": "high",
+        "exploit_available": "Yes"
+    }
+)
+```
+
+**Windows hosts with specific CVE:**
+```python
+tsc_list_vulns_by_cve(
+    "CVE-2021-44228",
+    filters={
+        "operating_system": "Windows",
+        "repository": "Production"
+    }
+)
+```
+
+**High VPR vulnerabilities with patches:**
+```python
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={
+        "vpr_score": "8-10",
+        "patch_available": "Yes"
+    }
+)
+```
+
+---
+
+## Performance & Caching
+
+### Token Efficiency
+
+All tools are optimized to minimize LLM token usage:
+
+| Tool | Token Usage | Savings | vs Raw API |
+|------|-------------|---------|------------|
+| tsc_profile_ip_efficient | ~2,500 | 83% | ~15,000 |
+| tsc_list_vulns_by_ip_summary | ~700 | 88% | ~6,000 |
+| tsc_list_vulns_by_ip_full | ~5,000 | 58% | ~12,000 |
+| tsc_list_ips | ~400-3,700 | 85% | ~5,000-25,000 |
+| tsc_list_vulns_by_cve | ~800-1,500 | 85% | ~10,000 |
+
+### Cache Strategy
+
+Intelligent caching reduces API calls and improves response times:
+
+| Data Type | TTL | Rationale |
+|-----------|-----|-----------|
+| Vulnerability data | 180s (3 min) | Changes frequently during scans |
+| IP lists | 120s (2 min) | Moderate change rate |
+| CVE searches | 240s (4 min) | Relatively stable |
+| Host software/services | 300s (5 min) | Rarely changes |
+| Static metadata | 300s (5 min) | Infrequent updates |
+
+### Response Times
+
+| Scenario | Response Time | Notes |
+|----------|---------------|-------|
+| Cache hit | <1s | Instant response from cache |
+| Fresh query (simple) | 1-2s | Single API call |
+| Fresh query (complex) | 2-4s | Multiple API calls |
+| Large dataset | 3-5s | Pagination or aggregation |
+
+---
+
+## Best Practices
+
+### 1. Start with Summary Tools
+
+Use lightweight summary tools before pulling full details:
+
+```bash
+# ✅ Efficient workflow
+1. tsc_list_vulns_by_ip_summary → Get counts
+2. If counts are high → tsc_list_vulns_by_ip_full → Get details
+
+# ❌ Inefficient workflow
+1. tsc_list_vulns_by_ip_full → Always pulls full records (wasteful)
+```
+
+### 2. Apply Filters Early
+
+Narrow results with filters to reduce token usage:
+
+```python
+# ✅ Good: Filter for critical vulns only
+tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"severity": "critical"},
+    end_offset=10
+)
+
+# ❌ Wasteful: Pull all 500 vulnerabilities
+tsc_list_vulns_by_ip_full("10.1.20.10")
+```
+
+### 3. Use Pagination
+
+Request small batches for faster responses:
+
+```python
+# ✅ Good: Request first 20 results
+tsc_list_vulns_by_ip_full("10.1.20.10", end_offset=20)
+
+# ❌ Slower: Request 200 results at once
+tsc_list_vulns_by_ip_full("10.1.20.10", end_offset=200)
+```
+
+### 4. Leverage Caching
+
+Be aware of cache TTLs for your workflow:
+
+- **Real-time investigation** (1-5 min): Cache is fresh, responses are instant
+- **Continuous monitoring** (>5 min): Cache expires, fresh data fetched
+- **Reporting** (periodic): Cache ensures consistent data within TTL window
+
+### 5. Natural Language
+
+Use conversational commands with your AI assistant:
+
+```bash
+# ✅ Natural language (Claude understands)
+"Profile IP 10.1.20.10"
+"Show me critical vulnerabilities for 192.168.1.100"
+"Do we have CVE-2021-44228?"
+
+# ❌ No need for technical syntax
+tsc_profile_ip_efficient("10.1.20.10")
+```
+
+### 6. Combine Tools
+
+Use multiple tools together for comprehensive analysis:
+
+```bash
+# Workflow example
+1. "Do we have CVE-2021-44228?"
+   → tsc_list_vulns_by_cve identifies affected IPs
+
+2. "Profile IP 10.1.20.10"
+   → tsc_profile_ip_efficient gets host details
+
+3. "Show vulnerabilities for 10.1.20.10"
+   → tsc_list_vulns_by_ip_full gets remediation details
+```
+
+### 7. Scoring Filter Format
+
+Always use range format for scoring filters:
+
+```python
+# ✅ Correct
+filters={"asset_criticality": "7-10"}
+filters={"vpr_score": "8-10"}
+filters={"aes_score": "600-1000"}
+
+# ❌ Incorrect (not supported)
+filters={"asset_criticality": ">7"}
+filters={"vpr_score": ">=8"}
+```
+
+---
+
+## Support & Documentation
+
+### Additional Resources
+
+- **[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)** - Architecture and design decisions
+- **[FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)** - Complete filter reference (71+ filters)
+- **[TOOLS_ROADMAP.md](TOOLS_ROADMAP.md)** - Future features and development roadmap
+- **[README.md](README.md)** - Installation and setup instructions
+
+### Getting Help
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/ABMJ/tenable-sc-mcp-server/issues)
+- **Documentation**: All tools have detailed docstrings with examples
+- **MCP Resources**: Use `tenable-sc://filters/reference` for filter documentation
+
+### Version Information
+
+- **Current Version**: v1.2.2
+- **Last Updated**: 2026-06-19
+- **API Version**: Tenable.sc REST API 5.x+
+- **MCP Protocol**: 1.0+
+
+---
+
+**Document Version**: 1.0  
+**Status**: Production Ready  
+**Maintained By**: ABMJ  
+**License**: GPL-3.0

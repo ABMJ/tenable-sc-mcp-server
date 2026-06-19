@@ -21,6 +21,237 @@
 | **Testing** | ⏳ User Testing | 7 test cases provided for validation |
 | **Git Commit** | ⏳ Pending | Ready after test validation |
 | **v1.3.0 Plan** | ✅ Ready | See OS_AND_PLUGIN_FAMILY_FIX.md |
+| **v1.4.0 Plan** | ✅ Ready | See MULTI_CLIENT_API_KEYS.md |
+
+---
+
+## 🚀 Priority 1A: v1.3.0 Implementation - OS Filtering & Plugin Family Fix
+
+**CRITICAL:** Read [OS_AND_PLUGIN_FAMILY_FIX.md](.private/OS_AND_PLUGIN_FAMILY_FIX.md) before starting implementation!
+
+**What:** OS Filtering Enhancement + Plugin Family Fix  
+**Estimated Time:** 6-8 hours  
+**Breaking Changes:** Plugin family filter (v1.2.1 was broken, v1.3.0 fixes it)
+
+### Quick Summary
+
+Two critical issues discovered through user testing and API analysis:
+
+1. **CPE False Positives** - Regex patterns cause unintended matches
+   - Example: `.*windows.*(10|11).*` matches Server 2019
+   - Solution: Add `operating_system` filter for exact matching
+
+2. **Plugin Family Broken** - Current code uses NAME, API needs numeric ID
+   - Example: `family="Windows"` fails, needs `family=[{"id": "20"}]`
+   - Solution: Smart name→ID lookup with cache
+
+### Implementation Phases
+
+1. **Phase 1 (2-3h):** Core filter infrastructure
+   - Add 3 OS filter aliases to COMMON_FILTERS
+   - Implement 6 helper functions in convenience_tools.py
+   - Update build_filters() with special handling
+   - **NO HARDCODING** - all lookups via cached API calls
+
+2. **Phase 2 (2-3h):** Helper tools
+   - `tsc_list_operating_systems()` - Discover OS names
+   - `tsc_list_plugin_families()` - Discover family IDs
+
+3. **Phase 3 (1-2h):** Documentation updates
+   - FILTER_FORMAT_REFERENCE.md (two-tier OS approach)
+   - PLUGIN_FAMILY_INVESTIGATION.md (new file)
+   - MCP resource filter_reference.py
+   - DESIGN_PRINCIPLES.md (smart lookup pattern)
+
+4. **Phase 4 (1-2h):** Testing (11 new test cases)
+
+5. **Phase 5 (30min):** Container rebuild and deployment
+
+**Start Here:** [OS_AND_PLUGIN_FAMILY_FIX.md](.private/OS_AND_PLUGIN_FAMILY_FIX.md) - Complete 1,612-line implementation guide
+
+---
+
+## 🔄 Priority 1B: v1.4.0 Implementation - Multi-Client API Key Support
+
+**CRITICAL:** Read [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md) before starting implementation!
+
+**What:** Transform MCP server from single-tenant to multi-tenant architecture  
+**Estimated Time:** 4-5 hours  
+**Breaking Changes:** None (backward compatible with .env mode)  
+**Can Be Done:** Before or after v1.3.0 (independent features)
+
+### Quick Summary
+
+**Current Problem:**
+- MCP server loads ONE set of API keys from `.env` at startup
+- ALL clients share the SAME credentials
+- No per-client RBAC enforcement
+- Cannot support multiple users with different permissions
+
+**Solution:**
+- Add FastMCP `Context` parameter to all 15+ tools for session tracking
+- Store per-session `TenableScClient` instances with separate credentials
+- Add `initialize_credentials` tool for clients to provide API keys
+- Implement per-client cache isolation to prevent data leakage
+- Support BOTH legacy `.env` mode and new per-client mode (backward compatible)
+
+**Impact:**
+- ✅ Proper multi-user support with RBAC enforcement
+- ✅ Each client sees only data they're authorized to access
+- ✅ Maintains backward compatibility with existing deployments
+- ✅ Foundation for future session management and audit logging
+
+### Implementation Phases
+
+1. **Phase 1 (2h):** Core Session Management
+   - Add session storage with thread-safe locks (`_CLIENTS`, `_CACHE_PER_CLIENT`)
+   - Implement `_client_for_session(session_id)` function (replaces singleton)
+   - Implement `_register_client(session_id, config)` for credential registration
+   - Implement `_cleanup_session(session_id)` for disconnect handling
+   - Add `initialize_credentials` tool for credential initialization
+
+2. **Phase 2 (1.5h):** Update All Tools
+   - Add `from mcp.server.fastmcp import Context` import
+   - Add `ctx: Context` as first parameter to all 15+ tools
+   - Update all `_client()` calls to `_client_for_session(ctx.session_id)`
+   - Update all `_get_cache()` calls to `_get_cache_for_tool(ctx)`
+   - Tools affected:
+     - `tsc_request`, `tsc_analyze`, `tsc_resource_action`
+     - `tsc_list`, `tsc_get`, `tsc_create`, `tsc_update`, `tsc_delete`
+     - `tsc_catalog`, `tsc_resource_docs`, `tsc_download`, `tsc_upload_file`
+     - All convenience tools: `tsc_profile_ip_efficient`, `tsc_list_ips`, etc.
+
+3. **Phase 3 (1h):** Testing & Validation
+   - Unit tests for session storage/cleanup
+   - Integration tests with multiple clients (different credentials)
+   - Cache isolation verification
+   - Backward compatibility tests (.env fallback)
+   - Concurrent request tests
+
+4. **Phase 4 (1h):** Documentation
+   - Update README with multi-client usage examples
+   - Update DESIGN_PRINCIPLES with architecture decision (already done)
+   - Update tool docstrings with Context parameter note
+   - Write migration guide for users
+
+### New Tool: `initialize_credentials`
+
+**Purpose:** Allow clients to provide their own API credentials
+
+**Signature:**
+```python
+@mcp.tool()
+def initialize_credentials(
+    ctx: Context,
+    base_url: str,
+    access_key: str,
+    secret_key: str,
+    verify_ssl: bool = True,
+    cache_enabled: bool = True,
+    cache_backend: str = "memory",
+) -> dict[str, Any]:
+    """Initialize Tenable.sc credentials for this session."""
+```
+
+**Usage:**
+```
+User: Initialize Tenable.sc with URL https://tsc.company.com:8443,
+      access key abc123..., secret key xyz789...
+
+Claude: [Calls initialize_credentials tool]
+✅ Credentials initialized for session abc123...
+```
+
+### Key Code Changes
+
+**Session Management (server.py):**
+```python
+# Add at top
+from mcp.server.fastmcp import Context
+from threading import Lock
+
+_CLIENTS: dict[str, TenableScClient] = {}
+_CLIENTS_LOCK = Lock()
+_CACHE_PER_CLIENT: dict[str, Cache] = {}
+
+def _client_for_session(session_id: str) -> TenableScClient:
+    """Get or create client for this session."""
+    with _CLIENTS_LOCK:
+        if session_id in _CLIENTS:
+            return _CLIENTS[session_id]
+        
+        # Fallback to .env for backward compatibility
+        try:
+            config = TenableScConfig.from_env()
+            _CLIENTS[session_id] = TenableScClient(config=config)
+            return _CLIENTS[session_id]
+        except TenableScConfigError:
+            raise TenableScConfigError(
+                f"No credentials for session {session_id}. "
+                "Call initialize_credentials first."
+            )
+```
+
+**Tool Pattern (all tools):**
+```python
+# Before:
+@mcp.tool()
+def tsc_request(method: str, path: str, ...) -> dict[str, Any]:
+    client = _client()
+    cache = _get_cache()
+    ...
+
+# After:
+@mcp.tool()
+def tsc_request(ctx: Context, method: str, path: str, ...) -> dict[str, Any]:
+    client = _client_for_session(ctx.session_id)
+    cache = _get_cache_for_tool(ctx)
+    ...
+```
+
+### Testing Requirements
+
+**Unit Tests:**
+- Session storage and retrieval
+- Multiple concurrent sessions
+- Session cleanup (no memory leaks)
+- Cache isolation between sessions
+- Missing session error handling
+- Credential validation
+- Backward compatibility with `.env` fallback
+
+**Integration Tests:**
+- Client A (admin key) sees all repos
+- Client B (readonly key) sees limited repos
+- Cache doesn't leak between A and B
+- Session cleanup works on disconnect
+- Concurrent requests from multiple clients
+- Existing .env users see no change
+
+### Success Criteria
+
+- ✅ Multiple clients with different credentials see different data
+- ✅ Each client isolated with own cache
+- ✅ Existing .env mode continues to work
+- ✅ No performance degradation
+- ✅ Thread-safe session management
+- ✅ Memory doesn't leak on session cleanup
+
+### Deliverables
+
+- [ ] Session management implemented (server.py)
+- [ ] All 15+ tools updated with Context parameter
+- [ ] `initialize_credentials` tool added
+- [ ] Per-session cache working
+- [ ] Session cleanup on disconnect
+- [ ] Unit tests passing
+- [ ] Integration tests passing
+- [ ] README updated with multi-client examples
+- [ ] Tool docstrings updated
+- [ ] Version bumped to 1.4.0
+- [ ] Git commit and release
+
+**Start Here:** [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md) - Complete 1,200+-line implementation guide
 
 ---
 
