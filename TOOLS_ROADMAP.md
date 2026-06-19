@@ -842,6 +842,125 @@ The `family` filter parameter is currently in `COMMON_FILTERS` but may not be wo
 
 ---
 
+### 🔄 v1.4.0: Multi-Client API Key Support (4-5 hours)
+
+**Status**: 📋 Planned | **Priority**: High | **Estimated**: 4-5 hours  
+**Implementation Plan**: See [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)
+
+**Purpose:**
+Transform MCP server from single-tenant to multi-tenant architecture, allowing multiple clients to connect with different API keys and receive data according to their individual Tenable.sc RBAC permissions.
+
+**Current Problem:**
+- MCP server loads ONE set of API keys from `.env` at startup
+- ALL clients share the SAME credentials
+- No per-client RBAC enforcement
+- Cannot support multiple users with different permission levels
+
+**Solution Architecture:**
+- Add FastMCP `Context` parameter to all 15+ tools
+- Store per-session `TenableScClient` instances with separate credentials
+- Add `initialize_credentials` tool for clients to provide API keys
+- Implement per-client cache isolation to prevent data leakage
+- Support BOTH legacy `.env` mode and new per-client mode (backward compatible)
+
+**Implementation Phases:**
+
+1. **Phase 1 (2h):** Core Session Management
+   - Add session storage with thread-safe locks
+   - Implement `_client_for_session(session_id)` function
+   - Add `_register_client()` and `_cleanup_session()` functions
+   - Add `initialize_credentials` tool
+   - Per-session cache initialization
+
+2. **Phase 2 (1.5h):** Update All Tools
+   - Add `Context` parameter to all tools
+   - Update core API tools (tsc_request, tsc_analyze, tsc_resource_action, etc.)
+   - Update convenience tools (tsc_profile_ip_efficient, tsc_list_ips, etc.)
+   - Update cache access to use session-specific cache
+
+3. **Phase 3 (1h):** Testing & Validation
+   - Unit tests for session management
+   - Integration tests with multiple clients
+   - Cache isolation verification
+   - Backward compatibility tests (.env fallback)
+
+4. **Phase 4 (1h):** Documentation
+   - Update README with multi-client usage
+   - Update DESIGN_PRINCIPLES with architecture decision
+   - Update tool docstrings
+   - Write migration guide
+
+**New Tool Added:**
+
+#### `initialize_credentials`
+
+**Purpose:** Allow clients to provide their own API credentials for per-session authentication
+
+**Parameters:**
+- `ctx: Context` - MCP context (automatically provided)
+- `base_url: str` - Tenable.sc URL
+- `access_key: str` - API access key
+- `secret_key: str` - API secret key
+- `verify_ssl: bool = True` - SSL verification
+- `cache_enabled: bool = True` - Enable caching for this session
+- `cache_backend: str = "memory"` - Cache backend (memory/redis)
+
+**Returns:**
+- Session ID
+- Base URL confirmation
+- Cache configuration
+- Success message
+
+**Example:**
+```python
+initialize_credentials(
+    base_url="https://tsc.company.com:8443",
+    access_key="abc123...",
+    secret_key="xyz789...",
+    verify_ssl=False
+)
+```
+
+**Benefits:**
+- ✅ Each client isolated with own credentials
+- ✅ Tenable.sc RBAC enforced per-client
+- ✅ No shared cache data between clients
+- ✅ Support multiple concurrent users
+- ✅ Credentials never stored on disk
+- ✅ Backward compatible with existing deployments
+
+**Testing Requirements:**
+- Two clients with different credentials see different data
+- Cache isolation prevents data leakage
+- Session cleanup works on disconnect
+- Backward compatibility with .env mode
+- Concurrent requests from multiple clients
+
+**Breaking Changes:** None (backward compatible)
+
+**Files Modified:**
+- `src/tenable_sc_mcp/server.py` - Core session management
+- `src/tenable_sc_mcp/convenience_tools.py` - Add Context to all tools
+- `tests/test_multi_client.py` - New test file
+- `README.md` - Multi-client documentation
+- `DESIGN_PRINCIPLES.md` - Architecture decision
+
+**Deliverables:**
+- [ ] Session management implemented
+- [ ] All 15+ tools updated with Context parameter
+- [ ] initialize_credentials tool added
+- [ ] Per-session cache working
+- [ ] Session cleanup on disconnect
+- [ ] Unit tests passing
+- [ ] Integration tests passing
+- [ ] Documentation updated
+- [ ] Version bumped to 1.4.0
+- [ ] Release published
+
+**Module**: `server.py`, `convenience_tools.py` (affects all tools)
+
+---
+
 ### ⏳ Session 1.7: Tool 6 - Missing Patches
 
 #### `tsc_list_missing_patches_windows`

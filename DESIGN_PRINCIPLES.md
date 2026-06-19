@@ -597,6 +597,263 @@ src/tenable_sc_mcp/
 
 ---
 
+### Multi-Client Session Management (v1.4.0+)
+
+**Decision:** Implement per-session client isolation using FastMCP Context
+
+**Context:**
+- v1.2.2 and earlier used singleton `TenableScClient` from `.env` file
+- All clients connecting to MCP server shared same credentials
+- No RBAC enforcement per-client
+- Cannot support multiple users with different permissions
+
+**Architecture:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Multi-Client Flow (v1.4.0+)              │
+└──────────────────────────────────────────────────────────────┘
+
+Client A (Session: abc123)                Client B (Session: xyz789)
+    ↓                                          ↓
+    initialize_credentials(                    initialize_credentials(
+        access_key="admin_key",                    access_key="readonly_key",
+        secret_key="admin_secret"                  secret_key="readonly_secret"
+    )                                          )
+    ↓                                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│              MCP Server (Session-Aware)                      │
+│                                                              │
+│  _CLIENTS = {                                                │
+│      "abc123": TenableScClient(admin_key),    ←─ Session A  │
+│      "xyz789": TenableScClient(readonly_key)  ←─ Session B  │
+│  }                                                           │
+│                                                              │
+│  _CACHE_PER_CLIENT = {                                       │
+│      "abc123": Cache_A,  ←─ Isolated                        │
+│      "xyz789": Cache_B   ←─ Isolated                        │
+│  }                                                           │
+└─────────────────────────────────────────────────────────────┘
+    ↓                                          ↓
+┌─────────────────────┐                  ┌──────────────────┐
+│  Tenable.sc API     │                  │  Tenable.sc API  │
+│  (Admin Access)     │                  │  (ReadOnly)      │
+└─────────────────────┘                  └──────────────────┘
+
+Client A sees: All repositories, all scans, full RBAC
+Client B sees: Limited repositories, no admin functions
+```
+
+**Options Considered:**
+
+1. **Multiple Server Instances** (Rejected)
+   - Run separate MCP server processes on different ports
+   - Each with its own `.env` file
+   - **Pros:** Zero code changes, process isolation
+   - **Cons:** High resource usage, management complexity, no dynamic switching
+
+2. **Per-Session Credentials with Context** (✅ Selected)
+   - Store `TenableScClient` instances per session ID
+   - Use FastMCP `Context` parameter in all tools
+   - Add `initialize_credentials` tool for credential registration
+   - **Pros:** True multi-tenant, low overhead, clean architecture, backward compatible
+   - **Cons:** Requires refactoring all tools to accept Context
+
+3. **Credential Proxy Service** (Rejected)
+   - External service maps client → credentials
+   - Server queries proxy for each request
+   - **Pros:** External credential management, audit trail
+   - **Cons:** Extra network hop, complexity, latency, infrastructure overhead
+
+**Implementation Details:**
+
+**1. Session Storage (server.py):**
+```python
+from mcp.server.fastmcp import Context
+from threading import Lock
+
+# Per-session client storage
+_CLIENTS: dict[str, TenableScClient] = {}
+_CLIENTS_LOCK = Lock()
+_CACHE_PER_CLIENT: dict[str, Cache] = {}
+
+def _client_for_session(session_id: str) -> TenableScClient:
+    """Get TenableScClient for a specific session."""
+    with _CLIENTS_LOCK:
+        if session_id in _CLIENTS:
+            return _CLIENTS[session_id]
+        
+        # Fallback to .env for backward compatibility
+        try:
+            config = TenableScConfig.from_env()
+            client = TenableScClient(config=config)
+            _CLIENTS[session_id] = client
+            return client
+        except TenableScConfigError:
+            raise TenableScConfigError(
+                f"No credentials for session {session_id}. "
+                "Call initialize_credentials first."
+            )
+```
+
+**2. Credential Initialization Tool:**
+```python
+@mcp.tool()
+def initialize_credentials(
+    ctx: Context,
+    base_url: str,
+    access_key: str,
+    secret_key: str,
+    verify_ssl: bool = True,
+) -> dict[str, Any]:
+    """Initialize Tenable.sc credentials for this session."""
+    config = TenableScConfig(
+        base_url=base_url,
+        access_key=access_key,
+        secret_key=secret_key,
+        verify_ssl=verify_ssl,
+    )
+    _register_client(ctx.session_id, config)
+    
+    # Verify credentials work
+    client = _client_for_session(ctx.session_id)
+    client.request("GET", "/rest/system")  # Test call
+    
+    return {
+        "ok": True,
+        "session_id": ctx.session_id,
+        "base_url": base_url
+    }
+```
+
+**3. Tool Signature Pattern:**
+```python
+# Before v1.4.0:
+@mcp.tool()
+def tsc_request(method: str, path: str, ...) -> dict[str, Any]:
+    client = _client()  # ❌ Singleton
+    ...
+
+# After v1.4.0:
+@mcp.tool()
+def tsc_request(ctx: Context, method: str, path: str, ...) -> dict[str, Any]:
+    client = _client_for_session(ctx.session_id)  # ✅ Per-session
+    cache = _get_cache_for_tool(ctx)  # ✅ Per-session
+    ...
+```
+
+**4. Cache Isolation:**
+```python
+def _get_cache_for_tool(ctx: Context | None = None) -> Cache | None:
+    """Get cache instance for current session."""
+    if ctx and ctx.session_id in _CACHE_PER_CLIENT:
+        return _CACHE_PER_CLIENT[ctx.session_id]
+    return _CACHE  # Fallback for backward compatibility
+```
+
+**5. Session Cleanup:**
+```python
+def _cleanup_session(session_id: str) -> None:
+    """Clean up when client disconnects."""
+    with _CLIENTS_LOCK:
+        if session_id in _CLIENTS:
+            del _CLIENTS[session_id]
+        if session_id in _CACHE_PER_CLIENT:
+            cache = _CACHE_PER_CLIENT[session_id]
+            if isinstance(cache.backend, RedisCache):
+                cache.backend.client.close()
+            del _CACHE_PER_CLIENT[session_id]
+```
+
+**Security Considerations:**
+
+✅ **Pros:**
+- Each client's API keys are isolated in separate TenableScClient
+- Tenable.sc RBAC enforced per-client by backend
+- No shared state between sessions
+- Cache data isolated per session
+- Credentials never written to disk (memory only)
+- Thread-safe with locks
+
+⚠️ **Considerations:**
+- Credentials transmitted during `initialize_credentials` call
+  - **Mitigation:** Use TLS for remote connections (`--transport sse` with HTTPS)
+- Server holds credentials in memory (same as current `.env` mode)
+  - **Mitigation:** Standard practice, same as existing architecture
+- No credential validation before storage
+  - **Mitigation:** Added test API call in `initialize_credentials`
+- No session timeout mechanism
+  - **Future:** Add inactivity timeout (v1.4.1)
+
+**Trade-offs:**
+
+✅ **Pros:**
+- Proper multi-user support with RBAC enforcement
+- Each client sees only data they're authorized to access
+- Backward compatible with `.env` file mode (fallback)
+- Foundation for future audit logging and session management
+- Clean architecture with clear session boundaries
+- Minimal performance overhead
+
+⚠️ **Cons:**
+- All tool signatures now require `Context` parameter (breaking for tool interface)
+  - **Mitigation:** FastMCP automatically provides Context
+- Credentials transmitted over MCP protocol
+  - **Mitigation:** Use TLS for remote, stdio for local (secure)
+- Slightly more complex session management
+  - **Mitigation:** Well-tested with comprehensive test suite
+
+**Testing Strategy:**
+
+**Unit Tests:**
+- Session storage and retrieval
+- Multiple concurrent sessions
+- Session cleanup (no memory leaks)
+- Cache isolation between sessions
+- Missing session error handling
+- Credential validation
+- Backward compatibility with `.env` fallback
+
+**Integration Tests:**
+- Two clients with different credentials see different data
+- Two clients with same credentials see same data (but isolated cache)
+- Cache isolation prevents data leakage
+- Session cleanup after disconnect
+- Concurrent requests from multiple clients
+- RBAC enforcement (admin vs readonly)
+
+**Performance Tests:**
+- 10 concurrent clients with separate sessions
+- Memory usage per session (should be minimal)
+- Cache performance with multiple clients
+- Session cleanup doesn't leak memory
+
+**Future Enhancements (v1.4.1+):**
+- Session timeout after inactivity (e.g., 30 minutes)
+- Audit logging per session (who accessed what, when)
+- Credential rotation support
+- OAuth/SSO integration for enterprise authentication
+- Session persistence across server restarts (optional)
+- Rate limiting per session
+- Multi-tenancy usage analytics
+
+**Documentation Requirements:**
+- README updated with multi-client usage examples
+- Migration guide for users (v1.2.2 → v1.4.0)
+- Tool docstrings updated with Context parameter
+- Security best practices documented
+- DESIGN_PRINCIPLES updated (this section)
+- HANDOFF.md updated with implementation plan
+
+**Related Files:**
+- `src/tenable_sc_mcp/server.py` - Core session management
+- `src/tenable_sc_mcp/convenience_tools.py` - All tools updated
+- `tests/test_multi_client.py` - New test suite
+- `MULTI_CLIENT_API_KEYS.md` - Complete implementation plan
+- `README.md` - User documentation
+
+---
+
 ## Testing & Validation
 
 ### Required Tests for New Tools

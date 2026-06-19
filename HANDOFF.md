@@ -1,9 +1,10 @@
 # Tenable.sc MCP Server - Handoff Document
 
-**Last Updated:** 2026-06-18 18:00  
-**Project Status:** ✅ v1.2.1 Released (CPE/OS Filtering + Documentation Fixes)  
+**Last Updated:** 2026-06-19 12:30  
+**Project Status:** ✅ v1.2.2 Released (Repository Cleanup + Branch Protection)  
 **Next Session Priority:** v1.3.0 Implementation - OS Filtering & Plugin Family Fix  
-**Implementation Plan:** See [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md) for complete details
+**Implementation Plan:** See [OS_AND_PLUGIN_FAMILY_FIX.md](OS_AND_PLUGIN_FAMILY_FIX.md) for v1.3.0 details  
+**Future Priority:** v1.4.0 Multi-Client API Keys - See [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)
 
 ---
 
@@ -521,7 +522,101 @@ Regex patterns caused false positives:
 - [ ] Updated `COMMON_FILTERS` if needed
 - [ ] Updated `FILTER_FORMAT_REFERENCE.md` with family filter usage
 - [ ] 3-5 test cases for plugin family filtering
-- [ ] Green light to proceed with Tool 6
+- [ ] Green light to proceed with v1.4.0 or Tool 6
+
+---
+
+## 🔄 Priority 1B: v1.4.0 - Multi-Client API Key Support (4-5 hours)
+
+**OPTIONAL:** Can be done before or after v1.3.0 (independent features)
+
+**CRITICAL:** Read [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md) before starting implementation!
+
+**What:** Transform MCP server from single-tenant to multi-tenant architecture  
+**Estimated Time:** 4-5 hours  
+**Breaking Changes:** None (backward compatible with .env mode)
+
+### Quick Summary
+
+**Current Problem:**
+- MCP server loads ONE set of API keys from `.env` at startup
+- ALL clients share the SAME credentials
+- No per-client RBAC enforcement
+- Cannot support multiple users with different permissions
+
+**Solution:**
+- Add FastMCP `Context` parameter to all tools for session tracking
+- Store per-session `TenableScClient` instances
+- Add `initialize_credentials` tool for clients to provide API keys
+- Implement per-client cache isolation
+- Support BOTH legacy `.env` mode and new per-client mode
+
+**Impact:**
+- ✅ Proper multi-user support with RBAC enforcement
+- ✅ Each client sees only data they're authorized to access
+- ✅ Backward compatible with existing deployments
+- ✅ Foundation for future audit logging
+
+### Implementation Phases
+
+1. **Phase 1 (2h):** Core session management
+   - Add session storage with thread-safe locks
+   - Implement `_client_for_session()` function
+   - Add `initialize_credentials` tool
+   - Per-session cache isolation
+
+2. **Phase 2 (1.5h):** Update all tools
+   - Add `Context` parameter to 15+ tools
+   - Update all `_client()` calls to `_client_for_session(ctx.session_id)`
+   - Update convenience tools in convenience_tools.py
+
+3. **Phase 3 (1h):** Testing
+   - Unit tests for session management
+   - Integration tests with multiple clients
+   - Cache isolation verification
+   - Backward compatibility tests
+
+4. **Phase 4 (1h):** Documentation
+   - Update README with multi-client usage
+   - Update DESIGN_PRINCIPLES with architecture decision
+   - Update tool docstrings
+
+### Deliverables
+
+- [ ] Session management implemented (server.py)
+- [ ] All 15+ tools updated with Context parameter
+- [ ] initialize_credentials tool added
+- [ ] Per-session cache working
+- [ ] Session cleanup on disconnect
+- [ ] Unit tests passing
+- [ ] Integration tests passing
+- [ ] README updated
+- [ ] DESIGN_PRINCIPLES updated
+- [ ] Version bumped to 1.4.0
+- [ ] Git commit and release
+
+### Testing Requirements
+
+**Unit Tests:**
+- Session storage/retrieval
+- Multiple concurrent sessions
+- Cache isolation
+- Credential validation
+- Backward compatibility
+
+**Integration Tests:**
+- Two clients with different credentials see different data
+- Cache doesn't leak between clients
+- Session cleanup works
+- .env fallback works
+
+**Success Criteria:**
+- ✅ Client A (admin key) sees all repos
+- ✅ Client B (readonly key) sees limited repos
+- ✅ No cache data shared between A and B
+- ✅ Existing .env users see no change
+
+---
 
 ### Priority 2: Tool 6 - Scan Status & Control (3-4 hours)
 
