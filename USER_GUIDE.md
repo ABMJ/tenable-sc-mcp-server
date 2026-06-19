@@ -10,7 +10,6 @@
 
 ### Overview
 - [Introduction](#introduction)
-- [Breaking Changes in v1.2.0](#breaking-changes-in-v120)
 - [Quick Start](#quick-start)
 
 ### Available Tools
@@ -46,43 +45,6 @@ The Tenable.sc MCP Server provides AI-powered tools for security vulnerability m
 - ✅ **Unified Filters**: 71+ filters work consistently across all tools
 - ✅ **Natural Language**: Use conversational commands with your AI assistant
 - ✅ **Production Ready**: Battle-tested with comprehensive error handling
-
----
-
-## Breaking Changes in v1.2.0
-
-### Unified Filters Dict Parameter
-
-**All convenience tools now use a single `filters` dict parameter instead of explicit filter parameters.**
-
-#### ❌ Old Syntax (v1.1 and earlier - DEPRECATED):
-```python
-# No longer supported
-tsc_list_ips(repository="Default", asset_criticality="8-10", severity="critical")
-tsc_list_vulns_by_cve("CVE-2021-44228", asset_criticality="7-10", exploit_available="Yes")
-```
-
-#### ✅ New Syntax (v1.2.0+):
-```python
-# Use filters dict parameter
-tsc_list_ips(
-    repository="Default",
-    filters={"asset_criticality": "8-10", "severity": "critical"}
-)
-
-tsc_list_vulns_by_cve(
-    "CVE-2021-44228",
-    filters={"asset_criticality": "7-10", "exploit_available": "Yes"}
-)
-```
-
-### Why This Change?
-
-1. **Simpler function signatures** - 5 lines instead of 100+ per tool
-2. **Consistent interface** - All tools use identical filter pattern
-3. **Zero-edit filter additions** - Add to `COMMON_FILTERS` dict, available everywhere
-4. **Better MCP compatibility** - Fixes `**kwargs` serialization bug
-5. **Scales to 25+ tools** - Maintainable long-term architecture
 
 ---
 
