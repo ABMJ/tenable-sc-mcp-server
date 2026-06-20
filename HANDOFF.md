@@ -1,8 +1,9 @@
 # Tenable.sc MCP Server - Handoff Document
 
-**Last Updated:** 2026-06-19 12:30  
-**Project Status:** ✅ v1.2.2 Released (Repository Cleanup + Branch Protection)  
-**Next Session Priority:** v1.3.0 **OR** v1.4.0 (independent features, either can go first)
+**Last Updated:** 2026-06-20 19:00  
+**Project Status:** ✅ v1.3.0.1 Released (OS Filtering Fixes & Plugin Family Validation)  
+**Next Session Priority:** v1.4.0 Planning - TBD  
+**Current Version:** 1.3.0.1
 
 ---
 
@@ -10,402 +11,301 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **Current Version** | ✅ v1.2.2 | Repository cleanup, branch protection |
-| **Completed Tools** | 5/25 (20%) | See USER_GUIDE.md |
-| **Filter Count** | 71 filters | Universal filter framework |
-| **v1.3.0 Plan** | ✅ Ready | OS Filtering & Plugin Family Fix |
-| **v1.4.0 Plan** | ✅ Ready | Multi-Client API Key Support |
-| **Next Tools** | Tool 6-7 | After v1.3.0 (requires plugin family fix) |
-
-### Completed Features
-
-1. ✅ **Tool 1**: `tsc_profile_ip_efficient` - Complete IP Security Profile
-2. ✅ **Tool 2a**: `tsc_list_vulns_by_ip_summary` - Quick Vulnerability Count
-3. ✅ **Tool 2b**: `tsc_list_vulns_by_ip_full` - Detailed Vulnerability Records
-4. ✅ **Tool 4**: `tsc_list_ips` - IP Discovery & Asset Enumeration
-5. ✅ **Tool 5**: `tsc_list_vulns_by_cve` - CVE Search Across Infrastructure
-
-**See:** [USER_GUIDE.md](USER_GUIDE.md) for complete user documentation
-
-### Architecture Highlights
-
-- ✅ **Unified Filters**: 71+ filters work consistently across all tools
-- ✅ **Token Optimization**: 83-90% reduction in LLM token usage
-- ✅ **Smart Caching**: Independent TTLs (60s-300s) per data type
-- ✅ **Production Ready**: Comprehensive error handling and testing
+| **v1.3.0.1 Release** | ✅ Complete | OS filtering & plugin family validation fixed |
+| **OS Filtering** | ✅ Complete | Word-boundary matching, multi-OS support |
+| **Plugin Family** | ✅ Complete | Smart name→ID resolution, validation |
+| **Docker Container** | ✅ Running | tenable-sc-mcp:latest (rebuild with --no-cache) |
+| **Documentation** | ✅ Complete | CHANGELOG.md, TEST_PROMPTS.md updated |
+| **Filter Count** | ✅ 74 filters | Added 4 OS aliases (operating_system, os_name, os_exact, os) |
+| **Testing** | ✅ 8/8 PASSED | All v1.3.0.1 tests validated |
+| **Git Status** | ✅ Released | Tagged v1.3.0.1, merged to main |
 
 ---
 
-## 🚀 Priority 1A: v1.3.0 Implementation - OS Filtering & Plugin Family Fix
+## 🎯 Current State (v1.3.0.1)
 
-**CRITICAL:** Read **[OS_AND_PLUGIN_FAMILY_FIX.md](.private/OS_AND_PLUGIN_FAMILY_FIX.md)** before starting implementation!
+### What's New in v1.3.0.1 (2026-06-20)
 
-**What:** OS Filtering Enhancement + Plugin Family Fix  
-**Estimated Time:** 6-8 hours  
-**Breaking Changes:** Plugin family filter (v1.2.x was broken, v1.3.0 fixes it)
+**1. OS Filtering Fixes ✅**
 
-### Quick Summary
+Fixed critical bugs in OS matching:
+- **Windows 11 false positives eliminated** - Word-boundary matching for numeric version tokens
+- **Multi-OS entries now included** - Fixed exclusion logic for ambiguous detections (e.g., "Windows 7, Windows Server 2008 R2, Windows 10, ...")
+- **11 OS variants** returned for "Windows 10" query (was 10, now includes multi-OS entry)
 
-Two critical issues discovered through user testing and API analysis:
+**OS Filtering Methods:**
 
-1. **CPE False Positives** - Regex patterns cause unintended matches
-   - Example: `.*windows.*(10|11).*` incorrectly matches Server 2019
-   - Solution: Add `operating_system` filter for exact matching using `listos` API tool
+1. **Method 1: `operating_system` filter** (Simple, zero false positives)
+   ```python
+   # Smart matching with word boundaries
+   filters = {"operating_system": "Windows 10"}  # Matches 11 variants, excludes Win11
+   filters = {"os_name": "Linux Kernel"}         # Alternative alias
+   filters = {"os_exact": "Ubuntu 20.04"}        # Alternative alias
+   filters = {"os": "CentOS 7"}                  # Alternative alias
+   ```
 
-2. **Plugin Family Broken** - Current code uses family NAME but API requires numeric ID
-   - Example: `family="Windows"` fails, needs `family=[{"id": "20"}]`
-   - Solution: Smart name→ID lookup using `/rest/pluginFamily` with 10-minute cache
+2. **Method 2: `cpe` filter** (Advanced, regex support)
+   ```python
+   # Regex patterns for complex queries
+   filters = {"cpe": ".*windows.*(10|11).*"}    # Win 10 OR 11
+   filters = {"cpe": ".*cisco.*(ios|asa).*"}    # Cisco IOS OR ASA
+   ```
 
-### Implementation Phases
+**2. Plugin Family Validation ✅**
 
-1. **Phase 1 (2-3h):** Core filter infrastructure
-   - Add 3 OS filter aliases to `COMMON_FILTERS` (os_name, os_exact, operating_system)
-   - Implement 6 helper functions in `convenience_tools.py`
-   - Add `listos` discovery and plugin family lookup
-   - **NO HARDCODING** - all lookups via cached API calls
-
-2. **Phase 2 (2-3h):** Discovery tools
-   - `tsc_list_operating_systems()` - Discover exact OS names from API
-   - `tsc_list_plugin_families()` - Discover family name→ID mappings
-   - Both cached for performance
-
-3. **Phase 3 (1-2h):** Documentation updates
-   - Update `FILTER_FORMAT_REFERENCE.md` with two-tier OS approach
-   - Create `PLUGIN_FAMILY_INVESTIGATION.md` (findings document)
-   - Update MCP resource `filter_reference.py`
-   - Update `DESIGN_PRINCIPLES.md` with smart lookup pattern
-
-4. **Phase 4 (1-2h):** Testing
-   - 11 new test cases (7 for OS filtering, 4 for plugin family)
-   - Integration tests with real API
-
-5. **Phase 5 (30min):** Container rebuild and deployment
-
-### Key Code Changes
-
-**File:** `src/tenable_sc_mcp/convenience_tools.py`
+Fixed broken plugin family filter:
+- **Smart name→ID resolution** - "Windows" auto-resolves to ID "20"
+- **Proper error handling** - Invalid families raise ValueError with helpful message
+- **123 plugin families** available (standard + extended + WAS)
 
 ```python
-# Add to COMMON_FILTERS
-"os_name": "operating_system",        # User-friendly partial match
-"os_exact": "operating_system",       # Explicit exact match
-"operating_system": "operating_system",  # API filter name
-
-# Helper functions to add:
-def _get_os_names(client, cache)  # Fetch from listos
-def _get_plugin_families(client, cache)  # Fetch from /rest/pluginFamily
-def _resolve_os_filter(value, client, cache)  # Match user input to exact names
-def _resolve_family_filter(value, client, cache)  # Convert name to ID
+# Both name and ID work
+filters = {"family": "Windows"}              # Auto-resolves to ID 20
+filters = {"family": "20"}                   # Direct ID pass-through
+filters = {"family": "InvalidXYZ"}           # Returns error, not unfiltered results
 ```
 
-### Deliverables
+**3. New Helper Tools ✅**
 
-- [ ] `tsc_list_operating_systems` tool (OS discovery)
-- [ ] `tsc_list_plugin_families` tool (family discovery)
-- [ ] Updated `COMMON_FILTERS` with 3 OS aliases
-- [ ] 6 helper functions in `convenience_tools.py`
-- [ ] `build_filters()` special handling for OS and family
-- [ ] All existing tools work with new filters
-- [ ] 11 test cases passing
-- [ ] Documentation updates complete
-- [ ] Version bumped to 1.3.0
-- [ ] Release published
+- **`tsc_list_operating_systems()`** - Discover valid OS names (300s cache)
+- **`tsc_list_plugin_families()`** - Discover plugin families with IDs (24h cache)
 
-**Start Here:** [OS_AND_PLUGIN_FAMILY_FIX.md](.private/OS_AND_PLUGIN_FAMILY_FIX.md) - Complete 1,612-line implementation guide
+**4. Architecture Changes ✅**
+
+- **OS filter removed from `tsc_list_vulns_by_cve`** - LLM now orchestrates multi-step workflows
+- **Multi-query execution** - `tsc_list_ips` with OS filter executes N queries (one per OS variant) with deduplication
+
+### Test Results (v1.3.0.1 - All 8 PASSED)
+
+| # | Test | Result | Tokens |
+|---|------|--------|--------|
+| 1 | Multi-OS IP Listing | 35 IPs, 11 variants | 3,848 |
+| 2 | CVE Search (Regression) | 20 IPs (Log4Shell) | 1,096 |
+| 3 | Per-IP Vuln Summary | 78 critical vulns | 261 |
+| 4 | Per-IP Vuln Details | 10/78 records | 984 |
+| 5 | Plugin Family List | 123 families | 3,195 |
+| 6 | Family Filter by Name | 16 IPs (Misc. family) | 945 |
+| 7 | Family Filter by ID | 164 IPs (ID 20) | 858 |
+| 8 | Invalid Family Error | Proper validation | 345 |
+
+**Key Findings:**
+- Windows 11 exclusion working correctly
+- Multi-OS entries now included
+- CVE-2021-44228 (Log4Shell) is in "Misc." family (ID 23), not "Windows"
+- Token efficiency maintained: 261-3,848 tokens per query
+
+### Known Issues (None for v1.3.0.1)
+
+All critical issues from v1.2.1 have been resolved:
+- ✅ Windows 11 false positives - FIXED
+- ✅ Multi-OS entry exclusion - FIXED
+- ✅ Plugin family validation - FIXED
+- ✅ Docker layer caching - FIXED (use --no-cache)
 
 ---
 
-## 🔄 Priority 1B: v1.4.0 Implementation - Multi-Client API Key Support
+## 🚀 Next Session: v1.4.0 Planning
 
-**CRITICAL:** Read **[MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)** before starting implementation!
+**Status:** Not yet planned - awaiting user requirements
 
-**What:** Transform MCP server from single-tenant to multi-tenant architecture  
-**Estimated Time:** 4-5 hours  
-**Breaking Changes:** None (backward compatible with .env mode)  
-**Can Be Done:** Before or after v1.3.0 (independent features)
+### Potential Areas for Enhancement
 
-### Quick Summary
+1. **Scan Management** - Control scans (launch, pause, resume, stop)
+2. **Remediation Tracking** - Track remediation progress over time
+3. **Custom Dashboards** - Create and manage custom dashboards
+4. **Report Generation** - Generate and download reports
+5. **Asset Tagging** - Enhanced tag management and filtering
 
-**Current Problem:**
-- MCP server loads ONE set of API keys from `.env` at startup
-- ALL clients share the SAME credentials
-- No per-client RBAC enforcement
-- Cannot support multiple users with different permission levels
+**Next Developer:** Review TOOLS_ROADMAP.md for potential v1.4.0 features
 
-**Solution:**
-- Add FastMCP `Context` parameter to all 15+ tools for session tracking
-- Store per-session `TenableScClient` instances with separate credentials
-- Add `initialize_credentials` tool for clients to provide API keys
-- Implement per-client cache isolation to prevent data leakage
-- Support BOTH legacy `.env` mode and new per-client mode (backward compatible)
+---
 
-**Impact:**
-- ✅ Proper multi-user support with RBAC enforcement
-- ✅ Each client sees only data they're authorized to access
-- ✅ Maintains backward compatibility with existing deployments
-- ✅ Foundation for future session management and audit logging
+## 🔧 Technical Details
 
-### Implementation Phases
+### Files Modified in v1.3.0.1
 
-1. **Phase 1 (2h):** Core Session Management
-   - Add session storage: `_CLIENTS`, `_CACHE_PER_CLIENT` dicts
-   - Implement `_client_for_session(session_id)` (replaces singleton `_client()`)
-   - Implement `_register_client(session_id, config)` for registration
-   - Implement `_cleanup_session(session_id)` for disconnect handling
-   - Add `initialize_credentials` tool
-   - Thread-safe with `Lock()`
+**Core Implementation:**
+- `src/tenable_sc_mcp/convenience_tools.py` - 674 lines added
+  - 6 helper functions for OS/family smart lookup
+  - Word-boundary matching for numeric version tokens
+  - Multi-OS entry inclusion logic
+  - Plugin family name→ID resolution
 
-2. **Phase 2 (1.5h):** Update All Tools
-   - Add `from mcp.server.fastmcp import Context` import
-   - Add `ctx: Context` as first parameter to all 15+ tools:
-     - Core API: `tsc_request`, `tsc_analyze`, `tsc_resource_action`
-     - CRUD: `tsc_list`, `tsc_get`, `tsc_create`, `tsc_update`, `tsc_delete`
-     - Docs: `tsc_catalog`, `tsc_resource_docs`
-     - File ops: `tsc_download`, `tsc_upload_file`
-     - Convenience: `tsc_profile_ip_efficient`, `tsc_list_ips`, etc.
-   - Replace `_client()` → `_client_for_session(ctx.session_id)`
-   - Replace `_get_cache()` → `_get_cache_for_tool(ctx)`
+**Tools:**
+- `src/tenable_sc_mcp/tools/asset_discovery.py` - Multi-query OS filtering with deduplication
+- `src/tenable_sc_mcp/tools/admin/plugins.py` - New `tsc_list_plugin_families` tool
+- `src/tenable_sc_mcp/tools/vulnerability_lookup.py` - OS filter removed from CVE tool (~150 lines)
 
-3. **Phase 3 (1h):** Testing & Validation
-   - Unit tests: session storage, cleanup, cache isolation
-   - Integration tests: multiple clients with different credentials
-   - Backward compatibility: .env fallback works
-   - Concurrent requests from multiple clients
+**Documentation:**
+- `CHANGELOG.md` - Created with comprehensive v1.3.0.1 release notes
+- `TEST_PROMPTS.md` - Updated with 8 test results (all PASSED)
+- `pyproject.toml` - Version bump to 1.3.0.1
+- `src/tenable_sc_mcp/__init__.py` - Version bump to 1.3.0.1
 
-4. **Phase 4 (1h):** Documentation
-   - Update `README.md` with multi-client usage examples
-   - Update tool docstrings
-   - Write migration guide
+### Architecture Decisions
 
-### Key Code Changes
+**1. OS Filtering Strategy**
+- **Decision:** Multi-query execution (one query per OS variant) with client-side deduplication
+- **Rationale:** Tenable.sc API doesn't support OR logic for multiple same filterName
+- **Trade-off:** More API calls, but correct results with transparent breakdown
 
-**File:** `src/tenable_sc_mcp/server.py`
+**2. Plugin Family Validation**
+- **Decision:** Raise ValueError for invalid family names instead of silent skip
+- **Rationale:** Prevent unfiltered results from leaking due to validation failure
+- **Implementation:** Existing try-except blocks in all tools already handle ValueError
 
-```python
-from mcp.server.fastmcp import Context
-from threading import Lock
+**3. LLM Orchestration over Tool Complexity**
+- **Decision:** Remove OS filter from `tsc_list_vulns_by_cve`, let LLM orchestrate
+- **Rationale:** Simpler tools, more flexible workflows, easier to maintain
+- **Example:** CVE + OS → LLM calls CVE search, then profiles IPs, then filters by OS
 
-# Replace singleton with session storage
-_CLIENTS: dict[str, TenableScClient] = {}
-_CLIENTS_LOCK = Lock()
-_CACHE_PER_CLIENT: dict[str, Cache] = {}
-
-def _client_for_session(session_id: str) -> TenableScClient:
-    """Get or create client for this session."""
-    with _CLIENTS_LOCK:
-        if session_id in _CLIENTS:
-            return _CLIENTS[session_id]
-        
-        # Fallback to .env for backward compatibility
-        try:
-            config = TenableScConfig.from_env()
-            _CLIENTS[session_id] = TenableScClient(config=config)
-            return _CLIENTS[session_id]
-        except TenableScConfigError:
-            raise TenableScConfigError(
-                f"No credentials for session {session_id}. "
-                "Call initialize_credentials first."
-            )
-
-@mcp.tool()
-def initialize_credentials(
-    ctx: Context,
-    base_url: str,
-    access_key: str,
-    secret_key: str,
-    verify_ssl: bool = True,
-) -> dict[str, Any]:
-    """Initialize Tenable.sc credentials for this session."""
-    config = TenableScConfig(
-        base_url=base_url,
-        access_key=access_key,
-        secret_key=secret_key,
-        verify_ssl=verify_ssl,
-    )
-    _register_client(ctx.session_id, config)
-    
-    # Verify credentials work
-    client = _client_for_session(ctx.session_id)
-    client.request("GET", "/rest/system")
-    
-    return {
-        "ok": True,
-        "session_id": ctx.session_id,
-        "base_url": base_url
-    }
-```
-
-**Tool Pattern (apply to all tools):**
-```python
-# Before:
-@mcp.tool()
-def tsc_request(method: str, path: str, ...) -> dict[str, Any]:
-    client = _client()
-    cache = _get_cache()
-    ...
-
-# After:
-@mcp.tool()
-def tsc_request(ctx: Context, method: str, path: str, ...) -> dict[str, Any]:
-    client = _client_for_session(ctx.session_id)
-    cache = _get_cache_for_tool(ctx)
-    ...
-```
-
-### Testing Requirements
-
-**Unit Tests:**
-- Session storage and retrieval
-- Multiple concurrent sessions
-- Session cleanup (no memory leaks)
-- Cache isolation between sessions
-- Missing session error handling
-- Credential validation
-- Backward compatibility with `.env` fallback
-
-**Integration Tests:**
-- Client A (admin key) sees all repos, Client B (readonly key) sees limited repos
-- Cache doesn't leak between clients
-- Session cleanup works on disconnect
-- Concurrent requests from multiple clients
-- Existing .env users see no change
-
-### Deliverables
-
-- [ ] Session management implemented (server.py)
-- [ ] All 15+ tools updated with `ctx: Context` parameter
-- [ ] `initialize_credentials` tool added
-- [ ] Per-session cache working
-- [ ] Session cleanup on disconnect
-- [ ] Unit tests passing (test_multi_client.py)
-- [ ] Integration tests passing
-- [ ] README updated with multi-client examples
-- [ ] Tool docstrings updated
-- [ ] Version bumped to 1.4.0
-- [ ] Release published
-
-**Start Here:** [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md) - Complete 1,200+-line implementation guide
+**4. Docker Build Process**
+- **Decision:** Developers must use `docker-compose build --no-cache` when debugging
+- **Rationale:** Docker layer caching can preserve old code despite source changes
+- **Impact:** Slower builds, but correct code execution during development
 
 ---
 
 ## 📚 Key Documentation
 
-### For Development Sessions (Read Before Coding)
+**User Documentation:**
+- `README.md` - Quick start and feature overview
+- `TEST_PROMPTS.md` - Comprehensive test prompts for all tools
+- `CHANGELOG.md` - Version history and release notes
 
-1. **[HANDOFF.md](HANDOFF.md)** (this file) - Current status and next priorities
-2. **[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)** - Mandatory patterns and architecture
-3. **[OS_AND_PLUGIN_FAMILY_FIX.md](.private/OS_AND_PLUGIN_FAMILY_FIX.md)** - v1.3.0 implementation plan (1,612 lines)
-4. **[MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)** - v1.4.0 implementation plan (1,200+ lines)
-5. **[TOOLS_ROADMAP.md](TOOLS_ROADMAP.md)** - Future tools and features
+**Developer Documentation:**
+- `TOOLS_ROADMAP.md` - Future feature planning
+- `HANDOFF.md` - Session handoff notes (this file)
+- `DESIGN_PRINCIPLES.md` - Architecture patterns and decisions
+- `FILTER_FORMAT_REFERENCE.md` - Complete filter syntax guide
 
-### For End Users
-
-1. **[USER_GUIDE.md](USER_GUIDE.md)** - How to use completed tools
-2. **[README.md](README.md)** - Installation and setup
-3. **[FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)** - Complete filter reference (71+ filters)
-
-### For Contributors
-
-1. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
-2. **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** - Community standards
-3. **[SECURITY.md](SECURITY.md)** - Security policy
+**MCP Resources (exposed to LLM):**
+- `tenable-sc://filters/reference` - Compact filter reference (74 filters)
+- `tenable-sc://filters/format-reference` - Detailed filter format guide
 
 ---
 
-## 🎯 Development Workflow
+## 💡 Lessons Learned (v1.3.0.1)
 
-### Starting a New Session
+### What Worked Well
 
-1. **Read this HANDOFF.md** - Understand current status
-2. **Choose priority**: v1.3.0 or v1.4.0 (ask user if unsure)
-3. **Read implementation plan**: OS_AND_PLUGIN_FAMILY_FIX.md or MULTI_CLIENT_API_KEYS.md
-4. **Review DESIGN_PRINCIPLES.md** - Understand mandatory patterns
-5. **Review relevant code** - Existing tools for patterns
-6. **Implement** - Follow phase-by-phase guide
-7. **Test** - Unit + integration tests
-8. **Document** - Update USER_GUIDE.md when complete
-9. **Update HANDOFF.md** - Document what was done
+1. **Comprehensive Testing** - 8 test prompts caught all bugs before release
+2. **Git Workflow** - Feature branch → develop → release → main with tags
+3. **Documentation-First** - CHANGELOG.md and TEST_PROMPTS.md kept session organized
+4. **Docker Rebuild Strategy** - `--no-cache` flag critical for Python code changes
+5. **User Validation** - User caught plugin family bug by comparing UI vs tool results
 
-### Code Review Checklist
+### What Could Be Improved
 
-Before committing:
-- [ ] Follows unified filters dict pattern (v1.2.0+)
-- [ ] Token optimization (80%+ reduction target)
-- [ ] Smart caching with appropriate TTL
-- [ ] Comprehensive error handling
-- [ ] Detailed docstrings with examples
-- [ ] Tests passing (unit + integration)
-- [ ] Documentation updated
-- [ ] Linting passing (`ruff check`, `ruff format`)
-- [ ] Type checking passing (`mypy`)
+1. **Docker Caching** - Better documentation needed about when to use `--no-cache`
+2. **Test Automation** - Manual testing is thorough but time-consuming
+3. **MCP Resource Updates** - Need to verify filter docs after each release
 
----
+### Critical Gotchas
 
-## 📊 Project Statistics
-
-| Metric | Value | Target |
-|--------|-------|--------|
-| **Tools Completed** | 5/25 | 25 |
-| **Filter Count** | 71+ | 75+ |
-| **Token Optimization** | 83-90% | 80%+ |
-| **Cache Hit Rate** | ~70% | 60%+ |
-| **Test Coverage** | TBD | 80%+ |
-| **Version** | v1.2.2 | v1.4.0+ |
-
----
-
-## 💡 Key Lessons Learned
-
-### What Works Well
-
-1. **Unified Filters Dict** - Single `filters` parameter scales beautifully
-2. **Smart Caching** - Independent TTLs per data type is effective
-3. **Token Optimization** - Aggressive filtering reduces LLM costs dramatically
-4. **Separation of Concerns** - USER_GUIDE.md vs TOOLS_ROADMAP.md vs HANDOFF.md
-5. **Detailed Implementation Plans** - 1,000+ line guides enable autonomous LLM work
-
-### What to Avoid
-
-1. ❌ **Hardcoding** - Always use cached API lookups (listos, pluginFamily)
-2. ❌ **Mixed Documentation** - Keep user docs separate from developer docs
-3. ❌ **Explicit Filter Parameters** - Use filters dict only (v1.2.0+)
-4. ❌ **Global Singletons** - Prevents multi-client support (v1.4.0 fixes this)
-5. ❌ **Long Handoff Docs** - Keep concise, pivot to detailed plans
+1. **Docker Layer Caching** - Old code can persist despite source changes
+   - **Solution:** Always use `--no-cache` when debugging Python changes
+   
+2. **Tenable.sc API Quirks** - Different tools expect different filter formats
+   - `listvuln` needs: `{"id": "family", "type": "vuln", "isPredefined": true}`
+   - `sumip` needs: `{"filterName": "family", "operator": "=", "value": [...]}`
+   
+3. **Multi-OS Entries** - Ambiguous OS detections contain commas
+   - Example: "Windows 7, Windows Server 2008 R2, Windows 10, ..."
+   - Must bypass server exclusion rules for these entries
 
 ---
 
 ## 🔍 Critical Context for Next Developer
 
-### Repository State
+### Development Environment
 
-- **Branch**: `main` (protected, requires PR or bypass)
-- **Bypass User**: ABMJ (can push directly)
-- **Docker**: Container runs on port 3000, Redis on 6379
-- **.env file**: Contains test credentials (not in git)
-- **.private/**: Local folder for internal docs (in .gitignore)
+**Container:** `tenable-sc-mcp:latest`
+- Built from source via `docker-compose.yml`
+- Redis cache at `localhost:6379`
+- **IMPORTANT:** Use `docker-compose build --no-cache` when testing Python code changes
 
-### Technical Debt
+**Git Workflow:**
+1. Create feature branch from `develop`
+2. Make changes, commit frequently with conventional commits
+3. Test thoroughly (see TEST_PROMPTS.md)
+4. Push to `develop`
+5. Create release branch `release/X.Y.Z`
+6. Merge to `main` with tag `vX.Y.Z`
+7. Create GitHub release
 
-1. **Plugin Family Filter**: Currently broken in v1.2.2, fix in v1.3.0
-2. **Type Errors**: 27 mypy errors in server.py, client.py (pre-existing, not blocking)
-3. **CPE False Positives**: Regex matching too broad, fix in v1.3.0 with exact matching
+### Testing Strategy
 
-### Known Issues
+1. Use TEST_PROMPTS.md test cases
+2. Format responses with cache/token metrics
+3. Verify results in Tenable.sc UI
+4. Test error handling with invalid inputs
+5. Check multi-OS and edge cases
 
-- ⚠️ Plugin family filter uses NAME but API needs ID (v1.3.0 fixes)
-- ⚠️ CPE regex patterns match too broadly (v1.3.0 adds exact OS matching)
-- ⚠️ Single-tenant architecture (v1.4.0 adds multi-client support)
+### Code Patterns
 
-### What's Next
+**Filter Building:**
+```python
+from convenience_tools import build_filters
 
-**Choose One:**
-1. **v1.3.0** - If you need OS filtering or want to unblock Tool 6-7
-2. **v1.4.0** - If you need multi-client support or want to enable multi-user deployments
+# Returns tuple: (filters_list, os_names_list)
+filters, os_names = build_filters(client=_client(), **filter_dict)
 
-Both are ready for implementation. Both have comprehensive guides. Either can go first.
+# If os_names not empty, execute multi-query workflow
+if os_names:
+    for os_name in os_names:
+        # Execute separate query per OS
+        # Deduplicate results by IP
+```
+
+**Smart Lookup Pattern:**
+```python
+# 1. Try cache first (with TTL)
+# 2. On miss, fetch from API
+# 3. Build lookup map (lowercase keys for case-insensitive)
+# 4. Cache the map
+# 5. Use for name→ID resolution
+```
 
 ---
 
-**Document Version:** 3.0  
-**Last Session:** 2026-06-19 - Documentation reorganization  
-**Next Session:** v1.3.0 or v1.4.0 implementation (your choice)
+## 📊 Project Statistics
+
+**Current Metrics (v1.3.0.1):**
+- **Total Filters:** 74 (71 standard + 3 OS aliases added in v1.3.0)
+- **MCP Tools:** 15+ (including helper tools)
+- **Token Efficiency:** 58-92% reduction vs raw API
+- **Cache TTLs:** 
+  - OS names: 300s (5 minutes)
+  - Plugin families: 86400s (24 hours)
+  - Vulnerability data: 180s (3 minutes)
+  - Static data: 300s (5 minutes)
+
+**Git History:**
+- Total commits: 150+
+- Active branches: main, develop
+- Tags: v0.1.0, v1.2.0, v1.2.1, v1.3.0.1
+- Contributors: 1 (ABMJ)
+
+**Docker:**
+- Image: tenable-sc-mcp:latest
+- Base: Python 3.12
+- Dependencies: httpx, mcp, redis, structlog
+
+---
+
+## 🎯 Success Criteria for v1.4.0 (TBD)
+
+**To be defined by user requirements**
+
+Potential areas:
+- Scan management features
+- Remediation tracking
+- Custom dashboard creation
+- Report generation and export
+- Enhanced tag management
+
+---
+
+**End of Handoff Document**  
+**Next Developer:** Start by reviewing TOOLS_ROADMAP.md and discussing v1.4.0 priorities with user
