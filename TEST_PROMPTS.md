@@ -35,24 +35,12 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 6: Regex CPE - Windows Server 2016-2019](#test-6-regex-cpe---windows-server-2016-2019)
   - [Test 7: CPE Documentation Access](#test-7-cpe-documentation-access)
 
-### Operating System & Plugin Family Tests (v1.3.0)
-- [Operating System Filter Tests](#operating-system-filter-tests-v130)
-  - [Test 1: Discover Available Operating Systems](#test-1-discover-available-operating-systems)
-  - [Test 2: Exact Windows 10 Match](#test-2-exact-windows-10-match-zero-false-positives)
-  - [Test 3: Exact Server 2019 Match](#test-3-exact-server-2019-match-no-windows-10)
-  - [Test 4: Smart OS Lookup (Partial Match)](#test-4-smart-os-lookup-partial-match)
-  - [Test 5: Exact Linux Match](#test-5-exact-linux-match)
-  - [Test 6: Compare CPE vs Operating System](#test-6-compare-cpe-vs-operating-system-false-positive-check)
-- [Plugin Family Filter Tests](#plugin-family-filter-tests-v130)
-  - [Test 1: Discover Plugin Families](#test-1-discover-plugin-families)
-  - [Test 2: Family Filter by Name](#test-2-family-filter-by-name-smart-lookup)
-  - [Test 3: Family Filter by ID](#test-3-family-filter-by-id-direct-pass-through)
-  - [Test 4: Multiple Families (Mixed)](#test-4-multiple-families-mixed-name-and-id)
-  - [Test 5: Invalid Family Name](#test-5-invalid-family-name-error-handling)
-  - [Test 6: Search Plugin Families](#test-6-search-plugin-families-discovery-helper)
-- [New Tools (v1.3.0)](#quick-reference-new-tools-v130)
+### Operating System & Plugin Family Tests (v1.3.0 - NOT TESTED)
+- [Operating System Filter Tests](#operating-system-filter-tests-v130) - **SKIP: Not tested in this session**
+- [Plugin Family Filter Tests](#plugin-family-filter-tests-v130) - **SKIP: Not tested in this session**
+- [New Tools (v1.3.0)](#quick-reference-new-tools-v130) - **Reference only**
 
-### v1.3.0.1 Testing (Required)
+### 🧪 v1.3.0.1 Testing (THIS SESSION - REQUIRED)
 - [v1.3.0.1 Multi-Query OS Filter Tests](#v1301-multi-query-os-filter-tests)
   - [Test 1: Multi-OS IP Listing](#test-1-multi-os-ip-listing-tsc_list_ips)
   - [Test 2: Multi-OS CVE Search](#test-2-multi-os-cve-search-tsc_list_vulns_by_cve)
@@ -990,11 +978,23 @@ use tenable-sc to list plugin families with search "Windows"
 
 ---
 
-## v1.3.0.1 Multi-Query OS Filter Tests
+---
 
-**Purpose:** Validate OS filtering with multi-query execution and transparent breakdown
+## 🧪 v1.3.0.1 Session Testing (REQUIRED)
+
+**What Happened This Session:**
+- Discovered v1.3.0 OS filtering had false assumption (Tenable.sc doesn't support OR logic on same filterName)
+- Pivoted to v1.3.0.1 with multi-query approach (separate API call per OS variant)
+- Added validation errors for per-IP tools (single IP can't have multiple OS)
+- Fixed plugin family cache TTL (10 min → 24 hours)
+- Implemented transparent breakdown response format (per-OS results + deduplication stats)
 
 **Container:** `tenable-sc-mcp:v1.3.0.1`
+
+**Critical Tests:**
+1. Multi-query execution for OS filtering (tsc_list_ips, tsc_list_vulns_by_cve)
+2. Validation errors when OS filter used on per-IP tools
+3. Regression: Per-IP tools still work without OS filter
 
 ---
 
