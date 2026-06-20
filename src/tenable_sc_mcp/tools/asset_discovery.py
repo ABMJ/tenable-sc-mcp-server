@@ -15,6 +15,7 @@ from ..convenience_tools import (
     resolve_repository_name,
     resolve_asset_group_name,
 )
+from ..server import _client
 
 
 def register_tools(mcp):
@@ -222,42 +223,104 @@ def register_tools(mcp):
             # Extract filter dict
             filter_dict = filters or {}
             
-            # Add additional filters from dict
+            # Add additional filters from dict (v1.3.0.1: returns tuple with OS names)
             # Note: Scoring filters must be in range format (e.g., "7-10", "600-1000").
             # Operators like ">7" will raise ValueError with helpful message.
-            additional_filters = build_filters(**filter_dict)
+            additional_filters, os_names_to_query = build_filters(client=_client(), **filter_dict)
             filter_list.extend(additional_filters)
             
-            # DEBUG: Log filters being sent to API
-            import json
-            print("DEBUG: Filters being sent to Tenable.sc API:")
-            print(json.dumps(filter_list, indent=2))
-            
-            # Build query for sumip analysis tool with proper nested structure
-            # Tenable.sc API requires: {"type": "vuln", "query": {...}, "sourceType": "cumulative"}
-            query = {
-                "type": "vuln",
-                "query": {
-                    "type": "vuln",
-                    "tool": "sumip",
-                    "filters": filter_list
-                },
-                "sourceType": "cumulative"
-            }
-            
-            # Call tsc_analyze (handles caching)
-            tsc_analyze = server.tsc_analyze
-            result = tsc_analyze(query)
-            
-            if not result.get("ok"):
-                return result
-            
-            # Extract IP data from response
-            api_response = result.get("response", {})
-            if isinstance(api_response, dict) and "response" in api_response:
-                ip_data = api_response.get("response", {}).get("results", [])
+            # v1.3.0.1: Check if multi-query needed for OS filter
+            if os_names_to_query:
+                # MULTI-QUERY PATH: Execute one query per matched OS, aggregate results
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"OS filter detected: executing {len(os_names_to_query)} queries for OS variants")
+                
+                os_breakdown = []
+                all_ips_seen = {}  # {ip: full_metadata} for deduplication
+                tsc_analyze = server.tsc_analyze
+                
+                for os_name in os_names_to_query:
+                    # Add OS filter for this iteration
+                    os_filter = {
+                        "filterName": "operatingSystem",
+                        "operator": "=",
+                        "value": f"'{os_name}'"
+                    }
+                    query_filters = filter_list + [os_filter]
+                    
+                    # Build query
+                    query = {
+                        "type": "vuln",
+                        "query": {
+                            "type": "vuln",
+                            "tool": "sumip",
+                            "filters": query_filters
+                        },
+                        "sourceType": "cumulative"
+                    }
+                    
+                    # Execute query
+                    logger.debug(f"Querying IPs for OS: {os_name}")
+                    result = tsc_analyze(query)
+                    
+                    if not result.get("ok"):
+                        logger.error(f"Query failed for OS '{os_name}': {result.get('error')}")
+                        continue
+                    
+                    # Extract IP data from response
+                    api_response = result.get("response", {})
+                    if isinstance(api_response, dict) and "response" in api_response:
+                        ip_data = api_response.get("response", {}).get("results", [])
+                    else:
+                        ip_data = api_response.get("results", [])
+                    
+                    # Track per-OS breakdown
+                    ips_for_this_os = [item.get("ip") for item in ip_data if item.get("ip")]
+                    os_breakdown.append({
+                        "os_name": os_name,
+                        "ip_count": len(ips_for_this_os),
+                        "ips": ips_for_this_os if not include_details else None  # Save space if details requested
+                    })
+                    
+                    # Merge into global set (deduplicate by IP)
+                    for item in ip_data:
+                        ip_addr = item.get("ip")
+                        if ip_addr and ip_addr not in all_ips_seen:
+                            all_ips_seen[ip_addr] = item
+                
+                # Build formatted output from deduplicated results
+                ip_data = list(all_ips_seen.values())
+                
+                logger.info(f"Multi-OS query complete: {len(ip_data)} unique IPs across {len(os_names_to_query)} OS variants")
             else:
-                ip_data = api_response.get("results", [])
+                # SINGLE-QUERY PATH: No OS filter, execute normally
+                import json
+                print("DEBUG: Filters being sent to Tenable.sc API:")
+                print(json.dumps(filter_list, indent=2))
+                
+                query = {
+                    "type": "vuln",
+                    "query": {
+                        "type": "vuln",
+                        "tool": "sumip",
+                        "filters": filter_list
+                    },
+                    "sourceType": "cumulative"
+                }
+                
+                tsc_analyze = server.tsc_analyze
+                result = tsc_analyze(query)
+                
+                if not result.get("ok"):
+                    return result
+                
+                # Extract IP data from response
+                api_response = result.get("response", {})
+                if isinstance(api_response, dict) and "response" in api_response:
+                    ip_data = api_response.get("response", {}).get("results", [])
+                else:
+                    ip_data = api_response.get("results", [])
             
             # Format output based on include_details flag
             if include_details:
@@ -286,6 +349,21 @@ def register_tools(mcp):
                 "total_ips": len(formatted_ips),
                 "ips": formatted_ips
             }
+            
+            # Add OS breakdown if multi-query was used (v1.3.0.1)
+            if os_names_to_query:
+                response["by_os_variant"] = os_breakdown
+                
+                # Calculate deduplication stats
+                total_across_queries = sum(entry["ip_count"] for entry in os_breakdown)
+                duplicates_removed = total_across_queries - len(formatted_ips)
+                
+                response["deduplication_stats"] = {
+                    "total_ips_across_queries": total_across_queries,
+                    "unique_ips_after_dedup": len(formatted_ips),
+                    "duplicate_ips_removed": duplicates_removed,
+                    "note": f"{duplicates_removed} IPs appeared in multiple OS queries" if duplicates_removed > 0 else "No duplicate IPs found"
+                }
             
             # Add scope info
             if repository:
@@ -431,6 +509,142 @@ def _find_ip_membership(ip: str) -> dict[str, Any]:
             "ok": False,
             "error": f"Failed to lookup IP membership: {exc}"
         }
+    
+    
+    @mcp.tool()
+    def tsc_list_operating_systems(
+        sort_by: str = "count",  # count | name
+        limit: int = 50,
+        start_offset: int = 0,
+    ) -> dict[str, Any]:
+        """
+        List all operating systems detected in your environment with asset counts.
+        Use this to discover valid OS names for the operating_system filter.
+        
+        WHEN TO USE THIS TOOL:
+        - User asks "what operating systems are in our environment"
+        - User needs to find exact OS name for filtering
+        - User asks "show me all Windows versions we have"
+        - Before using operating_system filter (discover valid values)
+        
+        This tool wraps the Tenable.sc 'listos' analysis tool and returns
+        deduplicated OS names with counts. Use the exact name in your
+        operating_system filter for zero false positives.
+        
+        Token Efficiency: ~1,500-2,000 tokens (vs ~8,000 raw)
+        Cache TTL: 300s (5 min - semi-static data)
+        
+        Args:
+            sort_by: Sort order: "count" (default) or "name"
+            limit: Max OS entries to return (1-200, default: 50)
+            start_offset: Starting record for pagination (default: 0)
+        
+        Returns:
+            Dict with:
+            - ok: True/False
+            - total_os: Total unique OS detected
+            - returned: Number returned in this response
+            - operating_systems: List of {name: str, count: int}
+            - pagination: {start: int, end: int, more_available: bool}
+        
+        Example:
+            >>> tsc_list_operating_systems(limit=10)
+            {
+                "ok": True,
+                "total_os": 257,
+                "returned": 10,
+                "operating_systems": [
+                    {"name": "Linux Kernel 4.8", "count": 56},
+                    {"name": "Microsoft Windows 10 Pro Build 19045", "count": 7},
+                    ...
+                ],
+                "pagination": {"start": 0, "end": 50, "more_available": True}
+            }
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Validate parameters
+            if limit < 1 or limit > 200:
+                return {
+                    "ok": False,
+                    "error": "limit must be between 1 and 200"
+                }
+            
+            if start_offset < 0:
+                return {
+                    "ok": False,
+                    "error": "start_offset must be >= 0"
+                }
+            
+            if sort_by not in ("count", "name"):
+                return {
+                    "ok": False,
+                    "error": f"Invalid sort_by: {sort_by}. Use 'count' or 'name'"
+                }
+            
+            # Build listos query
+            query = {
+                "type": "vuln",
+                "tool": "listos",
+                "sourceType": "cumulative",
+                "startOffset": start_offset,
+                "endOffset": start_offset + limit,
+                "sortColumn": sort_by,
+                "sortDirection": "desc",
+                "filters": []
+            }
+            
+            # Call analysis API (uses existing caching in tsc_analyze)
+            from ..server import tsc_analyze
+            result = tsc_analyze(query)
+            
+            if not result.get("ok"):
+                return {
+                    "ok": False,
+                    "error": "Failed to query operating systems",
+                    "details": result.get("error"),
+                    "hint": "Check Tenable.sc connectivity and permissions"
+                }
+            
+            response = result.get("response", {})
+            os_list = response.get("results", [])
+            total = int(response.get("totalRecords", 0))
+            returned = int(response.get("returnedRecords", 0))
+            
+            # Format response
+            return {
+                "ok": True,
+                "total_os": total,
+                "returned": returned,
+                "operating_systems": [
+                    {
+                        "name": os_entry["name"],
+                        "count": int(os_entry["count"]),
+                        "detection_method": os_entry.get("detectionMethod", "N/A")
+                    }
+                    for os_entry in os_list
+                ],
+                "pagination": {
+                    "start": start_offset,
+                    "end": start_offset + limit,
+                    "more_available": (start_offset + returned) < total
+                },
+                "usage_tip": (
+                    "Use exact 'name' values in operating_system filter for precise matching. "
+                    "Example: filters={'operating_system': 'Microsoft Windows 10 Pro Build 19045'} "
+                    "or use partial name for smart matching: filters={'os_name': 'Windows 10'}"
+                )
+            }
+        
+        except Exception as e:
+            logger.error(f"Error in tsc_list_operating_systems: {e}", exc_info=True)
+            return {
+                "ok": False,
+                "error": "Unexpected error listing operating systems",
+                "hint": "Check server logs for details"
+            }
 
 
 # Export for testing

@@ -16,6 +16,7 @@ services:
       retries: 3
 
   tenable-sc-mcp:
+    build: .
     image: tenable-sc-mcp:latest
     container_name: tenable-sc-mcp
     user: "${LOCAL_UID}:${LOCAL_GID}"
