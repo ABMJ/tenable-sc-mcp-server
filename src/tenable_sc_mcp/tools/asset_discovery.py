@@ -15,6 +15,7 @@ from ..convenience_tools import (
     resolve_repository_name,
     resolve_asset_group_name,
 )
+from ..server import _client
 
 
 def register_tools(mcp):
@@ -225,7 +226,7 @@ def register_tools(mcp):
             # Add additional filters from dict
             # Note: Scoring filters must be in range format (e.g., "7-10", "600-1000").
             # Operators like ">7" will raise ValueError with helpful message.
-            additional_filters = build_filters(**filter_dict)
+            additional_filters = build_filters(client=_client(), **filter_dict)
             filter_list.extend(additional_filters)
             
             # DEBUG: Log filters being sent to API
