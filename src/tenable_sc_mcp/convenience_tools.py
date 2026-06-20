@@ -733,13 +733,19 @@ def match_operating_systems(partial_name: str, client: Any) -> list[str]:
         if not token_match:
             continue
         
+        # Multi-OS entries (ambiguous detections with commas) should always be included
+        # They represent cases where Tenable.sc couldn't definitively determine the OS
+        is_multi_os = ',' in os_name
+        
         # Smart exclusion: If searching "Windows 10", exclude "Server" unless explicitly requested
-        if "server" in os_name_lower and "server" not in user_input:
+        # BUT: Never exclude multi-OS entries (they legitimately contain the requested OS)
+        if not is_multi_os and "server" in os_name_lower and "server" not in user_input:
             logger.debug(f"Excluding '{os_name}' (contains 'server', not in user input)")
             continue
         
         # Smart exclusion: If searching "Windows Server", exclude non-Server
-        if "server" in user_input and "server" not in os_name_lower:
+        # BUT: Never exclude multi-OS entries
+        if not is_multi_os and "server" in user_input and "server" not in os_name_lower:
             logger.debug(f"Excluding '{os_name}' (user requested 'server', OS is not server)")
             continue
         
