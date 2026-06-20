@@ -603,15 +603,35 @@ def get_operating_systems(client: Any) -> list[dict]:
     
     # Cache miss - fetch from API using listos analysis tool
     try:
+        # Query structure must match Tenable.sc UI format exactly
         query = {
-            "type": "vuln",
-            "tool": "listos",
+            "query": {
+                "name": "",
+                "description": "",
+                "context": "",
+                "status": -1,
+                "createdTime": 0,
+                "modifiedTime": 0,
+                "groups": [],
+                "type": "vuln",
+                "tool": "listos",
+                "sourceType": "cumulative",
+                "startOffset": 0,
+                "endOffset": 500,  # Get first 500 OS (covers most environments)
+                "filters": [],
+                "sortColumn": "count",
+                "sortDirection": "desc",
+                "vulnTool": "listos"
+            },
             "sourceType": "cumulative",
-            "startOffset": 0,
-            "endOffset": 500,  # Get first 500 OS (covers most environments)
-            "sortColumn": "count",
-            "sortDirection": "desc",
-            "filters": []
+            "sortField": "count",
+            "sortDir": "desc",
+            "columns": [
+                {"name": "name"},
+                {"name": "count"},
+                {"name": "detectionMethod"}
+            ],
+            "type": "vuln"
         }
         
         # Use server's tsc_analyze function (not client.analyze which doesn't exist)
@@ -622,8 +642,10 @@ def get_operating_systems(client: Any) -> list[dict]:
             logger.error(f"Failed to fetch operating systems: {result.get('error')}")
             return []
         
-        response = result.get("response", {})
-        os_list = response.get("results", [])
+        # Response has nested structure: result['response']['response']['results']
+        outer_response = result.get("response", {})
+        inner_response = outer_response.get("response", {})
+        os_list = inner_response.get("results", [])
         
         # Cache for 5 minutes
         try:
