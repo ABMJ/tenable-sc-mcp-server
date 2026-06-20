@@ -781,11 +781,21 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> t
     unknown_params = []
     
     # ========================================================================
-    # SPECIAL HANDLING: Operating System Filter (v1.3.0.1 FIX)
+    # SPECIAL HANDLING: Operating System Filter (v1.3.0.2 FIX)
     # ========================================================================
-    # OS filters are NOT added to main filters list anymore.
-    # Instead, matched OS names are returned separately for multi-query execution.
-    # Reason: Tenable.sc API does NOT support OR logic for multiple same filterName.
+    # OS filters use CPE partial matching instead of operatingSystem filter.
+    # User input: "Windows 10" → Normalized: "windows_10" → CPE filter: ~= "windows_10"
+    # This matches all Windows 10 CPE variants in a SINGLE query (efficient!).
+    # 
+    # Previous approach (v1.3.0.1): Multi-query with operatingSystem filter (WRONG)
+    # - Used listos human-readable names with operatingSystem filter
+    # - operatingSystem filter expects CPE format, not human names
+    # - Required multiple queries (one per OS variant)
+    # 
+    # New approach (v1.3.0.2): Single-query with CPE partial matching (CORRECT)
+    # - Convert user input to CPE-compatible format
+    # - Use cpe filter with ~= operator for partial matching
+    # - Single query matches all variants efficiently
     os_param_keys = ["operating_system", "os_name", "os_exact", "os"]
     os_value = None
     
@@ -795,17 +805,19 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> t
             break
     
     if os_value:
-        if not client:
-            logger.error("Operating system filter requires client instance for smart lookup")
-        else:
-            # Match partial OS name to exact OS names
-            matched_os_names = match_operating_systems(os_value, client)
-            
-            if matched_os_names:
-                os_names_to_query = matched_os_names
-                logger.debug(f"Matched {len(matched_os_names)} OS names for multi-query: {matched_os_names}")
-            else:
-                logger.warning(f"No operating systems matched '{os_value}' - filter skipped. Use tsc_list_operating_systems() to discover valid OS names.")
+        # Normalize user input to CPE-compatible format
+        # "Windows 10" → "windows_10"
+        # "Server 2019" → "server_2019"  
+        # "Oracle Linux" → "oracle_linux"
+        normalized_os = os_value.strip().lower().replace(" ", "_")
+        
+        # Add CPE filter with partial matching operator
+        filters.append({
+            "filterName": "cpe",
+            "operator": "~=",
+            "value": normalized_os
+        })
+        logger.debug(f"Added CPE filter for OS: '{os_value}' → normalized: '{normalized_os}' (partial match)")
     
     # ========================================================================
     # SPECIAL HANDLING: Plugin Family Filter (v1.3.0 FIX)

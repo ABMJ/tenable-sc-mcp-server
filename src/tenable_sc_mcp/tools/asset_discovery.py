@@ -223,104 +223,42 @@ def register_tools(mcp):
             # Extract filter dict
             filter_dict = filters or {}
             
-            # Add additional filters from dict (v1.3.0.1: returns tuple with OS names)
+            # Add additional filters from dict (v1.3.0.2: no longer returns OS names)
             # Note: Scoring filters must be in range format (e.g., "7-10", "600-1000").
             # Operators like ">7" will raise ValueError with helpful message.
+            # v1.3.0.2: OS filters now use CPE partial matching (single query, efficient!)
             additional_filters, os_names_to_query = build_filters(client=_client(), **filter_dict)
             filter_list.extend(additional_filters)
             
-            # v1.3.0.1: Check if multi-query needed for OS filter
-            if os_names_to_query:
-                # MULTI-QUERY PATH: Execute one query per matched OS, aggregate results
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"OS filter detected: executing {len(os_names_to_query)} queries for OS variants")
-                
-                os_breakdown = []
-                all_ips_seen = {}  # {ip: full_metadata} for deduplication
-                tsc_analyze = server.tsc_analyze
-                
-                for os_name in os_names_to_query:
-                    # Add OS filter for this iteration
-                    os_filter = {
-                        "filterName": "operatingSystem",
-                        "operator": "=",
-                        "value": f"'{os_name}'"
-                    }
-                    query_filters = filter_list + [os_filter]
-                    
-                    # Build query
-                    query = {
-                        "type": "vuln",
-                        "query": {
-                            "type": "vuln",
-                            "tool": "sumip",
-                            "filters": query_filters
-                        },
-                        "sourceType": "cumulative"
-                    }
-                    
-                    # Execute query
-                    logger.debug(f"Querying IPs for OS: {os_name}")
-                    result = tsc_analyze(query)
-                    
-                    if not result.get("ok"):
-                        logger.error(f"Query failed for OS '{os_name}': {result.get('error')}")
-                        continue
-                    
-                    # Extract IP data from response
-                    api_response = result.get("response", {})
-                    if isinstance(api_response, dict) and "response" in api_response:
-                        ip_data = api_response.get("response", {}).get("results", [])
-                    else:
-                        ip_data = api_response.get("results", [])
-                    
-                    # Track per-OS breakdown
-                    ips_for_this_os = [item.get("ip") for item in ip_data if item.get("ip")]
-                    os_breakdown.append({
-                        "os_name": os_name,
-                        "ip_count": len(ips_for_this_os),
-                        "ips": ips_for_this_os if not include_details else None  # Save space if details requested
-                    })
-                    
-                    # Merge into global set (deduplicate by IP)
-                    for item in ip_data:
-                        ip_addr = item.get("ip")
-                        if ip_addr and ip_addr not in all_ips_seen:
-                            all_ips_seen[ip_addr] = item
-                
-                # Build formatted output from deduplicated results
-                ip_data = list(all_ips_seen.values())
-                
-                logger.info(f"Multi-OS query complete: {len(ip_data)} unique IPs across {len(os_names_to_query)} OS variants")
-            else:
-                # SINGLE-QUERY PATH: No OS filter, execute normally
-                import json
-                print("DEBUG: Filters being sent to Tenable.sc API:")
-                print(json.dumps(filter_list, indent=2))
-                
-                query = {
+            # Execute single query (v1.3.0.2: OS filter uses CPE, no multi-query needed)
+            import json
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug("Filters being sent to Tenable.sc API:")
+            logger.debug(json.dumps(filter_list, indent=2))
+            
+            query = {
+                "type": "vuln",
+                "query": {
                     "type": "vuln",
-                    "query": {
-                        "type": "vuln",
-                        "tool": "sumip",
-                        "filters": filter_list
-                    },
-                    "sourceType": "cumulative"
-                }
-                
-                tsc_analyze = server.tsc_analyze
-                result = tsc_analyze(query)
-                
-                if not result.get("ok"):
-                    return result
-                
-                # Extract IP data from response
-                api_response = result.get("response", {})
-                if isinstance(api_response, dict) and "response" in api_response:
-                    ip_data = api_response.get("response", {}).get("results", [])
-                else:
-                    ip_data = api_response.get("results", [])
+                    "tool": "sumip",
+                    "filters": filter_list
+                },
+                "sourceType": "cumulative"
+            }
+            
+            tsc_analyze = server.tsc_analyze
+            result = tsc_analyze(query)
+            
+            if not result.get("ok"):
+                return result
+            
+            # Extract IP data from response
+            api_response = result.get("response", {})
+            if isinstance(api_response, dict) and "response" in api_response:
+                ip_data = api_response.get("response", {}).get("results", [])
+            else:
+                ip_data = api_response.get("results", [])
             
             # Format output based on include_details flag
             if include_details:
@@ -349,21 +287,6 @@ def register_tools(mcp):
                 "total_ips": len(formatted_ips),
                 "ips": formatted_ips
             }
-            
-            # Add OS breakdown if multi-query was used (v1.3.0.1)
-            if os_names_to_query:
-                response["by_os_variant"] = os_breakdown
-                
-                # Calculate deduplication stats
-                total_across_queries = sum(entry["ip_count"] for entry in os_breakdown)
-                duplicates_removed = total_across_queries - len(formatted_ips)
-                
-                response["deduplication_stats"] = {
-                    "total_ips_across_queries": total_across_queries,
-                    "unique_ips_after_dedup": len(formatted_ips),
-                    "duplicate_ips_removed": duplicates_removed,
-                    "note": f"{duplicates_removed} IPs appeared in multiple OS queries" if duplicates_removed > 0 else "No duplicate IPs found"
-                }
             
             # Add scope info
             if repository:
