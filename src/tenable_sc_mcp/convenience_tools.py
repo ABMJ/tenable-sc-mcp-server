@@ -430,7 +430,288 @@ def convert_score_operator_to_range(score_value: str, max_score: float = 10.0) -
     )
 
 
-def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
+# ============================================================================
+# SMART LOOKUP HELPERS (v1.3.0)
+# ============================================================================
+
+def get_plugin_families(client: Any) -> dict[str, str]:
+    """
+    Fetch plugin families from API with caching.
+    Returns dict mapping family name (lowercase) to ID.
+    
+    Cache Strategy:
+        - Key: "plugin_families_map"
+        - TTL: 600s (10 min - static data)
+        - Structure: {"windows": "20", "general": "30", ...}
+    
+    Args:
+        client: Tenable.sc client instance
+    
+    Returns:
+        Dict mapping family name to ID: {"windows": "20", ...}
+    
+    Note: This is a helper function - not exposed as MCP tool
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    cache_key = "plugin_families_map"
+    
+    # Try cache first
+    try:
+        if hasattr(client, 'cache') and client.cache:
+            cached = client.cache.get(cache_key)
+            if cached:
+                logger.debug(f"Plugin families loaded from cache (key: {cache_key})")
+                return cached
+    except Exception as e:
+        logger.warning(f"Cache read failed for plugin families: {e}")
+    
+    # Cache miss - fetch from API
+    try:
+        # Call GET /rest/pluginFamily?fields=name
+        result = client.get("pluginFamily", params={"fields": "name"})
+        
+        if not result.get("ok"):
+            logger.error(f"Failed to fetch plugin families: {result.get('error')}")
+            return {}
+        
+        families = result.get("response", [])
+        
+        # Build name→ID mapping (lowercase for case-insensitive lookup)
+        family_map = {
+            family["name"].strip().lower(): family["id"]
+            for family in families
+            if "id" in family and "name" in family
+        }
+        
+        # Cache for 10 minutes
+        try:
+            if hasattr(client, 'cache') and client.cache:
+                client.cache.set(cache_key, family_map, ttl=600)
+                logger.debug(f"Cached {len(family_map)} plugin families (TTL: 600s)")
+        except Exception as e:
+            logger.warning(f"Cache write failed for plugin families: {e}")
+        
+        return family_map
+    
+    except Exception as e:
+        logger.error(f"Error fetching plugin families: {e}", exc_info=True)
+        return {}
+
+
+def resolve_plugin_family_id(name_or_id: str, client: Any) -> str | None:
+    """
+    Convert plugin family name to numeric ID, or pass through if already ID.
+    
+    Args:
+        name_or_id: Family name ("Windows") or ID ("20")
+        client: Tenable.sc client
+    
+    Returns:
+        Numeric ID string, or None if not found
+    
+    Examples:
+        "Windows" → "20"
+        "20" → "20"
+        "windows : microsoft bulletins" → "10"
+        "InvalidFamily" → None (logs warning)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    value = str(name_or_id).strip()
+    
+    # Check if already numeric ID
+    if value.isdigit():
+        logger.debug(f"Plugin family value is already numeric ID: {value}")
+        return value
+    
+    # Lookup name→ID
+    family_map = get_plugin_families(client)
+    
+    if not family_map:
+        logger.warning("Plugin family map is empty - cannot resolve name to ID")
+        return None
+    
+    # Case-insensitive lookup
+    value_lower = value.lower()
+    
+    # Direct match
+    if value_lower in family_map:
+        family_id = family_map[value_lower]
+        logger.debug(f"Resolved plugin family '{value}' → ID '{family_id}'")
+        return family_id
+    
+    # Partial match (fallback)
+    for family_name, family_id in family_map.items():
+        if value_lower in family_name or family_name in value_lower:
+            logger.debug(f"Partial match: plugin family '{value}' → ID '{family_id}' (matched '{family_name}')")
+            return family_id
+    
+    # Not found
+    logger.warning(f"Unknown plugin family: '{value}'. Use tsc_list_plugin_families() to discover valid names/IDs.")
+    return None
+
+
+def format_family_filter_value(ids: list[str]) -> list[dict]:
+    """
+    Convert list of IDs to Tenable.sc API format.
+    
+    Args:
+        ids: ["20", "10", "30"]
+    
+    Returns:
+        [{"id": "20"}, {"id": "10"}, {"id": "30"}]
+    """
+    return [{"id": str(id_val)} for id_val in ids]
+
+
+def get_operating_systems(client: Any) -> list[dict]:
+    """
+    Fetch all operating systems from listos tool with caching.
+    Returns list of OS entries with name and count.
+    
+    Cache Strategy:
+        - Key: "listos_all_os"
+        - TTL: 300s (5 min - semi-static)
+        - Structure: [{"name": "...", "count": 123}, ...]
+    
+    Args:
+        client: Tenable.sc client instance
+    
+    Returns:
+        List of OS dicts: [{"name": "Microsoft Windows 10 Pro", "count": 7}, ...]
+    
+    Note: This is a helper function - not exposed as MCP tool
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    cache_key = "listos_all_os"
+    
+    # Try cache first
+    try:
+        if hasattr(client, 'cache') and client.cache:
+            cached = client.cache.get(cache_key)
+            if cached:
+                logger.debug(f"Operating systems loaded from cache (key: {cache_key})")
+                return cached
+    except Exception as e:
+        logger.warning(f"Cache read failed for operating systems: {e}")
+    
+    # Cache miss - fetch from API using listos analysis tool
+    try:
+        query = {
+            "type": "vuln",
+            "tool": "listos",
+            "sourceType": "cumulative",
+            "startOffset": 0,
+            "endOffset": 500,  # Get first 500 OS (covers most environments)
+            "sortColumn": "count",
+            "sortDirection": "desc",
+            "filters": []
+        }
+        
+        # Use existing analyze wrapper
+        result = client.analyze(query)
+        
+        if not result.get("ok"):
+            logger.error(f"Failed to fetch operating systems: {result.get('error')}")
+            return []
+        
+        response = result.get("response", {})
+        os_list = response.get("results", [])
+        
+        # Cache for 5 minutes
+        try:
+            if hasattr(client, 'cache') and client.cache:
+                client.cache.set(cache_key, os_list, ttl=300)
+                logger.debug(f"Cached {len(os_list)} operating systems (TTL: 300s)")
+        except Exception as e:
+            logger.warning(f"Cache write failed for operating systems: {e}")
+        
+        return os_list
+    
+    except Exception as e:
+        logger.error(f"Error fetching operating systems: {e}", exc_info=True)
+        return []
+
+
+def match_operating_systems(partial_name: str, client: Any) -> list[str]:
+    """
+    Match user's partial OS name against available OS names.
+    Returns list of exact OS names that match.
+    
+    Algorithm:
+        1. Fetch all OS names from listos (cached)
+        2. Normalize: lowercase input and OS names
+        3. Split input into tokens: "Windows 10" → ["windows", "10"]
+        4. Match if ALL tokens present in OS name
+        5. Apply smart exclusion (e.g., "Windows 10" excludes "Server")
+    
+    Args:
+        partial_name: User input like "Windows 10", "Oracle Linux", "CentOS 7"
+        client: Tenable.sc client
+    
+    Returns:
+        List of exact OS names: ["Microsoft Windows 10 Pro Build 19045", ...]
+    
+    Examples:
+        "Windows 10" → ["Microsoft Windows 10 Pro Build 19045", 
+                        "Microsoft Windows 10 Enterprise"]
+        "Server 2019" → ["Microsoft Windows Server 2019 Standard Build 17763"]
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not partial_name:
+        return []
+    
+    # Get all OS names
+    os_list = get_operating_systems(client)
+    
+    if not os_list:
+        logger.warning("Operating systems list is empty - cannot match partial name")
+        return []
+    
+    # Normalize input
+    user_input = partial_name.strip().lower()
+    user_tokens = user_input.split()
+    
+    matches = []
+    
+    for os_entry in os_list:
+        os_name = os_entry.get("name", "")
+        if not os_name:
+            continue
+        
+        os_name_lower = os_name.lower()
+        
+        # All tokens must be present
+        if all(token in os_name_lower for token in user_tokens):
+            # Smart exclusion: If searching "Windows 10", exclude "Server" unless explicitly requested
+            if "server" in os_name_lower and "server" not in user_input:
+                logger.debug(f"Excluding '{os_name}' (contains 'server', not in user input)")
+                continue
+            
+            # Smart exclusion: If searching "Windows Server", exclude non-Server
+            if "server" in user_input and "server" not in os_name_lower:
+                logger.debug(f"Excluding '{os_name}' (user requested 'server', OS is not server)")
+                continue
+            
+            matches.append(os_name)
+            logger.debug(f"Matched OS: '{os_name}' for input '{partial_name}'")
+    
+    logger.info(f"Found {len(matches)} OS matches for '{partial_name}'")
+    
+    if not matches:
+        logger.warning(f"No operating systems matched '{partial_name}'. Use tsc_list_operating_systems() to discover valid OS names.")
+    
+    return matches
+
+
+def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
     """
     Universal filter builder for all convenience tools.
     
@@ -439,13 +720,19 @@ def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
     Automatically converts severity string names to numeric values.
     Validates parameters and warns about unknown filters.
     
+    v1.3.0: Added smart lookup for operating_system and family filters.
+    
     Args:
+        client: Tenable.sc client instance (required for OS and family smart lookup)
         validate: If True, log warnings for unknown parameters (default: True)
         **kwargs: Filter parameters using convenience names (e.g., ip="10.1.20.10")
     
     Returns:
         List of filter dictionaries for analysis queries
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Scoring filters that require operator-to-range conversion
     SCORING_FILTERS = {
         'asset_criticality': 10.0,    # ACR: 0-10 scale
@@ -479,6 +766,71 @@ def build_filters(validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
     
     filters = []
     unknown_params = []
+    
+    # ========================================================================
+    # SPECIAL HANDLING: Operating System Filter (v1.3.0)
+    # ========================================================================
+    # Check for operating_system, os_name, or os_exact parameters
+    os_param_keys = ["operating_system", "os_name", "os_exact"]
+    os_value = None
+    
+    for key in os_param_keys:
+        if key in kwargs:
+            os_value = kwargs.pop(key)  # Remove from kwargs to avoid duplicate processing
+            break
+    
+    if os_value:
+        if not client:
+            logger.error("Operating system filter requires client instance for smart lookup")
+        else:
+            # Match partial OS name to exact OS names
+            matched_os_names = match_operating_systems(os_value, client)
+            
+            if matched_os_names:
+                # Create exact-match filter for each matched OS
+                # Note: Multiple OS filters are OR'd by Tenable.sc API
+                for os_name in matched_os_names:
+                    filters.append({
+                        "filterName": "operatingSystem",
+                        "operator": "=",
+                        "value": f"'{os_name}'"  # Single quotes inside string
+                    })
+                    logger.debug(f"Added OS filter: {os_name}")
+            else:
+                logger.warning(f"No operating systems matched '{os_value}' - filter skipped. Use tsc_list_operating_systems() to discover valid OS names.")
+    
+    # ========================================================================
+    # SPECIAL HANDLING: Plugin Family Filter (v1.3.0 FIX)
+    # ========================================================================
+    if "family" in kwargs:
+        if not client:
+            logger.error("Plugin family filter requires client instance for smart lookup")
+        else:
+            family_value = kwargs.pop("family")  # Remove from kwargs
+            
+            # Handle list or single value
+            if isinstance(family_value, list):
+                family_values = family_value
+            else:
+                family_values = [family_value]
+            
+            # Resolve each name/ID to numeric ID
+            family_ids = []
+            for value in family_values:
+                family_id = resolve_plugin_family_id(value, client)
+                if family_id:
+                    family_ids.append(family_id)
+            
+            if family_ids:
+                # Format for API: [{"id": "20"}, {"id": "10"}]
+                filters.append({
+                    "filterName": "family",
+                    "operator": "=",
+                    "value": format_family_filter_value(family_ids)
+                })
+                logger.debug(f"Added family filter with IDs: {family_ids}")
+            else:
+                logger.warning(f"No valid plugin family IDs resolved from {family_values} - filter skipped. Use tsc_list_plugin_families() to discover valid names/IDs.")
     
     for param, value in kwargs.items():
         if value is None:
