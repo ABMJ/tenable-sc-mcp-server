@@ -54,6 +54,10 @@ def register_all_tools(mcp: "FastMCP") -> None:
     from .asset_discovery import register_tools as register_asset_discovery
     register_asset_discovery(mcp)
     
+    # Import and register admin tools (v1.3.0+)
+    from .admin import register_all_admin_tools
+    register_all_admin_tools(mcp)
+    
     # Future tool modules will be registered here as they're implemented
 
 
