@@ -35,7 +35,7 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 6: Regex CPE - Windows Server 2016-2019](#test-6-regex-cpe---windows-server-2016-2019)
   - [Test 7: CPE Documentation Access](#test-7-cpe-documentation-access)
 
-### Operating System & Plugin Family Tests (v1.3.0)
+### Operating System & Plugin Family Tests (v1.3.0 / v1.3.0.1)
 - [Operating System Filter Tests](#operating-system-filter-tests-v130)
   - [Test 1: Discover Available Operating Systems](#test-1-discover-available-operating-systems)
   - [Test 2: Exact Windows 10 Match](#test-2-exact-windows-10-match-zero-false-positives)
@@ -43,6 +43,10 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 4: Smart OS Lookup (Partial Match)](#test-4-smart-os-lookup-partial-match)
   - [Test 5: Exact Linux Match](#test-5-exact-linux-match)
   - [Test 6: Compare CPE vs Operating System](#test-6-compare-cpe-vs-operating-system-false-positive-check)
+  - [Test 7: Multi-OS Query Transparent Breakdown (v1.3.0.1)](#test-7-multi-os-query-transparent-breakdown-v1301)
+  - [Test 8: Multi-OS Vulnerability Summary (v1.3.0.1)](#test-8-multi-os-vulnerability-summary-v1301)
+  - [Test 9: Multi-OS Vulnerability Details with Deduplication (v1.3.0.1)](#test-9-multi-os-vulnerability-details-with-deduplication-v1301)
+  - [Test 10: Multi-OS CVE Search (v1.3.0.1)](#test-10-multi-os-cve-search-v1301)
 - [Plugin Family Filter Tests](#plugin-family-filter-tests-v130)
   - [Test 1: Discover Plugin Families](#test-1-discover-plugin-families)
   - [Test 2: Family Filter by Name](#test-2-family-filter-by-name-smart-lookup)
@@ -781,6 +785,143 @@ Second query: use tenable-sc to list IPs with os_name "Windows 10" in Default
 **Links:**
 - [CPE Test 4](#test-4-regex-cpe---windows-10-or-11)
 - [OS Test 4](#test-4-smart-os-lookup-partial-match)
+
+---
+
+### Test 7: Multi-OS Query Transparent Breakdown (v1.3.0.1)
+
+```
+I am testing multi-OS query with transparent breakdown for "Windows 10". Please format your response as:
+
+use tenable-sc to list IPs with os_name "Windows 10" in repository Default
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS for each OS query]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about multi-query execution and aggregation]
+📦 RESULT: 
+- OS variants found: [count]
+- Per-variant breakdown: [list with IP counts]
+- Total unique IPs: [count]
+- Duplicates removed: [count]
+```
+
+**Expected Result:**
+- ✅ Tool executes N queries (one per matched OS variant from listos)
+- ✅ Response includes `by_os_variant` with per-OS IP counts and lists
+- ✅ Response includes `deduplication_stats` showing aggregation details
+- ✅ Total unique IPs after deduplication (IPs appearing in multiple OS scans)
+- ✅ Transparent breakdown shows exact query behavior
+- ✅ Example: 3 OS variants → 3 API calls → 48 total IPs → 45 unique (3 duplicates)
+
+**Breakdown Format:**
+```json
+{
+  "total_ips": 45,
+  "by_os_variant": [
+    {"os_name": "Windows 10 Pro Build 19045", "ip_count": 30, "ips": [...]},
+    {"os_name": "Windows 10 Enterprise", "ip_count": 18, "ips": [...]}
+  ],
+  "deduplication_stats": {
+    "total_ips_across_queries": 48,
+    "unique_ips_after_dedup": 45,
+    "duplicate_ips_removed": 3,
+    "note": "3 IPs appeared in multiple OS queries"
+  }
+}
+```
+
+**Link:** [Tool 4: tsc_list_ips](#tool-4-ip-listing-tsc_list_ips)
+
+---
+
+### Test 8: Multi-OS Vulnerability Summary (v1.3.0.1)
+
+```
+I am testing multi-OS vulnerability summary with "Windows 10" filter. Please format your response as:
+
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with os_name "Windows 10"
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about multi-OS vuln aggregation]
+📦 RESULT:
+- OS variants queried: [count]
+- Total vulnerabilities aggregated: [count]
+- Per-variant breakdown: [list with severity counts]
+- Note about potential duplicate counting: [Yes/No]
+```
+
+**Expected Result:**
+- ✅ Tool executes N queries (one per matched OS variant)
+- ✅ Response includes `by_os_variant` with per-OS severity breakdowns
+- ✅ Aggregated total vulnerability counts across all OS variants
+- ✅ Note warns: "Counts may include duplicates if same vulnerability detected on multiple OS scans"
+- ✅ Useful for understanding scan coverage across OS variants
+
+**Link:** [Tool 2a: tsc_list_vulns_by_ip_summary](#summary-view-efficient)
+
+---
+
+### Test 9: Multi-OS Vulnerability Details with Deduplication (v1.3.0.1)
+
+```
+I am testing multi-OS vulnerability details with deduplication. Please format your response as:
+
+use tenable-sc to list detailed vulnerabilities for IP 10.1.20.10 with os_name "Windows 10" and severity "critical", show first 20
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about multi-OS vuln detail aggregation]
+📦 RESULT:
+- OS variants queried: [count]
+- Total unique vulnerabilities: [count]
+- Duplicates removed: [count]
+- Per-variant breakdown: [available/hidden]
+- Deduplication key: IP:plugin_id:port
+```
+
+**Expected Result:**
+- ✅ Tool executes N queries (one per matched OS variant)
+- ✅ Response includes `by_os_variant` with per-OS vulnerability lists
+- ✅ Response includes `deduplication_stats` with dedup details
+- ✅ Vulnerabilities deduplicated by composite key: `IP:plugin_id:port`
+- ✅ Same vulnerability detected on multiple OS scans counted only once
+- ✅ Final `vulnerabilities` array contains unique records only
+
+**Link:** [Tool 2b: tsc_list_vulns_by_ip_full](#full-details-view-tool-2---primary-test)
+
+---
+
+### Test 10: Multi-OS CVE Search (v1.3.0.1)
+
+```
+I am testing multi-OS CVE search with transparent breakdown. Please format your response as:
+
+use tenable-sc to find all assets with CVE-2021-44228 and os_name "Windows 10"
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about multi-OS CVE search]
+📦 RESULT:
+- CVE: CVE-2021-44228
+- OS variants queried: [count]
+- Total unique affected IPs: [count]
+- Per-variant breakdown: [list with IP counts]
+- Duplicates removed: [count]
+```
+
+**Expected Result:**
+- ✅ Tool executes N queries (one per matched OS variant)
+- ✅ Response includes `by_os_variant` with per-OS affected IP counts
+- ✅ Response includes `deduplication_stats` showing IP deduplication
+- ✅ IPs deduplicated by IP address (same IP on multiple OS scans)
+- ✅ Useful for scoping CVE impact across OS variants
+
+**Link:** [Tool 5: tsc_list_vulns_by_cve](#tool-5-cve-search)
 
 ---
 
