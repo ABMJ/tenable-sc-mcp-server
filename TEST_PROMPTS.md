@@ -36,16 +36,15 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 7: CPE Documentation Access](#test-7-cpe-documentation-access)
 
 ### 🧪 v1.3.0.1 Testing (THIS SESSION - REQUIRED)
-- [v1.3.0.1 Session Testing](#-v1301-session-testing-required) - **9 Tests Total**
-  - [Test 1: Multi-OS IP Listing](#test-1-multi-os-ip-listing-tsc_list_ips)
-  - [Test 2: Multi-OS CVE Search](#test-2-multi-os-cve-search-tsc_list_vulns_by_cve)
-  - [Test 3: OS Filter Validation Error](#test-3-os-filter-validation-error-per-ip-tool)
-  - [Test 4: Per-IP Vulnerability Summary](#test-4-per-ip-vulnerability-summary-regression-test)
-  - [Test 5: Per-IP Vulnerability Details](#test-5-per-ip-vulnerability-details-regression-test)
-  - [Test 6: Plugin Family Discovery](#test-6-plugin-family-discovery-tsc_list_plugin_families)
-  - [Test 7: Family Filter by Name](#test-7-plugin-family-filter-by-name-smart-lookup)
-  - [Test 8: Family Filter by ID](#test-8-plugin-family-filter-by-id-direct)
-  - [Test 9: Invalid Family Name](#test-9-invalid-plugin-family-name-error-handling)
+- [v1.3.0.1 Session Testing](#-v1301-session-testing-required) - **8 Tests Total**
+  - [Test 1: Multi-OS IP Listing](#test-1-multi-os-ip-listing)
+  - [Test 2: Multi-OS CVE Search](#test-2-multi-os-cve-search)
+  - [Test 3: Per-IP Vulnerability Summary](#test-3-per-ip-vulnerability-summary-regression)
+  - [Test 4: Per-IP Vulnerability Details](#test-4-per-ip-vulnerability-details-regression)
+  - [Test 5: Plugin Family Discovery](#test-5-plugin-family-discovery)
+  - [Test 6: Plugin Family Filter by Name](#test-6-plugin-family-filter-by-name)
+  - [Test 7: Plugin Family Filter by ID](#test-7-plugin-family-filter-by-id)
+  - [Test 8: Invalid Plugin Family Name](#test-8-invalid-plugin-family-name)
 
 ### Reference
 - [Visual Test Prompt Style Guide](#visual-test-prompt-style-guide)
