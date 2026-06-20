@@ -174,7 +174,8 @@ All critical issues from v1.2.1 have been resolved:
 - `CHANGELOG.md` - Version history and release notes
 
 **Developer Documentation:**
-- `.private/TOOLS_ROADMAP.md` - Future feature planning
+- `docs/development/TOOLS_ROADMAP.md` - Future feature planning
+- `docs/development/HANDOFF.md` - Session handoff notes
 - `DESIGN_PRINCIPLES.md` - Architecture patterns and decisions
 - `FILTER_FORMAT_REFERENCE.md` - Complete filter syntax guide
 
