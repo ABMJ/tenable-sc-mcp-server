@@ -614,8 +614,9 @@ def get_operating_systems(client: Any) -> list[dict]:
             "filters": []
         }
         
-        # Use existing analyze wrapper
-        result = client.analyze(query)
+        # Use server's tsc_analyze function (not client.analyze which doesn't exist)
+        from . import server
+        result = server.tsc_analyze(query)
         
         if not result.get("ok"):
             logger.error(f"Failed to fetch operating systems: {result.get('error')}")
