@@ -44,9 +44,8 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 5: Exact Linux Match](#test-5-exact-linux-match)
   - [Test 6: Compare CPE vs Operating System](#test-6-compare-cpe-vs-operating-system-false-positive-check)
   - [Test 7: Multi-OS Query Transparent Breakdown (v1.3.0.1)](#test-7-multi-os-query-transparent-breakdown-v1301)
-  - [Test 8: Multi-OS Vulnerability Summary (v1.3.0.1)](#test-8-multi-os-vulnerability-summary-v1301)
-  - [Test 9: Multi-OS Vulnerability Details with Deduplication (v1.3.0.1)](#test-9-multi-os-vulnerability-details-with-deduplication-v1301)
-  - [Test 10: Multi-OS CVE Search (v1.3.0.1)](#test-10-multi-os-cve-search-v1301)
+  - [Test 8: OS Filter Validation Error (Per-IP Tools) (v1.3.0.1)](#test-8-os-filter-validation-error-per-ip-tools-v1301)
+  - [Test 9: Multi-OS CVE Search (v1.3.0.1)](#test-9-multi-os-cve-search-v1301)
 - [Plugin Family Filter Tests](#plugin-family-filter-tests-v130)
   - [Test 1: Discover Plugin Families](#test-1-discover-plugin-families)
   - [Test 2: Family Filter by Name](#test-2-family-filter-by-name-smart-lookup)
@@ -835,67 +834,46 @@ use tenable-sc to list IPs with os_name "Windows 10" in repository Default
 
 ---
 
-### Test 8: Multi-OS Vulnerability Summary (v1.3.0.1)
+### Test 8: OS Filter Validation Error (Per-IP Tools) (v1.3.0.1)
 
 ```
-I am testing multi-OS vulnerability summary with "Windows 10" filter. Please format your response as:
+I am testing OS filter validation on per-IP vulnerability tools. Please format your response as:
 
 use tenable-sc to get vulnerability summary for IP 10.1.20.10 with os_name "Windows 10"
 
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about multi-OS vuln aggregation]
-📦 RESULT:
-- OS variants queried: [count]
-- Total vulnerabilities aggregated: [count]
-- Per-variant breakdown: [list with severity counts]
-- Note about potential duplicate counting: [Yes/No]
+✅/❌ TEST STATUS: [PASS if error returned, FAIL if query executed]
+📊 ERROR EXPECTED: Yes
+📝 SUMMARY: [one-liner about validation logic]
+📦 RESULT: Error message received: [Yes/No]
 ```
 
 **Expected Result:**
-- ✅ Tool executes N queries (one per matched OS variant)
-- ✅ Response includes `by_os_variant` with per-OS severity breakdowns
-- ✅ Aggregated total vulnerability counts across all OS variants
-- ✅ Note warns: "Counts may include duplicates if same vulnerability detected on multiple OS scans"
-- ✅ Useful for understanding scan coverage across OS variants
+- ✅ Tool returns clear error (does NOT execute query)
+- ✅ Error message: "OS filter not supported when querying specific IP"
+- ✅ Reason: "A single IP has only one OS version at scan time, not multiple variants"
+- ✅ Hint guides user to correct tools (tsc_profile_ip_efficient or tsc_list_ips)
+- ℹ️ Validates logical constraint: IP can't have multiple OS simultaneously
 
-**Link:** [Tool 2a: tsc_list_vulns_by_ip_summary](#summary-view-efficient)
+**Error Format:**
+```json
+{
+  "ok": false,
+  "error": "OS filter (operating_system/os_name/os_exact) not supported when querying specific IP",
+  "reason": "A single IP has only one OS version at scan time, not multiple variants",
+  "hint": "Use tsc_profile_ip_efficient() to see this IP's actual OS, or use tsc_list_ips() with OS filter to find multiple IPs with specific OS",
+  "ip": "10.1.20.10"
+}
+```
+
+**Also Test With:**
+- `tsc_list_vulns_by_ip_full(ip="10.1.20.10", os_name="Windows 10")` → Same error
+- Both per-IP tools reject OS filter consistently
+
+**Link:** [Tool 2: tsc_list_vulns_by_ip_summary](#summary-view-efficient)
 
 ---
 
-### Test 9: Multi-OS Vulnerability Details with Deduplication (v1.3.0.1)
-
-```
-I am testing multi-OS vulnerability details with deduplication. Please format your response as:
-
-use tenable-sc to list detailed vulnerabilities for IP 10.1.20.10 with os_name "Windows 10" and severity "critical", show first 20
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about multi-OS vuln detail aggregation]
-📦 RESULT:
-- OS variants queried: [count]
-- Total unique vulnerabilities: [count]
-- Duplicates removed: [count]
-- Per-variant breakdown: [available/hidden]
-- Deduplication key: IP:plugin_id:port
-```
-
-**Expected Result:**
-- ✅ Tool executes N queries (one per matched OS variant)
-- ✅ Response includes `by_os_variant` with per-OS vulnerability lists
-- ✅ Response includes `deduplication_stats` with dedup details
-- ✅ Vulnerabilities deduplicated by composite key: `IP:plugin_id:port`
-- ✅ Same vulnerability detected on multiple OS scans counted only once
-- ✅ Final `vulnerabilities` array contains unique records only
-
-**Link:** [Tool 2b: tsc_list_vulns_by_ip_full](#full-details-view-tool-2---primary-test)
-
----
-
-### Test 10: Multi-OS CVE Search (v1.3.0.1)
+### Test 9: Multi-OS CVE Search (v1.3.0.1)
 
 ```
 I am testing multi-OS CVE search with transparent breakdown. Please format your response as:
