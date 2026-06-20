@@ -712,20 +712,39 @@ def match_operating_systems(partial_name: str, client: Any) -> list[str]:
         
         os_name_lower = os_name.lower()
         
-        # All tokens must be present
-        if all(token in os_name_lower for token in user_tokens):
-            # Smart exclusion: If searching "Windows 10", exclude "Server" unless explicitly requested
-            if "server" in os_name_lower and "server" not in user_input:
-                logger.debug(f"Excluding '{os_name}' (contains 'server', not in user input)")
-                continue
-            
-            # Smart exclusion: If searching "Windows Server", exclude non-Server
-            if "server" in user_input and "server" not in os_name_lower:
-                logger.debug(f"Excluding '{os_name}' (user requested 'server', OS is not server)")
-                continue
-            
-            matches.append(os_name)
-            logger.debug(f"Matched OS: '{os_name}' for input '{partial_name}'")
+        # Check if all tokens match (word boundary aware for version numbers)
+        token_match = True
+        for token in user_tokens:
+            # For numeric tokens (version numbers), require word boundaries
+            if token.isdigit():
+                # Check if token exists as complete word (not substring)
+                # "10" should match "Windows 10" but NOT "Windows 11"
+                import re
+                pattern = r'\b' + re.escape(token) + r'\b'
+                if not re.search(pattern, os_name_lower):
+                    token_match = False
+                    break
+            else:
+                # For non-numeric tokens, use substring matching
+                if token not in os_name_lower:
+                    token_match = False
+                    break
+        
+        if not token_match:
+            continue
+        
+        # Smart exclusion: If searching "Windows 10", exclude "Server" unless explicitly requested
+        if "server" in os_name_lower and "server" not in user_input:
+            logger.debug(f"Excluding '{os_name}' (contains 'server', not in user input)")
+            continue
+        
+        # Smart exclusion: If searching "Windows Server", exclude non-Server
+        if "server" in user_input and "server" not in os_name_lower:
+            logger.debug(f"Excluding '{os_name}' (user requested 'server', OS is not server)")
+            continue
+        
+        matches.append(os_name)
+        logger.debug(f"Matched OS: '{os_name}' for input '{partial_name}'")
     
     logger.info(f"Found {len(matches)} OS matches for '{partial_name}'")
     
