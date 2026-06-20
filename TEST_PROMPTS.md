@@ -38,7 +38,7 @@ Use these prompts to test the tools and verify functionality. **Always append ca
 ### 🧪 v1.3.0.1 Testing (THIS SESSION - REQUIRED)
 - [v1.3.0.1 Session Testing](#-v1301-session-testing-required) - **8 Tests Total**
   - [Test 1: Multi-OS IP Listing](#test-1-multi-os-ip-listing)
-  - [Test 2: Multi-OS CVE Search](#test-2-multi-os-cve-search)
+  - [Test 2: CVE Search (Regression)](#test-2-cve-search-regression)
   - [Test 3: Per-IP Vulnerability Summary](#test-3-per-ip-vulnerability-summary-regression)
   - [Test 4: Per-IP Vulnerability Details](#test-4-per-ip-vulnerability-details-regression)
   - [Test 5: Plugin Family Discovery](#test-5-plugin-family-discovery)
@@ -46,7 +46,7 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 7: Plugin Family Filter by ID](#test-7-plugin-family-filter-by-id)
   - [Test 8: Invalid Plugin Family Name](#test-8-invalid-plugin-family-name)
 
-**Note:** Each test includes formatting instructions for Claude to report cache status and token usage
+**Note:** Test 2 simplified - OS filtering removed from CVE tool (LLM now orchestrates multi-step workflow)
 
 ### Reference
 - [Visual Test Prompt Style Guide](#visual-test-prompt-style-guide)
@@ -626,9 +626,13 @@ fetch the MCP resource tenable-sc://filters/format-reference and show me the CPE
 ## 🧪 v1.3.0.1 Session Testing (REQUIRED)
 
 **What was fixed:**
-- OS filter parameter alias (`os` now works alongside `os_name`, `operating_system`, `os_exact`)
-- Multi-query execution for OS filtering (one query per OS variant, with deduplication)
-- AttributeError fix in `get_operating_systems()` (now uses `server.tsc_analyze`)
+1. **Windows 11 exclusion:** OS matching now uses word-boundary detection for version numbers
+   - "Windows 10" no longer matches "Windows 11" (was matching "1" in "11")
+2. **OS filter parameter alias:** `os` now works alongside `os_name`, `operating_system`, `os_exact`
+3. **Multi-query execution:** OS filtering in `tsc_list_ips` (one query per OS variant, with deduplication)
+4. **Architecture simplification:** Removed OS filter from `tsc_list_vulns_by_cve` (LLM now orchestrates multi-step workflow)
+5. **API query format:** Fixed listos query structure to match Tenable.sc UI format
+6. **Response parsing:** Fixed nested response extraction (result['response']['response']['results'])
 
 **Container:** `tenable-sc-mcp:latest` (built from develop branch)
 
@@ -653,22 +657,23 @@ use tenable-sc to list IPs with os "Windows 10" in repository Default
 
 ---
 
-### Test 2: Multi-OS CVE Search
+### Test 2: CVE Search (Regression)
 
 **Copy and paste this entire block:**
 ```
-I am testing tsc_list_vulns_by_cve with multi-OS filter. Please format your response as:
+I am testing tsc_list_vulns_by_cve (regression test). Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used for this specific query only (exclude schema load)
-📝 SUMMARY: [one-liner about CVE search with OS filtering]
-📦 RESULT: CVE: CVE-2021-44228, OS variants: [count], Unique affected IPs: [count]
+📝 SUMMARY: [one-liner about CVE search results]
+📦 RESULT: CVE: CVE-2021-44228, Total affected IPs: [count], Severity breakdown: [summary]
 
-use tenable-sc to find all assets with CVE-2021-44228 and os "Windows 10"
+use tenable-sc to find all assets with CVE-2021-44228
 ```
 
-**Expected:** Only Windows 10 IPs with Log4Shell, multi-query breakdown, ~800-1,500 tokens
+**Expected:** All IPs with Log4Shell (no OS filter), ~800-1,200 tokens
+**Note:** OS filtering removed from this tool in v1.3.0.1 - LLM now handles multi-step workflow
 
 ---
 
@@ -789,8 +794,8 @@ use tenable-sc to find vulnerabilities in plugin family "InvalidFamilyXYZ123"
 
 | # | Test | Status | Tokens | Notes |
 |---|------|--------|--------|-------|
-| 1 | Multi-OS IP Listing | ✅ PASS | ~719 | 36 IPs returned |
-| 2 | Multi-OS CVE Search | ⬜ | | |
+| 1 | Multi-OS IP Listing | ⬜ | | Retest after Win11 fix |
+| 2 | CVE Search (Regression) | ⬜ | | Simplified (no OS filter) |
 | 3 | Per-IP Summary | ⬜ | | |
 | 4 | Per-IP Details | ⬜ | | |
 | 5 | Plugin Family Discovery | ⬜ | | |
