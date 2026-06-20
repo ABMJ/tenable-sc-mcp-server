@@ -122,6 +122,7 @@ COMMON_FILTERS = {
     "operating_system": "operatingSystem",  # Exact OS match - RECOMMENDED (smart partial matching)
     "os_name": "operatingSystem",           # Alias for user-friendliness
     "os_exact": "operatingSystem",          # Alias for explicit intent
+    "os": "operatingSystem",                # Short alias for convenience
     
     # Vulnerability Info (10 filters)
     "plugin_id": "pluginID",
@@ -785,7 +786,7 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> t
     # OS filters are NOT added to main filters list anymore.
     # Instead, matched OS names are returned separately for multi-query execution.
     # Reason: Tenable.sc API does NOT support OR logic for multiple same filterName.
-    os_param_keys = ["operating_system", "os_name", "os_exact"]
+    os_param_keys = ["operating_system", "os_name", "os_exact", "os"]
     os_value = None
     
     for key in os_param_keys:
