@@ -29,7 +29,7 @@ def register_tools(mcp):
         vulnerability type. Use the 'id' field in your family filter.
         
         Token Efficiency: ~800-1,200 tokens
-        Cache TTL: 600s (10 min - static data)
+        Cache TTL: 86400s (24 hours - static data, rarely changes)
         
         Args:
             search: Optional search term to filter families by name
@@ -87,9 +87,9 @@ def register_tools(mcp):
                         
                         families = result.get("response", [])
                         
-                        # Cache for 10 minutes (static data)
-                        client.cache.set(cache_key, families, ttl=600)
-                        logger.debug(f"Cached {len(families)} plugin families (TTL: 600s)")
+                        # Cache for 24 hours (static data)
+                        client.cache.set(cache_key, families, ttl=86400)
+                        logger.debug(f"Cached {len(families)} plugin families (TTL: 86400s / 24h)")
                 else:
                     # No cache - direct API call
                     result = client.get("pluginFamily", params={"fields": "name"})

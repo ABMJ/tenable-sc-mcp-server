@@ -441,7 +441,7 @@ def get_plugin_families(client: Any) -> dict[str, str]:
     
     Cache Strategy:
         - Key: "plugin_families_map"
-        - TTL: 600s (10 min - static data)
+        - TTL: 86400s (24 hours - static data, rarely changes)
         - Structure: {"windows": "20", "general": "30", ...}
     
     Args:
@@ -485,11 +485,11 @@ def get_plugin_families(client: Any) -> dict[str, str]:
             if "id" in family and "name" in family
         }
         
-        # Cache for 10 minutes
+        # Cache for 24 hours (static data)
         try:
             if hasattr(client, 'cache') and client.cache:
-                client.cache.set(cache_key, family_map, ttl=600)
-                logger.debug(f"Cached {len(family_map)} plugin families (TTL: 600s)")
+                client.cache.set(cache_key, family_map, ttl=86400)
+                logger.debug(f"Cached {len(family_map)} plugin families (TTL: 86400s / 24h)")
         except Exception as e:
             logger.warning(f"Cache write failed for plugin families: {e}")
         
