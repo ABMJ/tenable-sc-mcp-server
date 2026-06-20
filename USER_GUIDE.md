@@ -1,8 +1,8 @@
 # Tenable.sc MCP Server - User Guide
 
-**Version**: v1.2.2  
-**Last Updated**: 2026-06-19  
-**Status**: 5 Production-Ready Tools
+**Version**: v1.3.0.1  
+**Last Updated**: 2026-06-20  
+**Status**: 7 Production-Ready Tools
 
 ---
 
@@ -18,6 +18,8 @@
 3. [tsc_list_vulns_by_ip_full](#2b-tsc_list_vulns_by_ip_full---detailed-vulnerability-records) - Detailed Vulnerability Records
 4. [tsc_list_ips](#4-tsc_list_ips---ip-discovery--asset-enumeration) - IP Discovery & Asset Enumeration
 5. [tsc_list_vulns_by_cve](#5-tsc_list_vulns_by_cve---cve-search-across-infrastructure) - CVE Search Across Infrastructure
+6. [tsc_list_operating_systems](#6-tsc_list_operating_systems---os-name-discovery) - OS Name Discovery
+7. [tsc_list_plugin_families](#7-tsc_list_plugin_families---plugin-family-discovery) - Plugin Family Discovery
 
 ### Reference
 - [Universal Filter Framework](#universal-filter-framework)
@@ -42,7 +44,7 @@ The Tenable.sc MCP Server provides AI-powered tools for security vulnerability m
 
 - ✅ **Token Efficient**: 83-90% reduction in LLM token usage vs raw API calls
 - ✅ **Smart Caching**: Intelligent TTLs (60s-300s) for frequently accessed data
-- ✅ **Unified Filters**: 71+ filters work consistently across all tools
+- ✅ **Unified Filters**: 74+ filters work consistently across all tools
 - ✅ **Natural Language**: Use conversational commands with your AI assistant
 - ✅ **Production Ready**: Battle-tested with comprehensive error handling
 
@@ -698,9 +700,184 @@ for ip_data in result["affected_ips"]:
 
 ---
 
+## 6. `tsc_list_operating_systems` - OS Name Discovery
+
+**Status**: ✅ Production Ready | **Token Savings**: 80%+ | **Cache**: 300s  
+**Module**: `tools/assets/asset_discovery.py`
+
+### What This Tool Does
+
+Discovers all valid operating system names from the Tenable.sc listos API. Use this to find exact OS names for filtering with the `operating_system` filter.
+
+### When to Use This Tool
+
+- **Before OS Filtering**: "What OS names are available for filtering?"
+- **Asset Discovery Planning**: "Show me all Windows variants in the system"
+- **Filter Validation**: "Is 'Windows Server 2019' a valid OS name?"
+- **Inventory Analysis**: "List all Linux distributions detected"
+
+### How to Use It
+
+#### Basic Discovery
+```
+You: What operating systems are available?
+
+Claude: [Lists all OS names detected, e.g., "Windows 10", "Windows Server 2019", 
+         "Ubuntu 20.04", "CentOS Linux 7", etc.]
+```
+
+#### Find Specific OS Variants
+```
+You: Show me all Windows operating systems
+
+Claude: [Filters list to Windows variants only]
+```
+
+### What You Get Back
+
+```json
+{
+  "ok": true,
+  "total": 156,
+  "operating_systems": [
+    "Windows 10",
+    "Windows Server 2019",
+    "Windows 11",
+    "Ubuntu 20.04",
+    "CentOS Linux 7",
+    ...
+  ],
+  "cache_status": "HIT"
+}
+```
+
+### Key Features
+
+- **Live API Data**: Always reflects current Tenable.sc detection results
+- **Fast Caching**: 300s (5 minute) cache for quick repeated queries
+- **Use with Filters**: Get exact names for `operating_system` filter
+- **Token Efficient**: Compact list format, ~500-1,000 tokens
+
+### Pro Tips
+
+1. **Use before filtering**: Get exact OS name, then use in `tsc_list_ips`
+2. **Case sensitive**: Use exact name as returned (e.g., "Windows 10" not "windows 10")
+3. **Handles variants**: Returns all detected variants (e.g., 11 Windows 10 variants)
+
+### Example Workflow
+
+```python
+# Step 1: Discover OS names
+os_list = tsc_list_operating_systems()
+
+# Step 2: Find IPs with specific OS
+ips = tsc_list_ips(
+    repository="Default",
+    filters={"operating_system": "Windows 10"}  # Use exact name from step 1
+)
+```
+
+---
+
+## 7. `tsc_list_plugin_families` - Plugin Family Discovery
+
+**Status**: ✅ Production Ready | **Token Savings**: 85%+ | **Cache**: 86400s (24h)  
+**Module**: `tools/admin/plugins.py`
+
+### What This Tool Does
+
+Lists all 123 plugin families with their numeric IDs and names. Essential for using the `family` filter correctly, as Tenable.sc requires numeric family IDs internally.
+
+### When to Use This Tool
+
+- **Before Family Filtering**: "What plugin families are available?"
+- **Find Family ID**: "What's the ID for the Windows plugin family?"
+- **Discover Categories**: "List all compliance plugin families"
+- **Validate Filters**: "Does the 'Database' family exist?"
+
+### How to Use It
+
+#### List All Families
+```
+You: What plugin families are available?
+
+Claude: [Lists 123 families with IDs, e.g., 
+         "Windows (ID: 20)", "Red Hat Local Security Checks (ID: 21)", etc.]
+```
+
+#### Search for Specific Family
+```
+You: What's the ID for the Windows plugin family?
+
+Claude: Windows plugin family has ID 20
+```
+
+### What You Get Back
+
+```json
+{
+  "ok": true,
+  "total": 123,
+  "plugin_families": [
+    {
+      "id": "20",
+      "name": "Windows"
+    },
+    {
+      "id": "21",
+      "name": "Red Hat Local Security Checks"
+    },
+    {
+      "id": "23",
+      "name": "Misc."
+    },
+    ...
+  ],
+  "cache_status": "HIT"
+}
+```
+
+### Key Features
+
+- **Smart Name→ID Resolution**: Tools auto-resolve family names to IDs
+- **Long Cache**: 24-hour cache (families rarely change)
+- **123 Total Families**: Standard (75) + Extended (34) + WAS (14)
+- **Token Efficient**: ~3,000-4,000 tokens for full list
+
+### Pro Tips
+
+1. **Use names directly**: Tools accept "Windows" and auto-resolve to ID 20
+2. **Check Misc. family**: Many plugins are in "Misc." (ID 23), including Log4Shell
+3. **Case matters**: Use exact name (e.g., "Windows" not "windows")
+4. **Validation**: Invalid families raise helpful errors
+
+### Example Workflow
+
+```python
+# Step 1: Discover family names
+families = tsc_list_plugin_families()
+
+# Step 2: Filter vulnerabilities by family
+vulns = tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"family": "Windows"}  # Auto-resolves to ID 20
+)
+
+# Or filter IPs with vulnerabilities in specific family
+ips = tsc_list_ips(
+    repository="Default",
+    filters={
+        "family": "Windows",
+        "severity": "critical"
+    }
+)
+```
+
+---
+
 ## Universal Filter Framework
 
-All tools support 71+ filters via the `filters` dict parameter. Filters are consistent across all tools.
+All tools support 74+ filters via the `filters` dict parameter. Filters are consistent across all tools.
 
 ### Common Filters
 
@@ -755,7 +932,7 @@ filters = {
 
 ### Complete Filter Reference
 
-For complete list of all 71+ filters, see: [FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)
+For complete list of all 74+ filters, see: [FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)
 
 ### Filter Examples
 
@@ -935,7 +1112,7 @@ filters={"vpr_score": ">=8"}
 ### Additional Resources
 
 - **[DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)** - Architecture and design decisions
-- **[FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)** - Complete filter reference (71+ filters)
+- **[FILTER_FORMAT_REFERENCE.md](FILTER_FORMAT_REFERENCE.md)** - Complete filter reference (74+ filters)
 - **[TOOLS_ROADMAP.md](TOOLS_ROADMAP.md)** - Future features and development roadmap
 - **[README.md](README.md)** - Installation and setup instructions
 
@@ -947,8 +1124,8 @@ filters={"vpr_score": ">=8"}
 
 ### Version Information
 
-- **Current Version**: v1.2.2
-- **Last Updated**: 2026-06-19
+- **Current Version**: v1.3.0.1
+- **Last Updated**: 2026-06-20
 - **API Version**: Tenable.sc REST API 5.x+
 - **MCP Protocol**: 1.0+
 
