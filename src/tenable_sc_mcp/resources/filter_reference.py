@@ -26,13 +26,17 @@ def generate_filter_reference() -> str:
             "asset_id", "asset", "asset_criticality", "ip", "uuid", 
             "dns_name", "repository", "repository_ids"
         ],
+        "Operating System & Platform": [
+            "operating_system", "os_name", "os_exact", "os",
+            "cpe", "os_cpe"
+        ],
         "Vulnerability Information": [
             "plugin_id", "plugin_name", "plugin_text", "plugin_type",
             "family", "family_id", "severity", "port", "protocol", "data_format"
         ],
         "CVE & Compliance": [
             "cve_id", "cve", "cce_id", "iavm_id", "ms_bulletin_id",
-            "xref", "cpe", "os_cpe", "stig_severity"
+            "xref", "stig_severity"
         ],
         "Risk Scoring": [
             "base_cvss_score", "cvss_v3_base_score", "cvss_v4_base_score",
@@ -72,7 +76,7 @@ def generate_filter_reference() -> str:
     # Build markdown documentation
     md = """# Tenable.sc Analysis Filter Reference
 
-**Version:** 1.2 (CPE Smart Operator Support)  
+**Version:** 1.3.0.1 (OS Filtering & Plugin Family Validation)  
 **Total Filters:** {total_filters}  
 **Resource URI:** `tenable-sc://filters/reference`
 
@@ -92,10 +96,63 @@ Filters enable precise queries across vulnerability data, asset discovery, and s
 
 **Tools that accept filters:**
 - `tsc_list_vulns_by_cve` - Search CVE across infrastructure
-- `tsc_list_ips` - IP discovery with filtering
+- `tsc_list_ips` - IP discovery with filtering (supports OS multi-query)
 - `tsc_list_vulns_by_ip_full` - Detailed vulnerability records
 - `tsc_list_vulns_by_ip_summary` - Vulnerability counts
 - `tsc_profile_ip_efficient` - IP security profile
+
+---
+
+## 🖥️ OS Filtering Methods (v1.3.0.1)
+
+**Two approaches for operating system filtering:**
+
+### Method 1: `operating_system` Filter (Recommended - Zero False Positives)
+
+Smart token-based matching with word boundaries. Use this for simple, precise OS queries.
+
+**Supported Aliases:** `operating_system`, `os_name`, `os_exact`, `os`
+
+```python
+# Simple text matching with automatic variant discovery
+tsc_list_ips(repository="Default", filters={{"operating_system": "Windows 10"}})  
+# Returns: 11 Windows 10 variants (Pro, Enterprise, Home, LTSB, multi-OS entries)
+# Excludes: Windows 11 (word-boundary matching prevents false positives)
+
+tsc_list_ips(filters={{"os_name": "Ubuntu 20.04"}})       # All Ubuntu 20.04 variants
+tsc_list_ips(filters={{"os": "CentOS 7"}})                # All CentOS 7 variants
+```
+
+**How It Works:**
+- Queries Tenable.sc `listos` tool for all OS names
+- Smart token matching: "Windows 10" matches "Microsoft Windows 10 Pro"
+- Word boundaries: "Windows 10" does NOT match "Windows 11"
+- Multi-query execution: One query per matched OS variant
+- Automatic deduplication of results
+
+**Discovery Tool:** `tsc_list_operating_systems()` - Shows all available OS names (300s cache)
+
+### Method 2: `cpe` Filter (Advanced - Regex Support)
+
+CPE (Common Platform Enumeration) filtering with smart operator detection.
+Use this for complex queries requiring regex patterns.
+
+```python
+# Simple string matching (auto-uses '~=' operator)
+tsc_list_ips(filters={{"cpe": "microsoft:windows"}})    # All Windows
+tsc_list_ips(filters={{"cpe": "linux"}})                # All Linux
+
+# Regex pattern matching (auto-uses 'pcre' operator)
+tsc_list_ips(filters={{"cpe": ".*windows.*(10|11).*"}})        # Win 10 OR 11
+tsc_list_ips(filters={{"cpe": ".*cisco.*(ios|asa).*"}})        # Cisco IOS OR ASA
+
+# Exact CPE matching (auto-uses '=' operator)
+tsc_list_ips(filters={{"cpe": "cpe:/o:microsoft:windows_10"}})
+```
+
+**When to Use Each Method:**
+- **Use `operating_system`** for: Simple queries, zero false positives, automatic variant discovery
+- **Use `cpe`** for: Complex regex patterns, advanced filtering, OR logic across platforms
 
 ---
 
@@ -288,44 +345,49 @@ tsc_list_vulns_by_ip_full("10.1.20.10",
 # Find assets in specific repository
 tsc_list_ips(repository="PCI Assets")
 
-# Filter by plugin family
-tsc_list_vulns_by_ip_full("10.1.20.10", family="Windows")
+# Filter by plugin family (auto name→ID resolution)
+tsc_list_vulns_by_ip_full("10.1.20.10", family="Windows")  # Resolves to ID 20
 
 # Search by MS bulletin
 tsc_list_vulns_by_ip_full("10.1.20.10", ms_bulletin_id="MS17-010")
 ```
 
-### OS/Platform Filtering (CPE)
+### OS Filtering Examples
 ```python
-# Simple string matching (auto-uses '~=' operator)
-tsc_list_ips(filters={{"cpe": "microsoft:windows"}})    # All Windows
-tsc_list_ips(filters={{"cpe": "linux"}})                # All Linux
-tsc_list_ips(filters={{"cpe": "cisco"}})                # All Cisco
+# Method 1: operating_system filter (recommended - zero false positives)
+tsc_list_ips(repository="Default", filters={{"operating_system": "Windows 10"}})  # 11 variants
+tsc_list_ips(filters={{"os_name": "Ubuntu 20.04"}})                              # All Ubuntu 20.04
+tsc_list_ips(filters={{"os": "CentOS 7"}})                                       # All CentOS 7
 
-# Regex pattern matching (auto-uses 'pcre' operator)
+# Method 2: CPE filter (advanced - regex support)
 tsc_list_ips(filters={{"cpe": ".*windows.*(10|11).*"}})        # Win 10 OR 11
-tsc_list_ips(filters={{"cpe": ".*windows_server_201[6-9].*"}}) # Server 2016-2019
-
-# Exact CPE matching (auto-uses '=' operator)
-tsc_list_ips(filters={{"cpe": "cpe:/o:microsoft:windows_10"}})
-
-# Both 'cpe' and 'os_cpe' parameters work (aliases)
-tsc_list_ips(filters={{"os_cpe": ".*cisco.*(ios|asa).*"}})
+tsc_list_ips(filters={{"cpe": ".*cisco.*(ios|asa).*"}})        # Cisco IOS OR ASA
+tsc_list_ips(filters={{"cpe": "cpe:/o:microsoft:windows_10"}}) # Exact CPE
 ```
 
-**📘 For complete CPE documentation, examples, and operator details:**
-Fetch MCP resource: `tenable-sc://filters/format-reference` (Section: OS Filtering)
+### Plugin Family Filtering
+```python
+# By name (auto-resolves to ID)
+tsc_list_vulns_by_cve("CVE-2021-44228", filters={{"family": "Misc."}})     # ID 23
+tsc_list_ips(repository="Default", filters={{"family": "Windows"}})         # ID 20
+
+# By ID (direct pass-through)
+tsc_list_ips(repository="Default", filters={{"family": "20"}})              # Windows family
+
+# Discovery tool
+tsc_list_plugin_families()  # Shows all 123 families with IDs (24h cache)
+```
 
 ### Network-Based Queries
 ```python
 # Find vulnerabilities on specific port
-tsc_list_vulns_by_ip_full("10.1.20.10", port=443, protocol="TCP")
+tsc_list_vulns_by_ip_full("10.1.20.10", filters={{"port": 443, "protocol": "TCP"}})
 
 # Identify assets with DNS name pattern
-tsc_list_ips(dns_name="webserver", repository="DMZ")
+tsc_list_ips(repository="DMZ", filters={{"dns_name": "webserver"}})
 
 # Port-specific vulnerability search
-tsc_list_vulns_by_cve("CVE-2014-0160", port=443)  # Heartbleed
+tsc_list_vulns_by_cve("CVE-2014-0160", filters={{"port": 443}})  # Heartbleed
 ```
 
 ### Complex Multi-Filter Queries
