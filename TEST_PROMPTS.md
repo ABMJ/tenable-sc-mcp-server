@@ -55,6 +55,14 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 6: Search Plugin Families](#test-6-search-plugin-families-discovery-helper)
 - [New Tools (v1.3.0)](#quick-reference-new-tools-v130)
 
+### v1.3.0.1 Testing (Required)
+- [v1.3.0.1 Multi-Query OS Filter Tests](#v1301-multi-query-os-filter-tests)
+  - [Test 1: Multi-OS IP Listing](#test-1-multi-os-ip-listing-tsc_list_ips)
+  - [Test 2: Multi-OS CVE Search](#test-2-multi-os-cve-search-tsc_list_vulns_by_cve)
+  - [Test 3: OS Filter Validation Error](#test-3-os-filter-validation-error-per-ip-tool)
+  - [Test 4: Per-IP Vulnerability Summary](#test-4-per-ip-vulnerability-summary-regression-test)
+  - [Test 5: Per-IP Vulnerability Details](#test-5-per-ip-vulnerability-details-regression-test)
+
 ### Reference
 - [Visual Test Prompt Style Guide](#visual-test-prompt-style-guide)
 - [Notes & Best Practices](#notes--best-practices)
@@ -1099,173 +1107,166 @@ use tenable-sc to list plugin families with search "Windows"
 ---
 
 
-## 🧪 **v1.3.0.1 TESTING CHECKLIST**
+---
 
-**Purpose:** Validate OS filter logic fix and verify per-IP tools still work correctly
+## v1.3.0.1 Multi-Query OS Filter Tests
 
-**Container:** `tenable-sc-mcp:v1.3.0.1` (rebuilt)
+**Purpose:** Validate OS filtering with multi-query execution and transparent breakdown
+
+**Container:** `tenable-sc-mcp:v1.3.0.1`
 
 ---
 
-### **Category 1: Multi-Query OS Filter (2 tests)**
+### Test 1: Multi-OS IP Listing (tsc_list_ips)
 
-These tools SHOULD support OS filter with multi-query execution:
+```
+I am testing tsc_list_ips with multi-OS filter to list Windows 10 assets. Please format your response as:
 
-#### **TEST 1: Multi-OS IP Listing (tsc_list_ips)**
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about multi-query execution]
+📦 RESULT: OS variants: [count], Total unique IPs: [count], Duplicates removed: [count]
+```
 
+**Test Command:**
 ```
 use tenable-sc to list IPs with os_name "Windows 10" in repository Default
 ```
 
-**Expected:**
-- ✅ Multiple queries executed (one per matched OS variant)
-- ✅ Response includes `by_os_variant` breakdown
-- ✅ Response includes `deduplication_stats`
-- ✅ Transparent breakdown shows per-OS IP counts
+**Expected Output:**
+- Multiple queries executed (one per matched OS variant from listos)
+- Response includes `by_os_variant` with per-OS IP counts
+- Response includes `deduplication_stats` showing aggregation
+- Example: 3 OS variants → 3 API calls → 48 total IPs → 45 unique
 
-**Format Your Response:**
-```
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner]
-📦 RESULT:
-  - OS variants found: [count]
-  - Total unique IPs: [count]
-  - Duplicates removed: [count]
-```
+**Token Efficiency:** Varies by number of OS variants matched
 
 ---
 
-#### **TEST 2: Multi-OS CVE Search (tsc_list_vulns_by_cve)**
+### Test 2: Multi-OS CVE Search (tsc_list_vulns_by_cve)
 
+```
+I am testing tsc_list_vulns_by_cve with multi-OS filter for Log4Shell. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about CVE search with OS filtering]
+📦 RESULT: CVE: CVE-2021-44228, OS variants: [count], Unique affected IPs: [count]
+```
+
+**Test Command:**
 ```
 use tenable-sc to find all assets with CVE-2021-44228 and os_name "Windows 10"
 ```
 
-**Expected:**
-- ✅ Multiple queries executed (one per matched OS variant)
-- ✅ Response includes `by_os_variant` breakdown
-- ✅ Response includes `deduplication_stats`
-- ✅ IPs deduplicated across OS variants
+**Expected Output:**
+- Multiple queries executed (one per matched OS variant)
+- Response includes `by_os_variant` with per-OS affected IP counts
+- Response includes `deduplication_stats` for IP deduplication
+- IPs deduplicated by IP address across OS variants
 
-**Format Your Response:**
-```
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner]
-📦 RESULT:
-  - CVE: CVE-2021-44228
-  - OS variants found: [count]
-  - Total unique IPs: [count]
-```
+**Token Efficiency:** ~800-1,500 tokens (varies by results)
 
 ---
 
-### **Category 2: OS Filter Validation (1 test)**
-
-This tool should REJECT OS filter with clear error:
-
-#### **TEST 3: OS Filter Validation Error**
+### Test 3: OS Filter Validation Error (Per-IP Tool)
 
 ```
-use tenable-sc to get vulnerability summary for IP 10.1.20.10 with os_name "Windows 10"
-```
+I am testing OS filter validation on per-IP vulnerability tools. Please format your response as:
 
-**Expected:**
-- ✅ Error returned (NO query executed)
-- ✅ Error message: "OS filter not supported when querying specific IP"
-- ✅ Helpful hint guides user to correct tools
-
-**Format Your Response:**
-```
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📝 ERROR RECEIVED: [Yes/No]
 📦 ERROR MESSAGE: [paste error message]
 ```
 
+**Test Command:**
+```
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with os_name "Windows 10"
+```
+
+**Expected Output:**
+- Error returned (NO query executed)
+- Error: "OS filter (operating_system/os_name/os_exact) not supported when querying specific IP"
+- Reason: "A single IP has only one OS version at scan time, not multiple variants"
+- Hint guides user to correct tools (tsc_profile_ip_efficient or tsc_list_ips)
+
 ---
 
-### **Category 3: Per-IP Tools Regression (2 tests)**
+### Test 4: Per-IP Vulnerability Summary (Regression Test)
 
-Verify these tools still work correctly WITHOUT OS filter:
+```
+I am testing tsc_list_vulns_by_ip_summary for normal operation without OS filter. Please format your response as:
 
-#### **TEST 4: Per-IP Vulnerability Summary (No OS Filter)**
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about vulnerability summary]
+📦 RESULT: Total: [count], Critical: [count], High: [count], Medium: [count], Low: [count], Info: [count]
+```
 
+**Test Command:**
 ```
 use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical
 ```
 
-**Expected:**
-- ✅ Query executes normally
-- ✅ Returns vulnerability summary by severity
-- ✅ No error about OS filter
-- ✅ Normal single-query behavior
+**Expected Output:**
+- Query executes normally (no errors)
+- Returns vulnerability summary by severity
+- Compact aggregated format
+- Normal single-query behavior
 
-**Format Your Response:**
-```
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📦 RESULT: Total: [count], Critical: [count], High: [count], Medium: [count], Low: [count], Info: [count]
-```
+**Token Efficiency:** ~700 tokens (vs ~6,000 raw) = 88% reduction
 
 ---
 
-#### **TEST 5: Per-IP Vulnerability Details (No OS Filter)**
+### Test 5: Per-IP Vulnerability Details (Regression Test)
 
+```
+I am testing tsc_list_vulns_by_ip_full for normal operation without OS filter. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about detailed vulnerability records]
+📦 RESULT: Returned [count] records of [total] total, First 3 plugins: [list]
+```
+
+**Test Command:**
 ```
 use tenable-sc to list detailed vulnerabilities for IP 10.1.20.10 with severity critical, show first 10
 ```
 
-**Expected:**
-- ✅ Query executes normally
-- ✅ Returns detailed vulnerability records
-- ✅ Pagination works correctly
-- ✅ No error about OS filter
+**Expected Output:**
+- Query executes normally (no errors)
+- 10 detailed vulnerability records
+- Plugin ID, name, severity, CVSS/VPR scores
+- Pagination works correctly (10 of X total)
 
-**Format Your Response:**
-```
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📦 RESULT: Returned [count] records of [total] total, First 3 plugins: [list]
-```
+**Token Efficiency:** ~5,000 tokens for 50 records (vs ~12,000 raw) = 58% reduction
 
 ---
 
-### **📋 SUMMARY TABLE**
+## Test Results Summary
 
-Copy this table and fill in results:
-
-| Test | Tool | OS Filter? | Expected | Result |
-|------|------|------------|----------|--------|
-| 1 | tsc_list_ips | YES | Multi-query + breakdown | ✅❌⚠️ |
-| 2 | tsc_list_vulns_by_cve | YES | Multi-query + breakdown | ✅❌⚠️ |
-| 3 | tsc_list_vulns_by_ip_summary | YES | Validation error | ✅❌⚠️ |
-| 4 | tsc_list_vulns_by_ip_summary | NO | Normal summary | ✅❌⚠️ |
-| 5 | tsc_list_vulns_by_ip_full | NO | Normal details | ✅❌⚠️ |
+| # | Test | Tool | OS Filter | Expected | Result |
+|---|------|------|-----------|----------|--------|
+| 1 | Multi-OS IP Listing | tsc_list_ips | YES | Multi-query + breakdown | ⬜ |
+| 2 | Multi-OS CVE Search | tsc_list_vulns_by_cve | YES | Multi-query + breakdown | ⬜ |
+| 3 | OS Filter Validation | tsc_list_vulns_by_ip_summary | YES | Validation error | ⬜ |
+| 4 | Per-IP Summary | tsc_list_vulns_by_ip_summary | NO | Normal summary | ⬜ |
+| 5 | Per-IP Details | tsc_list_vulns_by_ip_full | NO | Normal details | ⬜ |
 
 **Legend:**
 - ✅ PASS - Works as expected
-- ❌ FAIL - Broken or wrong behavior
+- ❌ FAIL - Broken or incorrect behavior  
 - ⚠️ PARTIAL - Works but with issues
+- ⬜ NOT TESTED
 
----
-
-### **🚀 HOW TO TEST**
-
-1. **Container Status:**
-   ```bash
-   docker ps | grep tenable-sc-mcp
-   docker logs tenable-sc-mcp 2>&1 | tail -10
-   ```
-
-2. **Run Each Test:** Copy test prompt from above, run in MCP client
-
-3. **Record Results:** Fill in summary table with ✅❌⚠️
-
-4. **Report Back:** Paste summary table + any error messages
+**Instructions:**
+1. Run each test command in your MCP client
+2. Fill in "Result" column with ✅/❌/⚠️
+3. Report summary table + any error messages
 
 ---
