@@ -295,10 +295,6 @@ def register_tools(mcp):
                 logger.info(f"Multi-OS query complete: {len(ip_data)} unique IPs across {len(os_names_to_query)} OS variants")
             else:
                 # SINGLE-QUERY PATH: No OS filter, execute normally
-                import json
-                print("DEBUG: Filters being sent to Tenable.sc API:")
-                print(json.dumps(filter_list, indent=2))
-                
                 query = {
                     "type": "vuln",
                     "query": {
