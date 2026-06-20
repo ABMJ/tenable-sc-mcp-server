@@ -1097,3 +1097,175 @@ use tenable-sc to list plugin families with search "Windows"
 **Module:** `tools/admin/plugins.py`
 
 ---
+
+
+## 🧪 **v1.3.0.1 TESTING CHECKLIST**
+
+**Purpose:** Validate OS filter logic fix and verify per-IP tools still work correctly
+
+**Container:** `tenable-sc-mcp:v1.3.0.1` (rebuilt)
+
+---
+
+### **Category 1: Multi-Query OS Filter (2 tests)**
+
+These tools SHOULD support OS filter with multi-query execution:
+
+#### **TEST 1: Multi-OS IP Listing (tsc_list_ips)**
+
+```
+use tenable-sc to list IPs with os_name "Windows 10" in repository Default
+```
+
+**Expected:**
+- ✅ Multiple queries executed (one per matched OS variant)
+- ✅ Response includes `by_os_variant` breakdown
+- ✅ Response includes `deduplication_stats`
+- ✅ Transparent breakdown shows per-OS IP counts
+
+**Format Your Response:**
+```
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner]
+📦 RESULT:
+  - OS variants found: [count]
+  - Total unique IPs: [count]
+  - Duplicates removed: [count]
+```
+
+---
+
+#### **TEST 2: Multi-OS CVE Search (tsc_list_vulns_by_cve)**
+
+```
+use tenable-sc to find all assets with CVE-2021-44228 and os_name "Windows 10"
+```
+
+**Expected:**
+- ✅ Multiple queries executed (one per matched OS variant)
+- ✅ Response includes `by_os_variant` breakdown
+- ✅ Response includes `deduplication_stats`
+- ✅ IPs deduplicated across OS variants
+
+**Format Your Response:**
+```
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner]
+📦 RESULT:
+  - CVE: CVE-2021-44228
+  - OS variants found: [count]
+  - Total unique IPs: [count]
+```
+
+---
+
+### **Category 2: OS Filter Validation (1 test)**
+
+This tool should REJECT OS filter with clear error:
+
+#### **TEST 3: OS Filter Validation Error**
+
+```
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with os_name "Windows 10"
+```
+
+**Expected:**
+- ✅ Error returned (NO query executed)
+- ✅ Error message: "OS filter not supported when querying specific IP"
+- ✅ Helpful hint guides user to correct tools
+
+**Format Your Response:**
+```
+✅/❌ TEST STATUS: [PASS/FAIL]
+📝 ERROR RECEIVED: [Yes/No]
+📦 ERROR MESSAGE: [paste error message]
+```
+
+---
+
+### **Category 3: Per-IP Tools Regression (2 tests)**
+
+Verify these tools still work correctly WITHOUT OS filter:
+
+#### **TEST 4: Per-IP Vulnerability Summary (No OS Filter)**
+
+```
+use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical
+```
+
+**Expected:**
+- ✅ Query executes normally
+- ✅ Returns vulnerability summary by severity
+- ✅ No error about OS filter
+- ✅ Normal single-query behavior
+
+**Format Your Response:**
+```
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📦 RESULT: Total: [count], Critical: [count], High: [count], Medium: [count], Low: [count], Info: [count]
+```
+
+---
+
+#### **TEST 5: Per-IP Vulnerability Details (No OS Filter)**
+
+```
+use tenable-sc to list detailed vulnerabilities for IP 10.1.20.10 with severity critical, show first 10
+```
+
+**Expected:**
+- ✅ Query executes normally
+- ✅ Returns detailed vulnerability records
+- ✅ Pagination works correctly
+- ✅ No error about OS filter
+
+**Format Your Response:**
+```
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📦 RESULT: Returned [count] records of [total] total, First 3 plugins: [list]
+```
+
+---
+
+### **📋 SUMMARY TABLE**
+
+Copy this table and fill in results:
+
+| Test | Tool | OS Filter? | Expected | Result |
+|------|------|------------|----------|--------|
+| 1 | tsc_list_ips | YES | Multi-query + breakdown | ✅❌⚠️ |
+| 2 | tsc_list_vulns_by_cve | YES | Multi-query + breakdown | ✅❌⚠️ |
+| 3 | tsc_list_vulns_by_ip_summary | YES | Validation error | ✅❌⚠️ |
+| 4 | tsc_list_vulns_by_ip_summary | NO | Normal summary | ✅❌⚠️ |
+| 5 | tsc_list_vulns_by_ip_full | NO | Normal details | ✅❌⚠️ |
+
+**Legend:**
+- ✅ PASS - Works as expected
+- ❌ FAIL - Broken or wrong behavior
+- ⚠️ PARTIAL - Works but with issues
+
+---
+
+### **🚀 HOW TO TEST**
+
+1. **Container Status:**
+   ```bash
+   docker ps | grep tenable-sc-mcp
+   docker logs tenable-sc-mcp 2>&1 | tail -10
+   ```
+
+2. **Run Each Test:** Copy test prompt from above, run in MCP client
+
+3. **Record Results:** Fill in summary table with ✅❌⚠️
+
+4. **Report Back:** Paste summary table + any error messages
+
+---
