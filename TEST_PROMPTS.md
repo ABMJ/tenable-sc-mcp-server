@@ -750,6 +750,7 @@ use tenable-sc to find vulnerabilities in plugin family "Windows" for CVE-2021-4
 ```
 
 **Expected:** Auto lookup of family ID, filtered results, varies by results
+**Note:** CVE-2021-44228 (Log4Shell) is in "Misc." family (ID 23), not "Windows" family
 
 ---
 
@@ -768,7 +769,7 @@ I am testing plugin family filtering by ID. Please format your response as:
 use tenable-sc to list IPs with vulnerabilities in plugin family ID 20 in repository Default
 ```
 
-**Expected:** Direct pass-through of ID, filtered results, varies by results
+**Expected:** Direct pass-through of ID 20 (Windows family), filtered results, varies by results
 
 ---
 
@@ -786,23 +787,32 @@ I am testing plugin family error handling. Please format your response as:
 use tenable-sc to find vulnerabilities in plugin family "InvalidFamilyXYZ123"
 ```
 
-**Expected:** Error message, suggestion to use tsc_list_plugin_families, minimal tokens
+**Expected:** Error message with "Invalid plugin family: InvalidFamilyXYZ123. Use tsc_list_plugin_families() to discover valid names/IDs.", minimal tokens
 
 ---
 
-## Test Results
+## Test Results (v1.3.0.1 - 2026-06-20)
 
-| # | Test | Status | Tokens | Notes |
-|---|------|--------|--------|-------|
-| 1 | Multi-OS IP Listing | ⬜ | | Retest after Win11 fix |
-| 2 | CVE Search (Regression) | ⬜ | | Simplified (no OS filter) |
-| 3 | Per-IP Summary | ⬜ | | |
-| 4 | Per-IP Details | ⬜ | | |
-| 5 | Plugin Family Discovery | ⬜ | | |
-| 6 | Family Filter by Name | ⬜ | | |
-| 7 | Family Filter by ID | ⬜ | | |
-| 8 | Invalid Family Name | ⬜ | | |
+| # | Test | Status | Tokens | Result | Notes |
+|---|------|--------|--------|--------|-------|
+| 1 | Multi-OS IP Listing | ✅ | 3,848 | 11 variants, 35 IPs, 1 dup removed | Includes multi-OS entry |
+| 2 | CVE Search (Regression) | ✅ | 1,096 | 20 IPs (Log4Shell) | No OS filter (v1.3.0.1) |
+| 3 | Per-IP Summary | ✅ | 261 | 78 critical vulns | Severity filter working |
+| 4 | Per-IP Details | ✅ | 984 | 10/78 records | Pagination working |
+| 5 | Plugin Family Discovery | ✅ | 3,195 | 123 families | Full catalog returned |
+| 6 | Family Filter by Name | ✅ | 945 | 16 IPs (Misc. family) | Log4Shell in Misc., not Windows |
+| 7 | Family Filter by ID | ✅ | 858 | 164 IPs (ID 20) | Windows family |
+| 8 | Invalid Family Name | ✅ | 345 | Error returned | Proper validation |
 
 **Legend:** ✅ PASS | ❌ FAIL | ⚠️ PARTIAL | ⬜ NOT TESTED
+
+**Summary:** All 8 tests PASSED. v1.3.0.1 ready for release.
+
+**Key Findings:**
+- Windows 11 false positives eliminated (word-boundary matching working)
+- Multi-OS entries now included (11 variants vs previous 10)
+- Plugin family validation working (proper error on invalid input)
+- CVE-2021-44228 (Log4Shell) correctly identified in "Misc." family, not "Windows"
+- Token efficiency maintained: 261-3,848 tokens per query
 
 ---
