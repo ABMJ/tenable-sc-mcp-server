@@ -470,15 +470,15 @@ def get_plugin_families(client: Any) -> dict[str, str]:
     
     # Cache miss - fetch from API
     try:
-        # Call GET /rest/pluginFamily?fields=name using tsc_list_plugin_families
-        from .server import tsc_list_plugin_families
-        result = tsc_list_plugin_families()
+        # Call GET /rest/pluginFamily?fields=name
+        response = client.request("GET", "pluginFamily", params={"fields": "name"})
         
-        if not result.get("ok"):
-            logger.error(f"Failed to fetch plugin families: {result.get('error')}")
+        # Parse response structure (same as OS list)
+        if response.get("error_code", 0) != 0:
+            logger.error(f"Failed to fetch plugin families: {response.get('error_msg', 'Unknown error')}")
             return {}
         
-        families = result.get("families", [])
+        families = response.get("response", [])
         
         # Build name→ID mapping (lowercase for case-insensitive lookup)
         family_map = {
