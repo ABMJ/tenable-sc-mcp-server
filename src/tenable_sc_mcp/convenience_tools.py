@@ -711,7 +711,7 @@ def match_operating_systems(partial_name: str, client: Any) -> list[str]:
     return matches
 
 
-def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
+def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Universal filter builder for all convenience tools.
     
@@ -721,6 +721,8 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> l
     Validates parameters and warns about unknown filters.
     
     v1.3.0: Added smart lookup for operating_system and family filters.
+    v1.3.0.1: CRITICAL FIX - OS filters now returned separately for multi-query execution.
+              Tenable.sc API does NOT support multiple filters with same filterName (no OR logic).
     
     Args:
         client: Tenable.sc client instance (required for OS and family smart lookup)
@@ -728,7 +730,16 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> l
         **kwargs: Filter parameters using convenience names (e.g., ip="10.1.20.10")
     
     Returns:
-        List of filter dictionaries for analysis queries
+        tuple: (filters_list, os_names_list)
+        - filters_list: Regular filters WITHOUT OS filters (single query compatible)
+        - os_names_list: Matched OS names for separate query execution (empty if no OS filter)
+                        Tools must execute one query per OS name and aggregate results.
+    
+    Example:
+        >>> filters, os_names = build_filters(client, os_name="Windows 10", severity="critical")
+        >>> # os_names = ["Windows 10 Pro Build 19045", "Windows 10 Enterprise"]
+        >>> # filters = [{"filterName": "severity", "operator": "=", "value": "4"}]
+        >>> # Tool must run 2 queries (one per OS) and aggregate results
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -765,12 +776,15 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> l
     }
     
     filters = []
+    os_names_to_query = []  # v1.3.0.1: Separate OS names for multi-query execution
     unknown_params = []
     
     # ========================================================================
-    # SPECIAL HANDLING: Operating System Filter (v1.3.0)
+    # SPECIAL HANDLING: Operating System Filter (v1.3.0.1 FIX)
     # ========================================================================
-    # Check for operating_system, os_name, or os_exact parameters
+    # OS filters are NOT added to main filters list anymore.
+    # Instead, matched OS names are returned separately for multi-query execution.
+    # Reason: Tenable.sc API does NOT support OR logic for multiple same filterName.
     os_param_keys = ["operating_system", "os_name", "os_exact"]
     os_value = None
     
@@ -787,15 +801,8 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> l
             matched_os_names = match_operating_systems(os_value, client)
             
             if matched_os_names:
-                # Create exact-match filter for each matched OS
-                # Note: Multiple OS filters are OR'd by Tenable.sc API
-                for os_name in matched_os_names:
-                    filters.append({
-                        "filterName": "operatingSystem",
-                        "operator": "=",
-                        "value": f"'{os_name}'"  # Single quotes inside string
-                    })
-                    logger.debug(f"Added OS filter: {os_name}")
+                os_names_to_query = matched_os_names
+                logger.debug(f"Matched {len(matched_os_names)} OS names for multi-query: {matched_os_names}")
             else:
                 logger.warning(f"No operating systems matched '{os_value}' - filter skipped. Use tsc_list_operating_systems() to discover valid OS names.")
     
@@ -900,7 +907,7 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> l
             f"'hostname' should be 'dns_name'."
         )
     
-    return filters
+    return filters, os_names_to_query
 
 
 def parse_plugin_19506_output(plugin_text: str) -> dict[str, Any]:
