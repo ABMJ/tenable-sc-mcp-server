@@ -873,10 +873,25 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> t
             
             # Resolve each name/ID to numeric ID
             family_ids = []
+            invalid_families = []
             for value in family_values:
                 family_id = resolve_plugin_family_id(value, client)
                 if family_id:
                     family_ids.append(family_id)
+                else:
+                    invalid_families.append(value)
+            
+            # If user explicitly requested family filter but none resolved, that's an error
+            if invalid_families and not family_ids:
+                error_msg = (
+                    f"Invalid plugin family: {', '.join(invalid_families)}. "
+                    f"Use tsc_list_plugin_families() to discover valid names/IDs."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            elif invalid_families:
+                # Some resolved, some didn't - warn but continue with valid ones
+                logger.warning(f"Invalid plugin families (ignored): {invalid_families}")
             
             if family_ids:
                 # Format for API: [{"id": "20"}, {"id": "10"}]
@@ -886,8 +901,6 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> t
                     "value": format_family_filter_value(family_ids)
                 })
                 logger.debug(f"Added family filter with IDs: {family_ids}")
-            else:
-                logger.warning(f"No valid plugin family IDs resolved from {family_values} - filter skipped. Use tsc_list_plugin_families() to discover valid names/IDs.")
     
     for param, value in kwargs.items():
         if value is None:
