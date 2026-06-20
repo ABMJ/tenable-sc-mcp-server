@@ -432,6 +432,142 @@ def _find_ip_membership(ip: str) -> dict[str, Any]:
             "ok": False,
             "error": f"Failed to lookup IP membership: {exc}"
         }
+    
+    
+    @mcp.tool()
+    def tsc_list_operating_systems(
+        sort_by: str = "count",  # count | name
+        limit: int = 50,
+        start_offset: int = 0,
+    ) -> dict[str, Any]:
+        """
+        List all operating systems detected in your environment with asset counts.
+        Use this to discover valid OS names for the operating_system filter.
+        
+        WHEN TO USE THIS TOOL:
+        - User asks "what operating systems are in our environment"
+        - User needs to find exact OS name for filtering
+        - User asks "show me all Windows versions we have"
+        - Before using operating_system filter (discover valid values)
+        
+        This tool wraps the Tenable.sc 'listos' analysis tool and returns
+        deduplicated OS names with counts. Use the exact name in your
+        operating_system filter for zero false positives.
+        
+        Token Efficiency: ~1,500-2,000 tokens (vs ~8,000 raw)
+        Cache TTL: 300s (5 min - semi-static data)
+        
+        Args:
+            sort_by: Sort order: "count" (default) or "name"
+            limit: Max OS entries to return (1-200, default: 50)
+            start_offset: Starting record for pagination (default: 0)
+        
+        Returns:
+            Dict with:
+            - ok: True/False
+            - total_os: Total unique OS detected
+            - returned: Number returned in this response
+            - operating_systems: List of {name: str, count: int}
+            - pagination: {start: int, end: int, more_available: bool}
+        
+        Example:
+            >>> tsc_list_operating_systems(limit=10)
+            {
+                "ok": True,
+                "total_os": 257,
+                "returned": 10,
+                "operating_systems": [
+                    {"name": "Linux Kernel 4.8", "count": 56},
+                    {"name": "Microsoft Windows 10 Pro Build 19045", "count": 7},
+                    ...
+                ],
+                "pagination": {"start": 0, "end": 50, "more_available": True}
+            }
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # Validate parameters
+            if limit < 1 or limit > 200:
+                return {
+                    "ok": False,
+                    "error": "limit must be between 1 and 200"
+                }
+            
+            if start_offset < 0:
+                return {
+                    "ok": False,
+                    "error": "start_offset must be >= 0"
+                }
+            
+            if sort_by not in ("count", "name"):
+                return {
+                    "ok": False,
+                    "error": f"Invalid sort_by: {sort_by}. Use 'count' or 'name'"
+                }
+            
+            # Build listos query
+            query = {
+                "type": "vuln",
+                "tool": "listos",
+                "sourceType": "cumulative",
+                "startOffset": start_offset,
+                "endOffset": start_offset + limit,
+                "sortColumn": sort_by,
+                "sortDirection": "desc",
+                "filters": []
+            }
+            
+            # Call analysis API (uses existing caching in tsc_analyze)
+            from ..server import tsc_analyze
+            result = tsc_analyze(query)
+            
+            if not result.get("ok"):
+                return {
+                    "ok": False,
+                    "error": "Failed to query operating systems",
+                    "details": result.get("error"),
+                    "hint": "Check Tenable.sc connectivity and permissions"
+                }
+            
+            response = result.get("response", {})
+            os_list = response.get("results", [])
+            total = int(response.get("totalRecords", 0))
+            returned = int(response.get("returnedRecords", 0))
+            
+            # Format response
+            return {
+                "ok": True,
+                "total_os": total,
+                "returned": returned,
+                "operating_systems": [
+                    {
+                        "name": os_entry["name"],
+                        "count": int(os_entry["count"]),
+                        "detection_method": os_entry.get("detectionMethod", "N/A")
+                    }
+                    for os_entry in os_list
+                ],
+                "pagination": {
+                    "start": start_offset,
+                    "end": start_offset + limit,
+                    "more_available": (start_offset + returned) < total
+                },
+                "usage_tip": (
+                    "Use exact 'name' values in operating_system filter for precise matching. "
+                    "Example: filters={'operating_system': 'Microsoft Windows 10 Pro Build 19045'} "
+                    "or use partial name for smart matching: filters={'os_name': 'Windows 10'}"
+                )
+            }
+        
+        except Exception as e:
+            logger.error(f"Error in tsc_list_operating_systems: {e}", exc_info=True)
+            return {
+                "ok": False,
+                "error": "Unexpected error listing operating systems",
+                "hint": "Check server logs for details"
+            }
 
 
 # Export for testing
