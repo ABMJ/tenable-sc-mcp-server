@@ -106,9 +106,9 @@ PORT_SCANNER_PLUGINS = {
     22964: "Service Detection",
 }
 
-# Universal filter mapping (70 analysis filters - v1.2.1)
+# Universal filter mapping (74 analysis filters - v1.3.0)
 COMMON_FILTERS = {
-    # Asset Identification (8 filters)
+    # Asset Identification (11 filters)
     "asset_id": "assetID",
     "asset": "asset",
     "asset_criticality": "assetCriticalityRating",
@@ -117,6 +117,11 @@ COMMON_FILTERS = {
     "dns_name": "dnsName",
     "repository": "repository",
     "repository_ids": "repositoryIDs",
+    
+    # Operating System Filters (NEW in v1.3.0) - Exact matching via listos
+    "operating_system": "operatingSystem",  # Exact OS match - RECOMMENDED (smart partial matching)
+    "os_name": "operatingSystem",           # Alias for user-friendliness
+    "os_exact": "operatingSystem",          # Alias for explicit intent
     
     # Vulnerability Info (10 filters)
     "plugin_id": "pluginID",
