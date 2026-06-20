@@ -619,303 +619,154 @@ fetch the MCP resource tenable-sc://filters/format-reference and show me the CPE
 
 ---
 
+---
+
 ## 🧪 v1.3.0.1 Session Testing (REQUIRED)
 
-**What Happened This Session:**
-- Discovered v1.3.0 OS filtering had false assumption (Tenable.sc doesn't support OR logic on same filterName)
-- Pivoted to v1.3.0.1 with multi-query approach (separate API call per OS variant)
-- Added validation errors for per-IP tools (single IP can't have multiple OS)
-- Fixed plugin family cache TTL (10 min → 24 hours)
-- Implemented transparent breakdown response format (per-OS results + deduplication stats)
+**What was fixed:**
+- OS filter parameter alias (`os` now works alongside `os_name`, `operating_system`, `os_exact`)
+- Multi-query execution for OS filtering (one query per OS variant, with deduplication)
+- AttributeError fix in `get_operating_systems()` (now uses `server.tsc_analyze`)
 
-**Container:** `tenable-sc-mcp:v1.3.0.1`
-
-**Critical Tests:**
-1. Multi-query execution for OS filtering (tsc_list_ips, tsc_list_vulns_by_cve)
-2. Validation errors when OS filter used on per-IP tools
-3. Regression: Per-IP tools still work without OS filter
+**Container:** `tenable-sc-mcp:latest` (built from develop branch)
 
 ---
 
-### Test 1: Multi-OS IP Listing (tsc_list_ips)
+### Test 1: Multi-OS IP Listing
 
+**Run this:**
 ```
-I am testing tsc_list_ips with multi-OS filter to list Windows 10 assets. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about multi-query execution]
-📦 RESULT: OS variants: [count], Total unique IPs: [count], Duplicates removed: [count]
+use tenable-sc to list IPs with os "Windows 10" in repository Default
 ```
 
-**Test Command:**
-```
-use tenable-sc to list IPs with os_name "Windows 10" in repository Default
-```
+**Check for:**
+- Returns ~36 Windows 10 IPs (not all 882 from repository)
+- Response includes `by_os_variant` breakdown
+- Response includes `deduplication_stats`
 
-**Expected Output:**
-- Multiple queries executed (one per matched OS variant from listos)
-- Response includes `by_os_variant` with per-OS IP counts
-- Response includes `deduplication_stats` showing aggregation
-- Example: 3 OS variants → 3 API calls → 48 total IPs → 45 unique
-
-**Token Efficiency:** Varies by number of OS variants matched
+**Expected tokens:** ~700-1,500
 
 ---
 
-### Test 2: Multi-OS CVE Search (tsc_list_vulns_by_cve)
+### Test 2: Multi-OS CVE Search
 
+**Run this:**
 ```
-I am testing tsc_list_vulns_by_cve with multi-OS filter for Log4Shell. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about CVE search with OS filtering]
-📦 RESULT: CVE: CVE-2021-44228, OS variants: [count], Unique affected IPs: [count]
+use tenable-sc to find all assets with CVE-2021-44228 and os "Windows 10"
 ```
 
-**Test Command:**
-```
-use tenable-sc to find all assets with CVE-2021-44228 and os_name "Windows 10"
-```
+**Check for:**
+- Returns only Windows 10 IPs with Log4Shell
+- Response includes `by_os_variant` breakdown
+- Response includes `deduplication_stats`
 
-**Expected Output:**
-- Multiple queries executed (one per matched OS variant)
-- Response includes `by_os_variant` with per-OS affected IP counts
-- Response includes `deduplication_stats` for IP deduplication
-- IPs deduplicated by IP address across OS variants
-
-**Token Efficiency:** ~800-1,500 tokens (varies by results)
+**Expected tokens:** ~800-1,500
 
 ---
 
-### Test 3: OS Filter Validation Error (Per-IP Tool)
+### Test 3: Per-IP Vulnerability Summary (Regression)
 
-```
-I am testing OS filter validation on per-IP vulnerability tools. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📝 ERROR RECEIVED: [Yes/No]
-📦 ERROR MESSAGE: [paste error message]
-```
-
-**Test Command:**
-```
-use tenable-sc to get vulnerability summary for IP 10.1.20.10 with os_name "Windows 10"
-```
-
-**Expected Output:**
-- Error returned (NO query executed)
-- Error: "OS filter (operating_system/os_name/os_exact) not supported when querying specific IP"
-- Reason: "A single IP has only one OS version at scan time, not multiple variants"
-- Hint guides user to correct tools (tsc_profile_ip_efficient or tsc_list_ips)
-
----
-
-### Test 4: Per-IP Vulnerability Summary (Regression Test)
-
-```
-I am testing tsc_list_vulns_by_ip_summary for normal operation without OS filter. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about vulnerability summary]
-📦 RESULT: Total: [count], Critical: [count], High: [count], Medium: [count], Low: [count], Info: [count]
-```
-
-**Test Command:**
+**Run this:**
 ```
 use tenable-sc to get vulnerability summary for IP 10.1.20.10 with severity critical
 ```
 
-**Expected Output:**
-- Query executes normally (no errors)
-- Returns vulnerability summary by severity
-- Compact aggregated format
-- Normal single-query behavior
+**Check for:**
+- Returns vulnerability counts by severity
+- No errors (OS filter validation was removed in v1.3.0.2)
 
-**Token Efficiency:** ~700 tokens (vs ~6,000 raw) = 88% reduction
+**Expected tokens:** ~700
 
 ---
 
-### Test 5: Per-IP Vulnerability Details (Regression Test)
+### Test 4: Per-IP Vulnerability Details (Regression)
 
-```
-I am testing tsc_list_vulns_by_ip_full for normal operation without OS filter. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about detailed vulnerability records]
-📦 RESULT: Returned [count] records of [total] total, First 3 plugins: [list]
-```
-
-**Test Command:**
+**Run this:**
 ```
 use tenable-sc to list detailed vulnerabilities for IP 10.1.20.10 with severity critical, show first 10
 ```
 
-**Expected Output:**
-- Query executes normally (no errors)
-- 10 detailed vulnerability records
-- Plugin ID, name, severity, CVSS/VPR scores
-- Pagination works correctly (10 of X total)
+**Check for:**
+- Returns 10 detailed vulnerability records
+- Pagination works correctly
 
-**Token Efficiency:** ~5,000 tokens for 50 records (vs ~12,000 raw) = 58% reduction
+**Expected tokens:** ~5,000 for 50 records
 
 ---
 
-## Test Results Summary
+### Test 5: Plugin Family Discovery
 
-| # | Test | Tool | OS Filter | Expected | Result |
-|---|------|------|-----------|----------|--------|
-| 1 | Multi-OS IP Listing | tsc_list_ips | YES | Multi-query + breakdown | ⬜ |
-| 2 | Multi-OS CVE Search | tsc_list_vulns_by_cve | YES | Multi-query + breakdown | ⬜ |
-| 3 | OS Filter Validation | tsc_list_vulns_by_ip_summary | YES | Validation error | ⬜ |
-| 4 | Per-IP Summary | tsc_list_vulns_by_ip_summary | NO | Normal summary | ⬜ |
-| 5 | Per-IP Details | tsc_list_vulns_by_ip_full | NO | Normal details | ⬜ |
-
-**Legend:**
-- ✅ PASS - Works as expected
-- ❌ FAIL - Broken or incorrect behavior  
-- ⚠️ PARTIAL - Works but with issues
-- ⬜ NOT TESTED
-
-**Instructions:**
-1. Run each test command in your MCP client
-2. Fill in "Result" column with ✅/❌/⚠️
-3. Report summary table + any error messages
-
----
-
-### Test 6: Plugin Family Discovery (tsc_list_plugin_families)
-
-```
-I am testing tsc_list_plugin_families to discover available plugin families. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about plugin family discovery]
-📦 RESULT: Total families: [count], First 5: [list]
-```
-
-**Test Command:**
+**Run this:**
 ```
 use tenable-sc to list all plugin families
 ```
 
-**Expected Output:**
-- List of plugin families with ID and name
-- Count of plugins per family
-- Alphabetically sorted
-- Cache hit on subsequent calls (24-hour TTL)
+**Check for:**
+- Returns list of plugin families with IDs
+- Cache hit on repeat calls (24-hour TTL)
 
-**Token Efficiency:** ~800-1,200 tokens (cached for 24 hours)
+**Expected tokens:** ~800-1,200
 
 ---
 
-### Test 7: Plugin Family Filter by Name (Smart Lookup)
+### Test 6: Plugin Family Filter by Name
 
+**Run this:**
 ```
-I am testing plugin family filtering with name-based lookup. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about family filtering]
-📦 RESULT: Found [count] vulnerabilities in family [name]
+use tenable-sc to find vulnerabilities in plugin family "Windows" for CVE-2021-44228
 ```
 
-**Test Command:**
-```
-use tenable-sc to find all vulnerabilities in plugin family "Windows" for CVE-2021-44228
-```
+**Check for:**
+- Automatic lookup of family ID from name
+- Results filtered to Windows family only
 
-**Expected Output:**
-- Automatic lookup of family ID from name "Windows"
-- Filter applied correctly to CVE search
-- Response shows family name resolved to ID
-- Works with partial or exact family names
-
-**Token Efficiency:** Varies by result size
+**Expected tokens:** Varies by results
 
 ---
 
-### Test 8: Plugin Family Filter by ID (Direct)
+### Test 7: Plugin Family Filter by ID
 
-```
-I am testing plugin family filtering with direct ID. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📊 CACHE: [HIT/MISS]
-🔢 TOKENS: [count] tokens used
-📝 SUMMARY: [one-liner about family ID filtering]
-📦 RESULT: Found [count] vulnerabilities in family ID [id]
-```
-
-**Test Command:**
+**Run this:**
 ```
 use tenable-sc to list IPs with vulnerabilities in plugin family ID 20 in repository Default
 ```
 
-**Expected Output:**
-- Direct pass-through of family ID (no lookup)
+**Check for:**
+- Direct pass-through of family ID
 - Filter applied correctly
-- Response confirms family ID used
 
-**Token Efficiency:** Varies by result size
-
----
-
-### Test 9: Invalid Plugin Family Name (Error Handling)
-
-```
-I am testing plugin family error handling with invalid name. Please format your response as:
-
-✅/❌ TEST STATUS: [PASS/FAIL]
-📝 ERROR RECEIVED: [Yes/No]
-📦 ERROR MESSAGE: [paste error message]
-```
-
-**Test Command:**
-```
-use tenable-sc to find vulnerabilities in plugin family "InvalidFamilyNameXYZ123"
-```
-
-**Expected Output:**
-- Error returned (NO query executed)
-- Error message indicates family not found
-- Helpful suggestion to use tsc_list_plugin_families for discovery
+**Expected tokens:** Varies by results
 
 ---
 
-## Test Results Summary (Updated)
+### Test 8: Invalid Plugin Family Name
 
-| # | Test | Feature | Expected | Result |
-|---|------|---------|----------|--------|
-| 1 | Multi-OS IP Listing | Multi-query OS | Multi-query + breakdown | ⬜ |
-| 2 | Multi-OS CVE Search | Multi-query OS | Multi-query + breakdown | ⬜ |
-| 3 | OS Filter Validation | Error handling | Validation error | ⬜ |
-| 4 | Per-IP Summary | Regression | Normal summary | ⬜ |
-| 5 | Per-IP Details | Regression | Normal details | ⬜ |
-| 6 | Plugin Family Discovery | New tool | List all families | ⬜ |
-| 7 | Family Filter by Name | Smart lookup | Auto ID resolution | ⬜ |
-| 8 | Family Filter by ID | Direct filter | Pass-through | ⬜ |
-| 9 | Invalid Family Name | Error handling | Helpful error | ⬜ |
+**Run this:**
+```
+use tenable-sc to find vulnerabilities in plugin family "InvalidFamilyXYZ123"
+```
 
-**Legend:**
-- ✅ PASS - Works as expected
-- ❌ FAIL - Broken or incorrect behavior  
-- ⚠️ PARTIAL - Works but with issues
-- ⬜ NOT TESTED
+**Check for:**
+- Error message indicating family not found
+- Suggestion to use tsc_list_plugin_families
 
-**Instructions:**
-1. Run each test command in your MCP client (Tests 1-9)
-2. Fill in "Result" column with ✅/❌/⚠️
-3. Report summary table + any error messages
+**Expected tokens:** Minimal (error response)
+
+---
+
+## Test Results
+
+| # | Test | Status | Notes |
+|---|------|--------|-------|
+| 1 | Multi-OS IP Listing | ✅ PASS | 36 IPs, ~719 tokens |
+| 2 | Multi-OS CVE Search | ⬜ | |
+| 3 | Per-IP Summary | ⬜ | |
+| 4 | Per-IP Details | ⬜ | |
+| 5 | Plugin Family Discovery | ⬜ | |
+| 6 | Family Filter by Name | ⬜ | |
+| 7 | Family Filter by ID | ⬜ | |
+| 8 | Invalid Family Name | ⬜ | |
+
+**Legend:** ✅ PASS | ❌ FAIL | ⚠️ PARTIAL | ⬜ NOT TESTED
 
 ---
