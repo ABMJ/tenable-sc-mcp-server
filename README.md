@@ -1,7 +1,7 @@
 # Tenable.sc MCP Server
 
 [![Release](https://img.shields.io/github/v/release/ABMJ/tenable-sc-mcp-server)](https://github.com/ABMJ/tenable-sc-mcp-server/releases)
-[![CI](https://github.com/ABMJ/tenable-sc-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/ABMJ/tenable-sc-mcp-server/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/ABMJ/tenable-sc-mcp-server/ci.yml)](https://github.com/ABMJ/tenable-sc-mcp-server/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://choosealicense.com/licenses/gpl-3.0/)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 
@@ -9,7 +9,19 @@
 
 Production-ready Model Context Protocol (MCP) server for Tenable Security Center Plus. Features intelligent caching for **90% token savings** and **1000x faster responses**.
 
-**Latest**: [v1.2.2](https://github.com/ABMJ/tenable-sc-mcp-server/releases/tag/v1.2.2) (2026-06-19) | **Status**: ✅ Production Ready
+**Latest**: [v1.3.0.1](https://github.com/ABMJ/tenable-sc-mcp-server/releases/tag/v1.3.0.1) (2026-06-20) - OS Filtering Fixes & Plugin Family Validation | **Status**: ✅ Production Ready
+
+---
+
+## What's New in v1.3.0.1
+
+- **Windows 11 false positives eliminated** - Word-boundary matching prevents "Windows 10" from matching "Windows 11"
+- **Multi-OS entries now included** - Fixed exclusion logic for ambiguous OS detections (11 variants vs 10)
+- **Plugin family validation working** - Invalid families now return proper errors instead of unfiltered results
+- **New helper tools** - `tsc_list_operating_systems()` and `tsc_list_plugin_families()` for discovery
+- **74 total filters** - Added 4 OS filter aliases (operating_system, os_name, os_exact, os)
+
+See [CHANGELOG.md](CHANGELOG.md) for complete release notes.
 
 ---
 
