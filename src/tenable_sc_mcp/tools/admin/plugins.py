@@ -75,47 +75,50 @@ def register_tools(mcp):
                         logger.debug("Plugin families loaded from cache")
                     else:
                         # Call API: GET /rest/pluginFamily?fields=name
-                        result = client.get("pluginFamily", params={"fields": "name"})
+                        response = client.request("GET", "pluginFamily", params={"fields": "name"})
                         
-                        if not result.get("ok"):
+                        # Parse response structure
+                        if response.get("error_code", 0) != 0:
                             return {
                                 "ok": False,
                                 "error": "Failed to fetch plugin families",
-                                "details": result.get("error"),
+                                "details": response.get("error_msg", "Unknown error"),
                                 "hint": "Check Tenable.sc connectivity and permissions"
                             }
                         
-                        families = result.get("response", [])
+                        families = response.get("response", [])
                         
                         # Cache for 24 hours (static data)
                         client.cache.set(cache_key, families, ttl=86400)
                         logger.debug(f"Cached {len(families)} plugin families (TTL: 86400s / 24h)")
                 else:
                     # No cache - direct API call
-                    result = client.get("pluginFamily", params={"fields": "name"})
+                    response = client.request("GET", "pluginFamily", params={"fields": "name"})
                     
-                    if not result.get("ok"):
+                    # Parse response structure
+                    if response.get("error_code", 0) != 0:
                         return {
                             "ok": False,
                             "error": "Failed to fetch plugin families",
-                            "details": result.get("error")
+                            "details": response.get("error_msg", "Unknown error")
                         }
                     
-                    families = result.get("response", [])
+                    families = response.get("response", [])
             
             except Exception as e:
                 logger.warning(f"Cache operation failed, proceeding with API call: {e}")
                 # Fallback to direct API call
-                result = client.get("pluginFamily", params={"fields": "name"})
+                response = client.request("GET", "pluginFamily", params={"fields": "name"})
                 
-                if not result.get("ok"):
+                # Parse response structure
+                if response.get("error_code", 0) != 0:
                     return {
                         "ok": False,
                         "error": "Failed to fetch plugin families",
-                        "details": result.get("error")
+                        "details": response.get("error_msg", "Unknown error")
                     }
                 
-                families = result.get("response", [])
+                families = response.get("response", [])
             
             # Apply search filter if provided
             if search:
