@@ -2,265 +2,176 @@
 
 **Python 3.11+ MCP server. Docker-first deployment. Currently on `develop` branch.**
 
+> **📐 CRITICAL REFERENCE**: Before making ANY code changes, consult **DESIGN_PRINCIPLES.md** for mandatory architecture patterns:
+> - Centralized Filter Management (filters dict pattern)
+> - Smart Lookup & Helper Tool patterns
+> - Caching strategy, error handling, git workflow
+> - This document contains the authoritative "why" and "how" for all development decisions.
+
 ---
 
-## Essential Commands
+## Critical Gotchas
 
+### Docker: Must rebuild with `--no-cache`
 ```bash
-# Local dev with venv
-python -m venv .venv && source .venv/bin/activate
-pip install -e .[dev]
-
-# Run MCP server (stdio mode)
-tenable-sc-mcp --transport stdio
-
-# Quality checks (must pass before commit)
-ruff check src tests    # lint
-mypy src                # type check
-pytest -q               # unit tests
-
-# Docker build + run (production mode)
-docker build --no-cache -t tenable-sc-mcp:latest .  # CRITICAL: --no-cache required when code changes
-docker-compose up -d    # includes Redis cache
-
-# Check container health
-docker compose logs tenable-sc-mcp
-docker ps --filter "name=redis"
+docker build --no-cache -t tenable-sc-mcp:latest .
 ```
+Layer caching prevents code changes from appearing. Always use `--no-cache` when src/ changes.
 
----
+### Filters: Range format, NOT operators
+```python
+# ✅ Correct
+filters={"asset_criticality": "7-10", "vpr_score": "8-10"}
 
-## Architecture Essentials
-
-### Project Structure
+# ❌ Wrong - will fail
+filters={"asset_criticality": ">7", "vpr_score": ">=8"}
 ```
-src/tenable_sc_mcp/
-├── server.py               # FastMCP registration, entry point
-├── client.py               # TenableScClient (REST API wrapper)
-├── cache.py                # Redis/in-memory caching layer
-├── convenience_tools.py    # COMMON_FILTERS dict, build_filters(), shared utils
-├── catalog.py              # Resource discovery
-├── tools/                  # Domain-specific tool modules
-│   ├── ip_profiling.py
-│   ├── vulnerability_lookup.py
-│   └── asset_discovery.py
-└── resources/              # MCP resources (auto-generated docs)
-    └── filter_reference.py
+Applies to: `asset_criticality`, `vpr_score`, `aes_score`, `cvss_v3_base_score`, `epss_score`
 
-tests/
-├── test_cache.py
-├── test_catalog.py
-└── integration/
-```
+### Single source of truth: COMMON_FILTERS dict
+Location: `src/tenable_sc_mcp/convenience_tools.py:110`
 
-### Dependencies & Execution
-- **Package manager**: pip + venv (no Poetry, no uv runtime despite lockfile)
-- **Entry point**: `tenable-sc-mcp` CLI installed via `project.scripts` in pyproject.toml
-- **Transport modes**: `stdio` (local), `streamable-http` (remote Docker)
-- **Required env**: `TSC_URL`, `TSC_ACCESS_KEY`, `TSC_SECRET_KEY` (see `.env.example`)
+**Never** add filter parameters to tool signatures. **Never** duplicate filter logic.
+All 74 filters live in this dict. Add new filters here only.
 
 ---
 
 ## Tool Development Pattern (MANDATORY)
 
-### The Critical Rule: Unified Filters Dict
-
-**ALL new tools with filter support MUST use this exact pattern:**
-
 ```python
 @mcp.tool()
 def tsc_tool_name(
     required_param: str,
-    filters: dict[str, Any] | None = None,  # ✅ Single filter dict
+    filters: dict[str, Any] | None = None,  # ✅ Only way to accept filters
 ) -> dict[str, Any]:
-    """
-    [Description]
-    
-    Args:
-        required_param: ...
-        filters: Optional filter parameters. Reference: tenable-sc://filters/reference
-            Common filters:
-                asset_criticality: ACR range (e.g., "7-10")
-                severity: critical/high/medium/low/info
-                exploit_available: Yes/No
-    """
     filter_dict = filters or {}
-    filter_list = build_filters(**filter_dict)  # ✅ Unpack dict
-    # ... use filter_list in API query
+    filter_list = build_filters(**filter_dict)  # ✅ Unpack, don't map manually
+    # Use filter_list in query
 ```
 
-**Never:**
-- ❌ Explicit filter parameters (`asset_criticality: str | None`, `severity: str | None`)
-- ❌ Manual filter mapping inside tool function
-- ❌ Duplicate filter logic across files
-
-**Single source of truth:**  
-`COMMON_FILTERS` dict in `convenience_tools.py` (74 filters)
-
----
-
-## Key Constraints
-
-### Scoring Filters
-**Range format required:** `"7-10"` NOT `">7"` or `">=7"`
-
-Applies to: `asset_criticality`, `vpr_score`, `aes_score`, `cvss_v3_base_score`, `epss_score`
-
-Example: `filters={"asset_criticality": "8-10", "vpr_score": "7-10"}`
-
-### Caching
-- **Backend**: Redis (production), in-memory (fallback)
-- **TTLs**: 60s-300s based on data volatility
-- **Key pattern**: `tool_name:param_hash` (pagination params excluded)
-- **Cache control**: `tsc_cache_stats()`, `tsc_cache_clear()`
-
-### Error Handling
-- Return `{"ok": False, "error": "...", "hint": "..."}` for failures
-- Log warnings (not errors) for unknown filter params
-- Never expose raw API errors to users
+Reference: `tenable-sc://filters/reference` (MCP resource, auto-generated from COMMON_FILTERS)
 
 ---
 
 ## Git Workflow
 
-### Branch Strategy
-```
-main (production, protected)
-  └── develop (integration)
-       ├── feature/tool-name
-       ├── bugfix/issue-desc
-       └── docs/doc-updates
-```
-
-### Current Branch: `develop`
-**All feature work merges to `develop` first, not `main`.**
-
-### Standard Feature Flow
+**Branch from `develop`, NOT `main`:**
 ```bash
-# 1. Start from develop
 git checkout develop && git pull
-
-# 2. Create feature branch
-git checkout -b feature/new-tool
-
-# 3. Develop + test
-ruff check . && mypy src && pytest -q
-
-# 4. Commit with convention
-git commit -m "feat(tools): Add tsc_new_tool"
-
-# 5. Push and PR to develop
-git push -u origin feature/new-tool
-gh pr create --base develop
+git checkout -b feature/tool-name
 ```
-
-### Commit Types
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `refactor`: Code refactoring
-- `test`: Tests added/updated
-- `chore`: Build/tooling
-
-**Format:** `<type>(<scope>): <subject>`  
-**Example:** `feat(tools): Add OS listing tool`
-
-### Release Flow (develop → main)
-1. Create `release/vX.Y.Z` from `develop`
-2. Bump version in `pyproject.toml`
-3. Final testing (no new features)
-4. PR to `main` → merge → tag
-5. Merge back to `develop` (critical!)
-
----
-
-## Testing Requirements
 
 **Before committing:**
 ```bash
-ruff check src tests  # Must pass
-mypy src             # Must pass
-pytest -q            # Must pass (>80% coverage preferred)
+ruff check src tests && mypy src && pytest -q  # All must pass
 ```
 
-**Test structure:**
-- Unit tests: `tests/test_*.py`
-- Integration: `tests/integration/` (requires Tenable.sc instance)
+**Commit format:**
+```
+<type>(<scope>): <subject>
+```
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+**Release flow:** `develop` → `release/vX.Y.Z` → `main` (tag) → back-merge to `develop`
 
 ---
 
-## Common Mistakes to Avoid
+## Dev Commands
 
-1. **Using explicit filter parameters instead of `filters: dict`**
-   - Old pattern (deprecated): `def tool(ip: str, severity: str | None)`
-   - Correct: `def tool(ip: str, filters: dict[str, Any] | None)`
-
-2. **Using operators in scoring filters**
-   - Wrong: `{"asset_criticality": ">7"}`
-   - Correct: `{"asset_criticality": "7-10"}`
-
-3. **Branching from `main` instead of `develop`**
-   - Feature branches MUST start from `develop`
-
-4. **Not running quality checks before commit**
-   - CI will fail if ruff/mypy/pytest don't pass locally
-
-5. **Editing filter logic in tools directly**
-   - Add filters to `COMMON_FILTERS` dict, not individual tools
-
-6. **Forgetting `--no-cache` on Docker rebuild**
-   - Code changes won't appear without it due to layer caching
-
----
-
-## Key Documentation
-
-- **DESIGN_PRINCIPLES.md**: Mandatory patterns for all tools
-- **FILTER_FORMAT_REFERENCE.md**: Complete filter reference (74 filters)
-- **ARCHITECTURE.md**: System design and component interaction
-- **USER_GUIDE.md**: Tool usage examples and best practices (7 tools documented)
-- **TOOLS_ROADMAP.md**: Pending Tools 6-27 specifications
-- **HANDOFF.md**: Next session priorities (v1.4.0 focus)
-- **CACHING_DEEP_DIVE.md**: Cache behavior and tuning
-
-**MCP Resource for LLMs:** `tenable-sc://filters/reference` (auto-generated filter docs)
-
----
-
-## Environment Setup
-
-**Required `.env` file:**
 ```bash
-TSC_URL=https://your-sc-server.com
-TSC_ACCESS_KEY=your-access-key
-TSC_SECRET_KEY=your-secret-key
-TSC_VERIFY_SSL=true
-TSC_CACHE_ENABLED=true
-TSC_CACHE_BACKEND=redis  # or "memory"
-TSC_CACHE_REDIS_HOST=redis
-TSC_CACHE_REDIS_PORT=6379
+# Local dev
+python -m venv .venv && source .venv/bin/activate
+pip install -e .[dev]
+tenable-sc-mcp --transport stdio
+
+# Docker (production)
+docker build --no-cache -t tenable-sc-mcp:latest .
+docker-compose up -d
+docker compose logs tenable-sc-mcp
+
+# Tests
+pytest -q                    # All tests
+pytest tests/test_file.py    # Single file
+pytest -k test_name          # Single test
+
+# Quality gates (must pass)
+ruff check src tests
+mypy src
+pytest -q
 ```
 
-**Docker Compose reads `.env` automatically.**
+---
+
+## Project Structure
+
+```
+src/tenable_sc_mcp/
+├── server.py               # FastMCP entry point, tool registration
+├── client.py               # TenableScClient (REST wrapper)
+├── cache.py                # Redis/memory cache layer
+├── convenience_tools.py    # COMMON_FILTERS (line 110), build_filters (line 764)
+├── tools/                  # Domain-specific tool modules
+│   ├── ip_profiling.py
+│   ├── vulnerability_lookup.py
+│   ├── asset_discovery.py
+│   └── admin/plugins.py
+└── resources/              # MCP resources (auto-generated docs)
+```
 
 ---
 
-## Quick Reference
+## Environment Variables
 
-| Task | Command |
-|------|---------|
-| Install dev deps | `pip install -e .[dev]` |
-| Run server (local) | `tenable-sc-mcp --transport stdio` |
-| Run server (remote) | `tenable-sc-mcp --transport streamable-http --port 8000` |
-| Lint | `ruff check .` |
-| Type check | `mypy src` |
-| Test | `pytest -q` |
-| Docker build | `docker build --no-cache -t tenable-sc-mcp:latest .` |
-| Docker run | `docker-compose up -d` |
-| View logs | `docker compose logs tenable-sc-mcp` |
-| Git feature start | `git checkout develop && git checkout -b feature/name` |
-| Git commit | `git commit -m "feat(scope): description"` |
+Required in `.env` (Docker Compose reads automatically):
+```bash
+TSC_URL=https://sc.example.com
+TSC_ACCESS_KEY=your-key
+TSC_SECRET_KEY=your-secret
+TSC_VERIFY_SSL=true
+TSC_CACHE_BACKEND=redis          # or "memory"
+TSC_CACHE_REDIS_HOST=redis
+```
 
 ---
 
-**Last Updated**: 2026-06-21 (aligned with v1.3.0.1)
+## Package Manager Quirks
+
+- **Lockfile uses uv**, but **execution uses pip + venv** (no Poetry, no uv runtime)
+- **Entry point**: `tenable-sc-mcp` installed via `pyproject.toml` scripts
+- **Install:** `pip install -e .` (editable) or `pip install -e .[dev]` (with test tools)
+
+---
+
+## Caching
+
+- **Backend**: Redis (production), in-memory (fallback)
+- **TTLs**: 60s-300s by data type
+- **Key pattern**: `tool_name:param_hash` (pagination excluded from hash)
+- **Control**: `tsc_cache_stats()`, `tsc_cache_clear(pattern=None)`
+
+---
+
+## Common Mistakes
+
+1. **Branching from `main`** → Use `develop`
+2. **Operators in scoring filters** → Use range format `"7-10"`
+3. **Explicit filter params in tools** → Use `filters: dict` only
+4. **Docker rebuild without `--no-cache`** → Code won't update
+5. **Editing filter logic in tools** → Add to `COMMON_FILTERS` dict instead
+
+---
+
+## Documentation
+
+**For development:**
+- DESIGN_PRINCIPLES.md - Architecture patterns (read this first)
+- FILTER_FORMAT_REFERENCE.md - All 74 filters
+- TOOLS_ROADMAP.md - Pending features
+
+**For users:**
+- USER_GUIDE.md - Tool examples
+- TEST_PROMPTS.md - Test queries
+
+---
+
+**Last Updated**: 2026-06-24
