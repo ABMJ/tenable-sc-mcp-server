@@ -1,8 +1,8 @@
 # Tenable.sc Convenience Tools - Development Roadmap
 
-**Status**: 8/27 tools complete (30%)  
+**Status**: 9/27 tools complete (33%)  
 **Last Updated**: 2026-06-24  
-**Next Priority**: Tool 7 (Scan Status Monitoring)
+**Next Priority**: Tool 8 (Compliance Summary)
 
 ---
 
@@ -10,12 +10,12 @@
 
 This document provides **detailed specifications for upcoming tools** (Tools 7-27) organized by implementation priority.
 
-**For Completed Tools:** See USER_GUIDE.md for full documentation on Tools 1-8
+**For Completed Tools:** See USER_GUIDE.md for full documentation on Tools 1-9
 
 **For New Development Sessions:** 
 1. Review HANDOFF.md for current status and next priorities
 2. Review DESIGN_PRINCIPLES.md for mandatory patterns
-3. Start with Tool 7 (Scan Status Monitoring)
+3. Start with Tool 8 (Compliance Summary)
 
 ---
 
@@ -23,164 +23,7 @@ This document provides **detailed specifications for upcoming tools** (Tools 7-2
 
 ---
 
-## Tool 7: Scan Status Monitoring (NEXT PRIORITY)
-
-### `tsc_scan_status`
-
-**Status**: ⏳ Next Priority | **Token Budget**: 2,000-4,000 | **Cache TTL**: 60s | **Estimated**: 2.5-3h
-
-**Purpose:**
-Real-time scan execution monitoring using Tenable.sc scanResult API. Tracks scan status, import status, and performance metrics.
-
-**Key API:** `/rest/scanResult` (comprehensive scan result endpoint)
-
-**Planned Features:**
-- List scan results with status filtering (running/completed/error/stopped/paused)
-- Track import status separately from scan status (critical for data availability)
-- Calculate progress metrics (IPs completed, percent complete, IPs/hour)
-- Time range filtering with support for both createdTime and finishTime
-- Detailed progress view per-scan (per-scanner breakdown, current scanning IPs)
-- Performance metrics (scan duration, estimated completion time)
-- Error detection (scan failures, import issues)
-
-**Use Cases:**
-- "Show me all running scans"
-- "Did last night's scans complete?"
-- "Why can't I see scan data?" (import status check)
-- "How long until PCI scan finishes?"
-- "Which scans failed this week?"
-- "What's the scanning rate?" (IPs/hour)
-
-**Module**: `tools/scanning.py` (new file)
-
-**Critical API Insights:**
-1. **Time Filtering:** `startTime`/`endTime` search by `createdTime` (not `finishTime`). Use `timeCompareField` param to search by finishTime.
-2. **Progress Field:** Only available on GET /{id}, NOT on list. Must query each scan individually for detailed progress.
-3. **Import vs Scan Status:** `status` = scan execution, `importStatus` = result import. Both must be tracked separately!
-4. **String Booleans:** `running`, `downloadAvailable` are strings "true"/"false", NOT booleans.
-
-**Implementation Notes:**
-- Use `/rest/scanResult` for list view with basic progress (completedIPs, totalIPs, completedChecks)
-- Use `/rest/scanResult/{id}` for detailed progress with per-scanner breakdown
-- Short cache TTL (60s) for real-time updates
-- Calculate IPs/hour from elapsed time and completed IPs
-- Estimate remaining time based on scan rate
-- Flag scans with completed status but running import (data not available yet)
-- Support status filters: running, completed, error, stopped, paused
-- Support time range helpers: 24h, 7d, 30d
-- Use `optimizeCompletedScans` param for historical queries (performance)
-
-**Function Signature:**
-```python
-@mcp.tool()
-def tsc_scan_status(
-    scan_id: int | None = None,           # Specific scan result ID
-    status: str | None = None,            # running/completed/error/stopped/paused
-    time_range: str | None = "24h",       # 24h/7d/30d
-    include_progress: bool = False,       # Detailed progress (per-scan query)
-    filters: dict[str, Any] | None = None # Additional filters
-) -> dict[str, Any]:
-```
-
-**Example Usage:**
-```python
-# List all running scans
-tsc_scan_status(status="running")
-
-# Check completed scans from last 24h
-tsc_scan_status(status="completed", time_range="24h")
-
-# Get detailed progress for specific scan
-tsc_scan_status(scan_id=123, include_progress=True)
-
-# Custom time range with finishTime filtering
-tsc_scan_status(filters={
-    "start_time": "2026-06-20",
-    "end_time": "2026-06-24",
-    "time_compare_field": "finishTime"
-})
-```
-
-**Output Format:**
-```json
-{
-    "ok": true,
-    "total_results": 15,
-    "active_scans": 3,
-    "completed_scans": 10,
-    "failed_scans": 2,
-    "scan_results": [
-        {
-            "id": "123",
-            "name": "Weekly PCI Scan",
-            "status": "Running",
-            "progress": {
-                "ips_completed": 450,
-                "ips_total": 500,
-                "percent": 90.0,
-                "checks_completed": 125000,
-                "checks_total": 135000,
-                "ips_per_hour": 200.0,
-                "estimated_remaining_seconds": 900
-            },
-            "timing": {
-                "started": "2026-06-24T10:00:00",
-                "elapsed": "2h 15m"
-            },
-            "import_status": "No Results",
-            "import_info": {"alert": false},
-            "scan": {"id": "45", "name": "PCI Quarterly"},
-            "repository": {"id": "9", "name": "Production"},
-            "initiator": {"username": "scheduler"}
-        },
-        {
-            "id": "122",
-            "name": "Full Network Scan",
-            "status": "Completed",
-            "progress": {
-                "ips_completed": 1000,
-                "ips_total": 1000,
-                "percent": 100.0
-            },
-            "timing": {
-                "started": "2026-06-24T06:00:00",
-                "finished": "2026-06-24T10:23:00",
-                "duration": "4h 23m"
-            },
-            "import_status": "Running",
-            "import_info": {
-                "alert": true,
-                "message": "Scan completed but import still processing",
-                "import_elapsed_seconds": 2700,
-                "import_elapsed_formatted": "45m"
-            },
-            "note": "Scan completed but import in progress"
-        }
-    ],
-    "filters_applied": {
-        "time_range": "24h",
-        "status": "all"
-    }
-}
-```
-
-**Helper Functions Required:**
-- `parse_time_range(time_range: str)` - Convert 24h/7d/30d to epoch timestamps
-- `calculate_progress(result: dict)` - Calculate percent, IPs/hour, estimated time
-- `check_import_status(result: dict)` - Alert on completed scan with running import
-- `format_timing(result: dict)` - Format start/finish/duration from epoch timestamps
-- `format_duration(seconds: int)` - Convert seconds to "Xh Ym" format
-
-**Complexity Notes:**
-- **MEDIUM complexity** due to dual status tracking and time estimation
-- Progress calculation requires elapsed time math and rate calculations
-- Import status detection is critical for operational visibility
-- Two-tier query pattern (list vs detailed) requires careful caching
-- Estimated 2.5-3 hours (includes helper functions and testing)
-
----
-
-## Tool 8: Compliance Summary
+## Tool 8: Compliance Summary (NEXT PRIORITY)
 
 ### `tsc_compliance_summary`
 
