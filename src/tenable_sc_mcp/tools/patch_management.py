@@ -291,7 +291,11 @@ def register_tools(mcp):
             "query": {
                 "tool": "vulndetails",
                 "type": "vuln",
+                "sourceType": "cumulative",
+                "startOffset": 0,
+                "endOffset": 50,
                 "filters": filter_list,
+                "vulnTool": "vulndetails"
             },
             "sourceType": "cumulative"
         }
