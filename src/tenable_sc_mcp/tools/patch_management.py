@@ -300,6 +300,14 @@ def register_tools(mcp):
                 "error": f"Tenable.sc API query failed: {str(e)}"
             }
         
+        # Check if API call succeeded
+        if not response.get("ok"):
+            return {
+                "ok": False,
+                "error": f"Tenable.sc API returned error: {response.get('error', 'Unknown error')}",
+                "details": response
+            }
+        
         # Parse plugin text for each result
         # tsc_analyze returns {"ok": True, "response": {"results": [...]}}
         patches_by_ip = []

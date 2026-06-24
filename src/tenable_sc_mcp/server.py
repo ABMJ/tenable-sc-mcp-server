@@ -412,7 +412,9 @@ def tsc_analyze(
             return cached
     
     # Call API if not cached
-    result = tsc_request("POST", "/analysis", body=query, fields=fields, timeout_seconds=timeout_seconds)
+    # Tenable.sc /analysis endpoint requires query to be wrapped in {"query": {...}}
+    request_body = {"query": query}
+    result = tsc_request("POST", "/analysis", body=request_body, fields=fields, timeout_seconds=timeout_seconds)
     
     # Cache successful responses with smart TTL based on query type
     if cache and cache_key and result.get("ok"):
