@@ -1,0 +1,189 @@
+═══════════════════════════════════════════════════════════════
+              TOOL 6 IMPLEMENTATION - ENHANCED PROMPT
+═══════════════════════════════════════════════════════════════
+
+Implement Tool 6 (Missing Patches) for tenable-sc-mcp-server 
+following the implementation plan in HANDOFF.md.
+
+Repository: /home/abmj/apps/tenable-sc-mcp-server
+Branch: develop
+Current State: v1.3.0.1, clean and ready for Tool 6
+
+═══════════════════════════════════════════════════════════════
+              STEP 1: REVIEW DOCUMENTATION
+═══════════════════════════════════════════════════════════════
+
+Required Reading (in order):
+1. HANDOFF.md - Section "Next Priority: Tool 6" (complete implementation plan)
+2. DESIGN_PRINCIPLES.md - Mandatory architecture patterns:
+   - Centralized Filter Management (filters dict pattern)
+   - Caching strategy and TTLs
+   - Error handling patterns
+   - Tool signature patterns
+3. TOOLS_ROADMAP.md - Tool 6 specification with plugin details
+4. AGENTS.md - Git workflow, Docker requirements, common mistakes
+
+═══════════════════════════════════════════════════════════════
+              STEP 2: REVIEW EXISTING CODEBASE
+═══════════════════════════════════════════════════════════════
+
+Study these files for patterns (DO NOT modify yet):
+
+Core Reference Files:
+1. src/tenable_sc_mcp/tools/vulnerability_lookup.py
+   - Reference for tool structure
+   - See tsc_list_vulns_by_ip_full() for query patterns
+   - See tsc_list_vulns_by_cve() for parsing patterns
+   - Note cache key generation and TTL usage
+
+2. src/tenable_sc_mcp/convenience_tools.py
+   - Line 110: COMMON_FILTERS dict (single source of truth)
+   - Line 764: build_filters() function (how to unpack filters)
+   - Line 850+: generate_cache_key() function
+   - Study _client() and _get_cache() helper functions
+
+3. src/tenable_sc_mcp/tools/ip_profiling.py
+   - See tsc_profile_ip_efficient() for multi-query patterns
+   - Note how to combine multiple data sources
+   - Study error handling and response formatting
+
+4. src/tenable_sc_mcp/server.py
+   - See how tools are registered with FastMCP
+   - Note the pattern: from .tools.module import register_tools
+   - Find where to add patch_management registration
+
+5. tests/test_vulnerability_lookup.py
+   - Reference for test structure
+   - See how to mock Tenable.sc API responses
+   - Study parametrize patterns for multiple test cases
+
+═══════════════════════════════════════════════════════════════
+              STEP 3: UNDERSTAND THE TASK
+═══════════════════════════════════════════════════════════════
+
+Goal: Create tsc_list_missing_patches() tool
+
+Technical Requirements:
+- Query Tenable.sc using vulndetails analysis tool
+- Support two modes:
+  * "universal" - Plugin 66334 (all OS + third-party software)
+  * "windows" - Plugin 38153 (Windows KB articles)
+- Parse HTML-escaped pluginText field with regex
+- Extract KB numbers (e.g., KB5025279) and third-party software
+- Group results by IP address
+- Support standard filters via filters dict parameter
+- Cache results with 240s TTL
+
+Data Flow:
+1. Accept mode + filters parameters
+2. Add pluginID filter (66334 or 38153)
+3. Build filter list with build_filters()
+4. Check cache first
+5. Query Tenable.sc API if cache miss
+6. Parse pluginText with HTML unescape + regex
+7. Group by IP with metadata (hostname, OS, repository)
+8. Cache result
+9. Return {"ok": True, ...} response
+
+═══════════════════════════════════════════════════════════════
+              STEP 4: IMPLEMENTATION PLAN
+═══════════════════════════════════════════════════════════════
+
+Create Feature Branch:
+git checkout -b feature/tool-6-missing-patches
+
+Files to Create/Modify:
+1. src/tenable_sc_mcp/tools/patch_management.py (NEW)
+   - tsc_list_missing_patches() main tool function
+   - parse_patch_report() dispatcher function
+   - parse_plugin_66334() for universal patches
+   - parse_plugin_38153() for Windows KB
+   - register_tools() to register with FastMCP
+
+2. src/tenable_sc_mcp/server.py (MODIFY)
+   - Add import: from .tools.patch_management import register_tools as register_patch_tools
+   - Add registration call: register_patch_tools(mcp)
+
+3. tests/test_patch_management.py (NEW)
+   - test_missing_patches_universal()
+   - test_missing_patches_windows()
+   - test_parse_plugin_66334()
+   - test_parse_plugin_38153()
+   - test_missing_patches_with_filters()
+
+4. TEST_PROMPTS.md (MODIFY)
+   - Add example queries for Tool 6
+
+Commit Strategy:
+1. After creating tool function: "feat(patch): Add tsc_list_missing_patches tool"
+2. After parsing functions: "feat(patch): Add plugin text parsers for 66334 and 38153"
+3. After registration: "feat(patch): Register patch management tools"
+4. After tests: "test(patch): Add comprehensive patch management tests"
+5. After docs: "docs: Add Tool 6 examples to TEST_PROMPTS.md"
+
+═══════════════════════════════════════════════════════════════
+              STEP 5: QUALITY GATES
+═══════════════════════════════════════════════════════════════
+
+Before Each Commit:
+ruff check src tests          # Linting
+mypy src                      # Type checking
+pytest tests/test_patch_management.py -v   # Unit tests
+
+Before Final Commit:
+pytest -q                     # All tests
+docker build --no-cache -t tenable-sc-mcp:latest .   # Docker build
+docker-compose up -d          # Integration test
+
+═══════════════════════════════════════════════════════════════
+              CRITICAL PATTERNS TO FOLLOW
+═══════════════════════════════════════════════════════════════
+
+1. Tool Signature (MANDATORY):
+@mcp.tool()
+def tsc_list_missing_patches(
+    mode: str = "universal",
+    filters: dict[str, Any] | None = None,  # ✅ Only way to accept filters
+) -> dict[str, Any]:
+
+2. Filter Handling (MANDATORY):
+filter_dict = filters or {}
+filter_dict["pluginID"] = plugin_id  # Add plugin filter
+filter_list = build_filters(**filter_dict)  # ✅ Unpack with **
+
+3. Caching Pattern (MANDATORY):
+cache_key = generate_cache_key(
+    f"missing_patches_{mode}",
+    params=filter_dict
+)
+if cache:
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+4. Response Format (MANDATORY):
+return {
+    "ok": True,
+    "mode": mode,
+    "total_affected_ips": len(patches_by_ip),
+    "patches_by_ip": patches_by_ip,
+}
+
+═══════════════════════════════════════════════════════════════
+              READY TO START?
+═══════════════════════════════════════════════════════════════
+
+Execute this plan:
+1. Review docs (HANDOFF.md, DESIGN_PRINCIPLES.md)
+2. Study reference files (vulnerability_lookup.py, convenience_tools.py)
+3. Create feature branch
+4. Implement following HANDOFF.md step-by-step plan
+5. Test thoroughly
+6. Commit with conventional commits format
+7. Create PR to develop
+
+Estimated Time: 3-4 hours
+Token Budget: 2,000-5,000 tokens per response
+Complexity: MEDIUM (regex parsing required)
+
+═══════════════════════════════════════════════════════════════
