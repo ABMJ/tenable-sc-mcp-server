@@ -9,17 +9,19 @@
 
 Production-ready Model Context Protocol (MCP) server for Tenable Security Center Plus. Features intelligent caching for **90% token savings** and **1000x faster responses**.
 
-**Latest**: [v1.3.0.1](https://github.com/ABMJ/tenable-sc-mcp-server/releases/tag/v1.3.0.1) (2026-06-20) - OS Filtering Fixes & Plugin Family Validation | **Status**: ✅ Production Ready
+**Latest**: [v1.3.1](https://github.com/ABMJ/tenable-sc-mcp-server/releases/tag/v1.3.1) (2026-06-24) - Patch Management Tool | **Status**: ✅ Production Ready
 
 ---
 
-## What's New in v1.3.0.1
+## What's New in v1.3.1
 
-- **Windows 11 false positives eliminated** - Word-boundary matching prevents "Windows 10" from matching "Windows 11"
-- **Multi-OS entries now included** - Fixed exclusion logic for ambiguous OS detections (11 variants vs 10)
-- **Plugin family validation working** - Invalid families now return proper errors instead of unfiltered results
-- **New helper tools** - `tsc_list_operating_systems()` and `tsc_list_plugin_families()` for discovery
-- **74 total filters** - Added 4 OS filter aliases (operating_system, os_name, os_exact, os)
+- **Tool 6: `tsc_list_missing_patches`** - Comprehensive patch gap analysis
+  - Universal mode: All OS types + third-party software (Chrome, Office, VMware, etc.)
+  - Windows mode: KB articles and legacy MS bulletins
+  - Smart parsing: Extracts KB IDs, vulnerability counts, third-party updates
+  - Repository name auto-resolution (e.g., "Default" → ID 9)
+  - Token efficient: 700-20,000 tokens depending on scope
+  - 6 critical bugs fixed during implementation
 
 See [CHANGELOG.md](CHANGELOG.md) for complete release notes.
 
@@ -74,6 +76,7 @@ TSC_VERIFY_SSL=true
 | `tsc_list_vulns_by_ip_full` | Detailed vulnerability records | 58% (5K vs 12K) | 180s |
 | `tsc_list_ips` | IP discovery with 55+ filters | 400-3.7K tokens | 120s |
 | `tsc_list_vulns_by_cve` | CVE outbreak response | 85% (1-2K vs 10K) | 240s |
+| `tsc_list_missing_patches` | Patch gap analysis (all OS + third-party) | 60-70% (0.7-20K) | 240s |
 
 ### Core API Tools
 

@@ -24,6 +24,13 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 3: CVE with Full Plugin Output](#test-3-cve-with-full-plugin-output)
   - [Test 4: Non-Existent CVE](#test-4-non-existent-cve-error-handling)
   - [Test 5: Cache HIT Behavior](#test-5-verify-cache-hit-behavior-repeat-test-1-1)
+- [Tool 6: Missing Patches (tsc_list_missing_patches)](#tool-6-missing-patches-tsc_list_missing_patches)
+  - [Test 1: Universal Patches (Single IP)](#test-1-universal-patches-single-ip)
+  - [Test 2: Universal Patches with Repository Filter](#test-2-universal-patches-with-repository-filter)
+  - [Test 3: Universal Patches (High-Criticality Assets)](#test-3-universal-patches-high-criticality-assets-only)
+  - [Test 4: Windows KB Mode (Single IP)](#test-4-windows-kb-mode-single-ip)
+  - [Test 5: Windows KB with Repository Filter](#test-5-windows-kb-with-repository-filter)
+  - [Test 6: Cache HIT Behavior](#test-6-verify-cache-hit-behavior-repeat-test-1)
 
 ### CPE Filter Tests (v1.2.1)
 - [CPE Filter Tests](#cpe-filter-tests)
@@ -464,6 +471,199 @@ I am testing tsc_list_ips to list all IPs in repository "Default". Please format
 - Test error handling with invalid inputs
 - Validate filters work correctly with real data
 - Compare token usage: first query (MISS) vs repeat (HIT)
+
+---
+
+## Tool 6: Missing Patches (tsc_list_missing_patches)
+
+**Purpose:** Universal patch gap analysis across all operating systems with Microsoft KB tracking and third-party software updates.
+
+**Modes:**
+- **universal** (plugin 66334): All OS types + third-party software (Chrome, Office, VMware, etc.)
+- **windows** (plugin 38153): Windows KB articles and legacy MS bulletins
+
+**Use Cases:**
+- Compliance reporting (PCI, NIST, CIS)
+- Remediation planning grouped by IP or patch
+- Microsoft KB tracking with superseded relationships
+- Third-party software update monitoring
+
+---
+
+### Test 1: Universal Patches (Single IP)
+```
+I am testing tsc_list_missing_patches in universal mode for IP 10.1.20.10. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: IP: [ip], Hostname: [hostname], OS: [os], Total patches: [count] ([X] Microsoft KBs, [Y] third-party)
+```
+
+**Expected Output:**
+- Single IP patch status
+- Microsoft KB article numbers with vulnerability counts
+- Third-party software updates (Google Chrome, VMware Tools, Office, etc.)
+- Hostname, OS, and repository information
+- Total patch count breakdown
+- Cache performance and token metrics
+
+**Token Efficiency:** ~500-1,500 tokens for single IP (vs 3,000-5,000 for wide-open query)
+
+**Note:** Use `filters={"ip": "10.1.20.10"}` to scope to a single IP. Querying all 1000+ IPs without filters is inefficient.
+
+---
+
+### Test 2: Universal Patches with Repository Filter
+```
+I am testing tsc_list_missing_patches in universal mode filtered by repository "Default" for IP 10.1.20.10. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Repository: [name], Affected IPs: [count], Total patches for 10.1.20.10: [count] ([X] Microsoft KBs, [Y] third-party)
+```
+
+**Expected Output:**
+- Only IPs from specified repository
+- Patch data for single IP
+- Repository name confirmed in results
+- Single IP scope for token efficiency
+
+**Note:** Use `filters={"ip": "10.1.20.10", "repository": "Default"}` to scope to Default repository
+
+---
+
+### Test 3: Universal Patches (High-Criticality Assets Only)
+```
+I am testing tsc_list_missing_patches in universal mode with asset_criticality filter "8-10" for IP 10.1.20.10. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: IP: [ip], ACR Score: [score], Total patches: [count] ([X] Microsoft KBs, [Y] third-party)
+```
+
+**Expected Output:**
+- Only high-criticality assets (ACR 8-10)
+- Patch data for critical system
+- Filter confirmation in response
+- Useful for prioritizing remediation efforts
+
+**Filter Format:** Must use range format `"8-10"` (NOT `">8"`)
+
+**Note:** Use `filters={"ip": "10.1.20.10", "asset_criticality": "8-10"}` for single critical asset
+
+---
+
+### Test 4: Windows KB Mode (Single IP)
+```
+I am testing tsc_list_missing_patches in windows mode for IP 10.1.20.10 to get Windows KB articles. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: IP: [ip], Hostname: [hostname], OS: [os], Missing KBs: [count], Sample KBs: [list 2-3 KB IDs]
+```
+
+**Expected Output:**
+- Windows-specific KB article numbers
+- Support.microsoft.com URLs for each KB
+- Legacy MS bulletin IDs (MS16-087, MS17-010, etc.) if present
+- Hostname and OS information
+- Total missing KB count
+
+**Token Efficiency:** ~500-1,000 tokens for single IP
+
+**Note:** Use `filters={"ip": "10.1.20.10"}` to scope to a single Windows IP.
+
+---
+
+### Test 5: Windows KB with Repository Filter
+```
+I am testing tsc_list_missing_patches in windows mode filtered by repository "Default" for IP 10.1.20.10 to focus on Windows patches. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: IP: [ip], Repository: [name], Missing KBs: [count], Most critical KB: [KB ID with highest vuln count]
+```
+
+**Expected Output:**
+- Only Windows systems in specified repository
+- KB article tracking for Default repository
+- Repository scoping confirmed
+- Useful for compliance audits and remediation planning
+
+**Note:** Use `filters={"ip": "10.1.20.10", "repository": "Default"}` to scope to Default repository
+
+---
+
+### Test 6: Verify Cache HIT Behavior (Repeat Test 1)
+```
+I am repeating Test 1 (universal patches for IP 10.1.20.10) to verify cache HIT. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [expected HIT]
+🔢 TOKENS: [count] tokens used (should be ~50-200 vs ~500-1,500 on MISS)
+📝 SUMMARY: Cache HIT reduced token usage by [X]%
+📦 RESULT: Data matches Test 1 results exactly
+```
+
+**Expected Behavior:**
+- Cache HIT (240s TTL)
+- Token usage 85-95% lower than Test 1
+- Identical results to Test 1
+- Response time < 1s
+
+**Cache TTL:** 240 seconds (4 minutes) for patch data
+
+---
+
+### Summary for Tool 6
+
+**Key Features:**
+- Universal patch tracking (all OS types)
+- Windows-specific KB article mode
+- Third-party software update tracking
+- Microsoft KB with vulnerability counts
+- Legacy MS bulletin support
+- Repository and asset criticality filtering
+- 240s cache TTL for patch data
+
+**Token Efficiency:**
+- Single IP query: ~500-1,500 tokens (recommended for testing)
+- Repository-scoped: ~2,000-5,000 tokens (moderate result sets)
+- Wide-open query: ~5,000-20,000+ tokens (NOT recommended for large environments)
+- Cache HIT: ~50-200 tokens (90-95% reduction)
+
+**Best Practices:**
+- **Always use IP or repository filters** for large environments (1000+ assets)
+- Use `filters={"ip": "x.x.x.x"}` for single-host queries
+- Use `universal` mode for comprehensive patch coverage
+- Use `windows` mode for Windows-specific KB tracking
+- Apply `repository` filter to scope by network segment
+- Use `asset_criticality` filter to prioritize critical assets
+- Use range format for scoring filters: `"8-10"` NOT `">8"`
+- Run queries twice to verify cache performance
+
+**Common Use Cases:**
+1. Single-host audit: Get patch status for specific IP with `ip` filter
+2. Compliance reporting: List patches for repository with `repository` filter
+3. Remediation planning: Identify critical systems with `asset_criticality` filter
+4. KB tracking: Monitor Windows update deployment status with `windows` mode
+5. Third-party updates: Track Chrome, Office, VMware Tool versions with `universal` mode
+
+**Performance Warning:**
+- Querying all patches without filters in environments with 1000+ IPs can consume 10,000-20,000+ tokens
+- Always scope queries with `ip`, `repository`, or `asset_criticality` filters
+
+---
 
 ## CPE Filter Tests
 

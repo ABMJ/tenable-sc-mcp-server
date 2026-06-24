@@ -544,7 +544,7 @@ from .tools import register_all_tools  # noqa: E402
 
 # Re-export convenience tool functions for backwards compatibility with tests
 # These are populated after register_all_tools() is called
-_tool_functions = {}
+_tool_functions: dict[str, Any] = {}
 
 def _get_tool(name: str):
     """Get a registered tool function by name."""
