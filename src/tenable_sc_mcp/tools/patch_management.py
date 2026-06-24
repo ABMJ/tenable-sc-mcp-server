@@ -266,10 +266,18 @@ def register_tools(mcp):
                 client=client,
                 **filter_dict
             )
+        except ValueError as e:
+            # User-friendly error for invalid filter values
+            return {
+                "ok": False,
+                "error": f"Invalid filter parameter: {str(e)}",
+                "hint": "Check filter names and values. Use tenable-sc://filters/reference for valid options."
+            }
         except Exception as e:
             return {
                 "ok": False,
-                "error": f"Filter validation failed: {str(e)}"
+                "error": f"Filter validation failed: {str(e)}",
+                "details": str(type(e).__name__)
             }
         
         # Generate cache key (excludes pagination params)
@@ -352,6 +360,20 @@ def register_tools(mcp):
                 **parsed
             })
         
+        # If we got 0 results, add a helpful message
+        note = None
+        if len(patches_by_ip) == 0 and len(results) == 0:
+            # No results from API - could be invalid IP/repo or no data
+            if filter_dict.get("ip"):
+                note = f"No data returned for IP {filter_dict['ip']}. This could mean: (1) IP doesn't exist in Tenable.sc, (2) IP wasn't scanned, (3) Plugin {plugin_id} didn't run, or (4) No patches are missing."
+            elif filter_dict.get("repository"):
+                note = f"No data returned for repository filter. Repository may not exist, may be empty, or may have no systems with missing patches."
+            else:
+                note = "No results returned. Filters may be too restrictive or no systems have missing patches."
+        elif len(patches_by_ip) == 0 and len(results) > 0:
+            # Got results but no plugin text - scans didn't capture patch data
+            note = f"Found {len(results)} systems but none have patch data. Plugin {plugin_id} may not have generated output, or patch detection wasn't enabled in scan policy."
+        
         result = {
             "ok": True,
             "mode": mode,
@@ -359,6 +381,9 @@ def register_tools(mcp):
             "total_affected_ips": len(patches_by_ip),
             "patches_by_ip": patches_by_ip,
         }
+        
+        if note:
+            result["note"] = note
         
         # Cache result
         if cache:
