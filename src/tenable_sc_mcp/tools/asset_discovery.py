@@ -72,6 +72,8 @@ def register_tools(mcp):
                 Other Filters:
                     uuid: Asset UUID filter
                     dns_name: DNS name filter (hostname)
+                    os: Operating system filter (e.g., "Windows Server", "Linux")
+                    operating_system: OS filter (alias for 'os')
                     first_seen: First seen timestamp (epoch)
                     last_seen: Last seen timestamp (epoch)
                     severity: Vulnerability severity (0-4 or info/low/medium/high/critical)
@@ -81,6 +83,8 @@ def register_tools(mcp):
                     family: Plugin family name
                     port: Port number
                     protocol: Protocol (TCP/UDP)
+                
+                NOTE: For complete filter reference (74+ filters), see: tenable-sc://filters/reference
                 
                 IMPORTANT - Scoring Filter Format:
                 - Use RANGE format: "min-max" (e.g., "7-10", "600-1000")
@@ -111,6 +115,9 @@ def register_tools(mcp):
             
             >>> tsc_list_ips(repository="Default", filters={"asset_criticality": "7-10", "aes_score": "600-1000"})
             {"ok": True, "repository": "Default", "filters_applied": {"asset_criticality": "7-10", "aes_score": "600-1000"}, "total_ips": 54, "ips": [...]}
+            
+            >>> tsc_list_ips(repository="Default", filters={"os": "Windows Server", "severity": "critical", "exploit_available": "Yes"})
+            {"ok": True, "repository": "Default", "filters_applied": {"os": "Windows Server", "severity": "critical", "exploit_available": "Yes"}, "total_ips": 59, "ips": [...]}
             
             >>> tsc_list_ips(ip="10.10.10.10")
             {
