@@ -31,6 +31,12 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 4: Windows KB Mode (Single IP)](#test-4-windows-kb-mode-single-ip)
   - [Test 5: Windows KB with Repository Filter](#test-5-windows-kb-with-repository-filter)
   - [Test 6: Cache HIT Behavior](#test-6-verify-cache-hit-behavior-repeat-test-1)
+- [Tool 7: Scan Status Monitoring (tsc_scan_status)](#tool-7-scan-status-monitoring-tsc_scan_status)
+  - [Test 1: List Running Scans](#test-1-list-running-scans)
+  - [Test 2: Check Completed Scans (Last 24h)](#test-2-check-completed-scans-last-24h)
+  - [Test 3: Scan Status for Specific Time Range](#test-3-scan-status-for-specific-time-range)
+  - [Test 4: Check for Import Issues](#test-4-check-for-import-issues)
+  - [Test 5: Failed Scans Investigation](#test-5-failed-scans-investigation)
 
 ### CPE Filter Tests (v1.2.1)
 - [CPE Filter Tests](#cpe-filter-tests)
