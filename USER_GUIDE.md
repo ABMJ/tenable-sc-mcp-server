@@ -2,7 +2,7 @@
 
 **Version**: v1.3.1  
 **Last Updated**: 2026-06-24  
-**Status**: 8 Production-Ready Tools
+**Status**: 9 Production-Ready Tools
 
 ---
 
@@ -21,6 +21,7 @@
 6. [tsc_list_operating_systems](#6-tsc_list_operating_systems---os-name-discovery) - OS Name Discovery
 7. [tsc_list_plugin_families](#7-tsc_list_plugin_families---plugin-family-discovery) - Plugin Family Discovery
 8. [tsc_list_missing_patches](#8-tsc_list_missing_patches---patch-gap-analysis) - Patch Gap Analysis
+9. [tsc_scan_status](#9-tsc_scan_status---scan-status-monitoring) - Scan Status Monitoring
 
 ### Reference
 - [Universal Filter Framework](#universal-filter-framework)
@@ -41,6 +42,7 @@ The Tenable.sc MCP Server provides AI-powered tools for security vulnerability m
 - **Risk Assessment**: Get vulnerability counts and details filtered by severity, VPR, or EPSS scores
 - **Compliance**: Track patching status and credential-based scanning coverage
 - **Patch Management**: Identify missing patches and security updates across all operating systems
+- **Scan Monitoring**: Track scan execution progress, import status, and performance metrics
 
 ### Key Features
 
@@ -84,6 +86,7 @@ Claude: Searching for CVE-2021-44228 across infrastructure...
 | **Vulnerability details** | "Show vulnerabilities for 192.168.1.100" |
 | **Asset discovery** | "List all Windows hosts in Default repository" |
 | **Patch gap analysis** | "What patches are missing on 10.1.20.10?" |
+| **Scan monitoring** | "Show me all running scans" |
 
 ---
 
