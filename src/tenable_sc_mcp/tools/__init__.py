@@ -58,6 +58,10 @@ def register_all_tools(mcp: "FastMCP") -> None:
     from .admin import register_all_admin_tools
     register_all_admin_tools(mcp)
     
+    # Import and register patch management tools (v1.3.1+)
+    from .patch_management import register_tools as register_patch_management
+    register_patch_management(mcp)
+    
     # Future tool modules will be registered here as they're implemented
 
 
