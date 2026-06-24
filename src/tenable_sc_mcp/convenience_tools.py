@@ -951,10 +951,12 @@ def build_filters(client: Any = None, validate: bool = True, **kwargs: Any) -> t
                 max_score = SCORING_FILTERS[param]
                 filter_value = convert_score_operator_to_range(filter_value, max_score)
         
+        # Cast value to Any because Tenable.sc API accepts various types
+        from typing import cast
         filters.append({
             "filterName": filter_name,
             "operator": operator,
-            "value": filter_value
+            "value": cast(Any, filter_value)
         })
     
     # Warn about unknown parameters
@@ -1170,7 +1172,7 @@ def resolve_asset_group_name(asset_group_name: str) -> str | None:
         response_data = result.get("response", {})
         
         # Handle multiple response formats
-        assets = []
+        assets: list[Any] = []
         if isinstance(response_data, dict):
             # Try nested "response" key first (common format)
             if "response" in response_data:
@@ -1179,7 +1181,8 @@ def resolve_asset_group_name(asset_group_name: str) -> str | None:
                     assets = inner
                 elif isinstance(inner, dict):
                     # Might have "manageable" or "usable" keys
-                    assets = inner.get("manageable", inner.get("usable", []))
+                    manageable_or_usable = inner.get("manageable", inner.get("usable", []))
+                    assets = manageable_or_usable if isinstance(manageable_or_usable, list) else []
             # Try "manageable" at top level
             elif "manageable" in response_data:
                 assets = response_data.get("manageable", [])

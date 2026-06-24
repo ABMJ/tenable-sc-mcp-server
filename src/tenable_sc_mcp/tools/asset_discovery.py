@@ -199,25 +199,28 @@ def register_tools(mcp):
                 # Asset group can be name or ID
                 if asset_group.isdigit():
                     # Direct asset group ID - need to look up name
-                    asset_group_id = asset_group
-                    asset_group_name = asset_group  # Will try to resolve below
+                    asset_group_id: str = asset_group
+                    asset_group_name: str = asset_group  # Will try to resolve below
                 else:
                     # Asset group name - need to look up ID
                     asset_group_name = asset_group
-                    asset_group_id = resolve_asset_group_name(asset_group)
-                    if not asset_group_id:
+                    asset_group_id_result: str | None = resolve_asset_group_name(asset_group)
+                    if not asset_group_id_result:
                         return {
                             "ok": False,
                             "error": f"Asset group not found: '{asset_group}'",
                             "hint": "Use tsc_resource_action(action='list', resource='asset') to see available asset groups"
                         }
+                    asset_group_id = asset_group_id_result
                 
                 # Tenable.sc API expects asset filter with BOTH id and name (as strings, not array)
                 # Format: {"id": "3", "name": "Windows Hosts"} - NOT [{"id": 3}]
+                # Using Any cast for value because Tenable.sc API accepts dict here (not standard)
+                from typing import cast
                 filter_list.append({
                     "filterName": "asset",
                     "operator": "=",
-                    "value": {"id": str(asset_group_id), "name": asset_group_name}
+                    "value": cast(Any, {"id": str(asset_group_id), "name": asset_group_name})
                 })
             
             # Extract filter dict
@@ -236,7 +239,8 @@ def register_tools(mcp):
                 logger = logging.getLogger(__name__)
                 logger.info(f"OS filter detected: executing {len(os_names_to_query)} queries for OS variants")
                 
-                os_breakdown = []
+                # Type hint for os_breakdown to fix mypy error on line 357
+                os_breakdown: list[dict[str, Any]] = []
                 all_ips_seen = {}  # {ip: full_metadata} for deduplication
                 tsc_analyze = server.tsc_analyze
                 

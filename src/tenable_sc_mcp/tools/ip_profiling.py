@@ -92,7 +92,8 @@ def register_tools(mcp):
         if not valid:
             return {"ok": False, "error": error}
         
-        result = {
+        # Type hint for result dict to fix mypy errors
+        result: dict[str, Any] = {
             "ok": True,
             "ip": ip,
             "summary": {},
