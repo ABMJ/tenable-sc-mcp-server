@@ -24,6 +24,13 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 3: CVE with Full Plugin Output](#test-3-cve-with-full-plugin-output)
   - [Test 4: Non-Existent CVE](#test-4-non-existent-cve-error-handling)
   - [Test 5: Cache HIT Behavior](#test-5-verify-cache-hit-behavior-repeat-test-1-1)
+- [Tool 6: Missing Patches (tsc_list_missing_patches)](#tool-6-missing-patches-tsc_list_missing_patches)
+  - [Test 1: Universal Patches (Basic)](#test-1-universal-patches-basic)
+  - [Test 2: Universal Patches with Filters](#test-2-universal-patches-with-repository-filter)
+  - [Test 3: Universal Patches (High-Criticality Assets)](#test-3-universal-patches-high-criticality-assets-only)
+  - [Test 4: Windows KB Mode (Basic)](#test-4-windows-kb-mode-basic)
+  - [Test 5: Windows KB with Repository Filter](#test-5-windows-kb-with-repository-filter)
+  - [Test 6: Cache HIT Behavior](#test-6-verify-cache-hit-behavior-repeat-test-1)
 
 ### CPE Filter Tests (v1.2.1)
 - [CPE Filter Tests](#cpe-filter-tests)
@@ -464,6 +471,180 @@ I am testing tsc_list_ips to list all IPs in repository "Default". Please format
 - Test error handling with invalid inputs
 - Validate filters work correctly with real data
 - Compare token usage: first query (MISS) vs repeat (HIT)
+
+---
+
+## Tool 6: Missing Patches (tsc_list_missing_patches)
+
+**Purpose:** Universal patch gap analysis across all operating systems with Microsoft KB tracking and third-party software updates.
+
+**Modes:**
+- **universal** (plugin 66334): All OS types + third-party software (Chrome, Office, VMware, etc.)
+- **windows** (plugin 38153): Windows KB articles and legacy MS bulletins
+
+**Use Cases:**
+- Compliance reporting (PCI, NIST, CIS)
+- Remediation planning grouped by IP or patch
+- Microsoft KB tracking with superseded relationships
+- Third-party software update monitoring
+
+---
+
+### Test 1: Universal Patches (Basic)
+```
+I am testing tsc_list_missing_patches in universal mode to get all missing patches. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Found [count] affected IPs. Sample IP: [ip] has [count] Microsoft KBs and [count] third-party patches.
+```
+
+**Expected Output:**
+- List of IPs with missing patches
+- Microsoft KB article numbers with vulnerability counts
+- Third-party software updates (Google Chrome, VMware Tools, Office, etc.)
+- Hostname, OS, and repository for each IP
+- Total patch count per IP
+- Cache performance and token metrics
+
+**Token Efficiency:** ~3,000-5,000 tokens depending on patch volume
+
+---
+
+### Test 2: Universal Patches with Repository Filter
+```
+I am testing tsc_list_missing_patches in universal mode filtered by repository "Default". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Repository: [name], Affected IPs: [count], Top missing patches: [list top 3 KBs or software]
+```
+
+**Expected Output:**
+- Only IPs from specified repository
+- Patch data grouped by IP
+- Repository name confirmed in results
+- Reduced result set compared to unfiltered query
+
+---
+
+### Test 3: Universal Patches (High-Criticality Assets Only)
+```
+I am testing tsc_list_missing_patches in universal mode with asset_criticality filter "8-10". Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Critical assets with patches: [count] IPs. Worst offender: [ip] with [count] total patches.
+```
+
+**Expected Output:**
+- Only high-criticality assets (ACR 8-10)
+- Patch data for business-critical systems
+- Filter confirmation in response
+- Useful for prioritizing remediation efforts
+
+**Filter Format:** Must use range format `"8-10"` (NOT `">8"`)
+
+---
+
+### Test 4: Windows KB Mode (Basic)
+```
+I am testing tsc_list_missing_patches in windows mode to get Windows KB articles. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Found [count] Windows systems. Sample IP: [ip] is missing [count] KB articles including: [list 2-3 KB IDs]
+```
+
+**Expected Output:**
+- Windows-specific KB article numbers
+- Support.microsoft.com URLs for each KB
+- Legacy MS bulletin IDs (MS16-087, MS17-010, etc.) if present
+- Hostname and OS for each Windows system
+- Total missing KB count per IP
+
+---
+
+### Test 5: Windows KB with Repository Filter
+```
+I am testing tsc_list_missing_patches in windows mode filtered by repository "Production" to focus on Windows servers. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about cache and token performance]
+📦 RESULT: Production Windows systems: [count], Most common missing KB: [KB ID], Affected systems: [count]
+```
+
+**Expected Output:**
+- Only Windows systems in specified repository
+- KB article tracking for production servers
+- Repository scoping confirmed
+- Useful for compliance audits and remediation planning
+
+---
+
+### Test 6: Verify Cache HIT Behavior (Repeat Test 1)
+```
+I am repeating Test 1 (universal patches, no filters) to verify cache HIT. Please format your response as:
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [expected HIT]
+🔢 TOKENS: [count] tokens used (should be ~50-200 vs ~3,000-5,000 on MISS)
+📝 SUMMARY: Cache HIT reduced token usage by [X]%
+📦 RESULT: Data matches Test 1 results exactly
+```
+
+**Expected Behavior:**
+- Cache HIT (240s TTL)
+- Token usage 85-95% lower than Test 1
+- Identical results to Test 1
+- Response time < 1s
+
+**Cache TTL:** 240 seconds (4 minutes) for patch data
+
+---
+
+### Summary for Tool 6
+
+**Key Features:**
+- Universal patch tracking (all OS types)
+- Windows-specific KB article mode
+- Third-party software update tracking
+- Microsoft KB with vulnerability counts
+- Legacy MS bulletin support
+- Repository and asset criticality filtering
+- 240s cache TTL for patch data
+
+**Token Efficiency:**
+- Universal mode: ~3,000-5,000 tokens (varies by patch volume)
+- Windows mode: ~2,000-4,000 tokens
+- Cache HIT: ~50-200 tokens (90-95% reduction)
+
+**Best Practices:**
+- Use `universal` mode for comprehensive patch coverage
+- Use `windows` mode for Windows-specific KB tracking
+- Apply `repository` filter to scope by network segment
+- Use `asset_criticality` filter to prioritize critical assets
+- Use range format for scoring filters: `"8-10"` NOT `">8"`
+- Run queries twice to verify cache performance
+
+**Common Use Cases:**
+1. Compliance reporting: List all missing patches for PCI/NIST/CIS audits
+2. Remediation planning: Identify critical systems with most patches missing
+3. KB tracking: Monitor Windows update deployment status
+4. Third-party updates: Track Chrome, Office, VMware Tool versions
+5. Asset-specific: Get patch status for single IP with `ip` filter
+
+---
 
 ## CPE Filter Tests
 
