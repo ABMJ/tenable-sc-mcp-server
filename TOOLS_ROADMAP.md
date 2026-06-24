@@ -1,8 +1,8 @@
 # Tenable.sc Convenience Tools - Development Roadmap
 
 **Status**: v1.3.0.1 Complete (OS Filtering & Plugin Family Validation)  
-**Last Updated**: 2026-06-20  
-**Next Priority**: v1.4.0 (Multi-Client API Keys) OR Tool 6 (independent features)
+**Last Updated**: 2026-06-24  
+**Next Priority**: Tool 6 (Missing Patches)
 
 ---
 
@@ -11,9 +11,6 @@
 ### Quick Navigation
 - [🎯 Quick Status](#-quick-status)
 - [📋 Document Purpose](#-document-purpose)
-
-### Release Planning
-- [🔄 v1.4.0 - Multi-Client API Key Support](#-v140---multi-client-api-key-support)
 
 ### Tool Development
 - [📅 Week 1 - Core Foundation (Tools 6-7)](#-week-1---core-foundation-tools-6-7)
@@ -30,7 +27,7 @@
 
 **Completed**: 7/27 tools (26%) - v1.3.0.1 includes OS filtering fixes + 2 helper tools  
 **Current Phase**: v1.3.0.1 Released (OS filtering & plugin family validation)  
-**Next Priority**: v1.4.0 (Multi-Client API Keys) OR Tool 6 (independent features)
+**Next Priority**: Tool 6 (Missing Patches)
 
 **v1.3.0.1 Architecture (RELEASED - 2026-06-20):**
 - ✅ OS filtering with word-boundary matching (74 total filters)
@@ -55,7 +52,7 @@
 
 ## 📋 Document Purpose
 
-This document provides **detailed specifications for pending tools** (Tools 6-27) organized by implementation priority:
+This document provides **detailed specifications for pending tools** (Tools 8-27) organized by implementation priority:
 
 - Clear purpose and use cases for each tool
 - Token budgets and cache TTL targets
@@ -68,60 +65,7 @@ This document provides **detailed specifications for pending tools** (Tools 6-27
 **For New Development Sessions:** 
 1. Review HANDOFF.md for current status and next priorities
 2. Review DESIGN_PRINCIPLES.md for mandatory patterns
-3. Start with v1.4.0 OR Tool 6 (independent features)
-
----
-
-## 🔄 v1.4.0 - Multi-Client API Key Support
-
-**CRITICAL:** Read **[MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)** before starting implementation!
-
-**Status**: ⏳ Pending | **Estimated Time**: 4-5 hours | **Priority**: HIGH  
-**Can Be Done**: Before or after Tool 6 (independent features)
-
-### Quick Summary
-
-**Problem:**
-- MCP server currently loads ONE set of API keys from `.env` at startup
-- ALL clients share the SAME credentials
-- No per-client RBAC enforcement
-- Cannot support multiple users with different permission levels
-
-**Solution:**
-- Add FastMCP `Context` parameter to all 15+ tools for session tracking
-- Store per-session `TenableScClient` instances with separate credentials
-- Add `initialize_credentials` tool for clients to provide API keys
-- Implement per-client cache isolation to prevent data leakage
-- Support BOTH legacy `.env` mode and new per-client mode (backward compatible)
-
-**Impact:**
-- ✅ Proper multi-user support with RBAC enforcement
-- ✅ Each client sees only data they're authorized to access
-- ✅ Maintains backward compatibility with existing deployments
-- ✅ Foundation for future session management and audit logging
-
-**Breaking Changes:** None (backward compatible)
-
-### Implementation Phases
-
-1. **Phase 1 (2h)**: Core session management infrastructure
-2. **Phase 2 (1.5h)**: Update all 15+ tools with `Context` parameter
-3. **Phase 3 (1h)**: Testing & validation (unit + integration)
-4. **Phase 4 (1h)**: Documentation updates
-
-### Deliverables
-
-- [ ] Session storage: `_CLIENTS`, `_CACHE_PER_CLIENT` dicts
-- [ ] `_client_for_session(session_id)` function
-- [ ] `initialize_credentials` tool
-- [ ] All tools updated with `ctx: Context` parameter
-- [ ] Per-client cache isolation
-- [ ] Backward compatibility with `.env` mode
-- [ ] Unit + integration tests
-- [ ] Documentation (README.md, migration guide)
-- [ ] Version bumped to 1.4.0
-
-**Implementation Guide:** [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md) (complete 4-5 hour plan)
+3. Start with Tool 6 (Missing Patches)
 
 ---
 
@@ -131,45 +75,213 @@ This document provides **detailed specifications for pending tools** (Tools 6-27
 
 ## 📅 WEEK 1 - CORE FOUNDATION (TOOLS 6-7)
 
-### ⏳ Session 1.7: Tool 6 - Missing Patches
+### ⏳ Tool 6: Missing Patches
 
-#### `tsc_list_missing_patches_windows`
+#### `tsc_list_missing_patches`
 
-**Status**: ⏳ Pending | **Token Budget**: 2,000-4,000 | **Cache TTL**: 240s | **Estimated**: 2h
+**Status**: ⏳ Pending | **Token Budget**: 2,000-5,000 | **Cache TTL**: 240s | **Estimated**: 3-4h
 
 **Purpose:**
-MS bulletin-based patch gap analysis for Windows systems.
+Universal patch gap analysis across all operating systems (Windows, Linux, macOS) with KB article tracking.
+
+**Key Plugins:**
+- **Plugin 66334** ("Patch Report") - Universal, all OS, includes third-party software
+- **Plugin 38153** ("Microsoft Windows Summary of Missing Patches") - Windows KB-specific
 
 **Planned Features:**
-- List missing MS patches by bulletin ID
-- Filter by severity (critical/important/moderate)
-- Filter by release date
-- Group by bulletin or by IP
-- Include affected IPs per bulletin
+- List missing patches for Windows, Linux, macOS, and Unix
+- Track Microsoft KB articles with superseded KB relationships
+- Include third-party software patches (Chrome, VMware, Nessus Agent, etc.)
+- Filter by IP, repository, or other standard filters
+- Group patches by IP address
+- Extract KB numbers and support URLs
 
 **Use Cases:**
-- Patch compliance reporting
-- MS bulletin tracking
-- Windows update verification
+- Patch compliance reporting across entire infrastructure
+- Windows KB tracking for Patch Tuesday validation
+- Third-party software update verification
 - Remediation prioritization
 
-**Module**: `tools/scanning.py`
+**Module**: `tools/patch_management.py` (new file)
 
 **Implementation Notes:**
-- Use `analysis` tool with `msupdate` tool type
-- Cache TTL: 240s (patches don't change frequently during analysis)
-- Filter parameters: severity, release_date, bulletin_id
-- Support both "by bulletin" and "by IP" grouping modes
-- Include KB article links in output
+- Query plugin 66334 (universal) OR plugin 38153 (Windows KB only)
+- Use `vulndetails` analysis tool to get full plugin output
+- Parse `pluginText` field (HTML-escaped text) to extract KB numbers
+- HTML unescape required: `&lt;` → `<`, `&gt;` → `>`
+- Regex patterns:
+  - KB articles: `KB\d+`
+  - Legacy MS bulletins: `MS\d{2}-\d+`
+  - Third-party software: `\[ (.+?) \]`
+- Cache TTL: 240s (patches change during Patch Tuesday)
+- Support both modes: universal (66334) or Windows-only (38153)
+
+**Data Structure (Plugin 66334 - Universal):**
+```
+<plugin_output>
+. You need to take the following 42 actions :
+
++ Install the following Microsoft patches :
+- KB5025279 (85 vulnerabilities)The following KBs would be covered: 
+KB5022872, KB5022874, KB5021291, ...
+
+[ Google Chrome < 113.0.5672.63 Multiple Vulnerabilities ]
++ Action to take : Upgrade to Google Chrome version 113.0.5672.63 or later.
++ Impact : Taking this action will resolve the following 71 different vulnerabilities :
+CVE-2023-2468, CVE-2023-2467, ...
+</plugin_output>
+```
+
+**Data Structure (Plugin 38153 - Windows KB):**
+```
+<plugin_output>The patches for the following bulletins or KBs are missing on the remote host :
+
+ - MS16-087 ( http://technet.microsoft.com/en-us/security/bulletin/ms16-087 )
+ - KB4025252 ( https://support.microsoft.com/en-us/help/4025252 )
+ - KB4025337 ( https://support.microsoft.com/en-us/help/4025337 )
+ ...
+</plugin_output>
+```
+
+**Query Structure:**
+```python
+# Mode 1: Universal patches (all OS + third-party)
+query = {
+    "tool": "vulndetails",
+    "type": "vuln",
+    "filters": [
+        {"filterName": "pluginID", "operator": "=", "value": "66334"},
+        # Additional user filters (ip, repository, etc.)
+    ]
+}
+
+# Mode 2: Windows KB only
+query = {
+    "tool": "vulndetails",
+    "type": "vuln",
+    "filters": [
+        {"filterName": "pluginID", "operator": "=", "value": "38153"},
+        # Additional user filters
+    ]
+}
+```
+
+**Parsing Implementation:**
+```python
+import re
+from html import unescape
+
+def parse_patch_report(plugin_text: str, plugin_id: str) -> dict:
+    """Parse patch report from plugin 66334 or 38153."""
+    text = unescape(plugin_text)
+    text = re.sub(r'</?plugin_output>', '', text)
+    
+    if plugin_id == "66334":
+        return parse_plugin_66334(text)
+    else:  # 38153
+        return parse_plugin_38153(text)
+
+def parse_plugin_66334(text: str) -> dict:
+    """Parse universal patch report (all OS)."""
+    patches = []
+    
+    # Extract Microsoft KB patches
+    kb_pattern = r'- (KB\d+)(?: \((\d+) vulnerabilities\))?'
+    for match in re.finditer(kb_pattern, text):
+        kb_id = match.group(1)
+        vuln_count = int(match.group(2)) if match.group(2) else None
+        patches.append({
+            "type": "microsoft_kb",
+            "kb_id": kb_id,
+            "vulnerability_count": vuln_count
+        })
+    
+    # Extract third-party software
+    software_pattern = r'\[ (.+?) \]'
+    for match in re.finditer(software_pattern, text):
+        patches.append({
+            "type": "third_party",
+            "software": match.group(1)
+        })
+    
+    return {"patches": patches}
+
+def parse_plugin_38153(text: str) -> dict:
+    """Parse Windows KB summary."""
+    kb_list = []
+    
+    # Extract KB articles
+    kb_pattern = r'(KB\d+)'
+    for match in re.finditer(kb_pattern, text):
+        kb_id = match.group(1)
+        kb_list.append({
+            "kb_id": kb_id,
+            "url": f"https://support.microsoft.com/en-us/help/{kb_id}"
+        })
+    
+    # Extract legacy MS bulletins
+    ms_pattern = r'(MS\d{2}-\d+)'
+    for match in re.finditer(ms_pattern, text):
+        kb_list.append({
+            "bulletin_id": match.group(1)
+        })
+    
+    return {"missing_kbs": kb_list}
+```
 
 **Example Usage:**
 ```python
-filters = {
-    "severity": "critical",
-    "release_date": "2024-01-01:2024-12-31"  # Range format
-}
-result = tsc_list_missing_patches_windows(filters=filters)
+# Universal patch report (all OS)
+result = tsc_list_missing_patches(
+    mode="universal",
+    filters={"ip": "10.1.20.10"}
+)
+
+# Windows KB only
+result = tsc_list_missing_patches(
+    mode="windows",
+    filters={"repository": "Production"}
+)
 ```
+
+**Output Format:**
+```json
+{
+  "ok": true,
+  "mode": "universal",
+  "total_affected_ips": 15,
+  "patches_by_ip": [
+    {
+      "ip": "10.1.20.10",
+      "hostname": "win7-office2010.labnet.local",
+      "os": "Microsoft Windows 7 Professional Service Pack 1",
+      "repository": "Default",
+      "total_missing_patches": 42,
+      "microsoft_kbs": [
+        {
+          "kb_id": "KB5025279",
+          "vulnerability_count": 85,
+          "supersedes": ["KB5022872", "KB5022874"]
+        }
+      ],
+      "third_party": [
+        {
+          "software": "Google Chrome < 113.0.5672.63",
+          "cve_count": 71
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Complexity Notes:**
+- **MEDIUM complexity** (not easy) due to text parsing requirements
+- HTML unescaping needed for plugin output
+- Two different text formats to handle
+- Regex extraction for KB numbers and software names
+- Need to associate patches with IPs
+- Estimated 3-4 hours (was originally estimated at 2h)
 
 ---
 

@@ -27,84 +27,87 @@
 
 ---
 
-## 🎯 Next Priority: Tool 6 - Missing Patches (Windows)
 
-**Tool Name:** `tsc_list_missing_patches_windows`  
-**Estimated Time:** 2-3 hours  
-**Token Budget:** 2,000-4,000 tokens  
+## 🎯 Next Priority: Tool 6 - Missing Patches
+
+**Tool Name:** `tsc_list_missing_patches`  
+**Estimated Time:** 3-4 hours  
+**Token Budget:** 2,000-5,000 tokens  
 **Cache TTL:** 240s (4 minutes)  
-**Module:** `src/tenable_sc_mcp/tools/scanning.py`
+**Module:** `src/tenable_sc_mcp/tools/patch_management.py` (new file)
 
 ### What This Tool Does
 
-Provides MS bulletin-based patch gap analysis for Windows systems. Helps security teams:
-- Identify missing Microsoft patches across Windows endpoints
-- Prioritize patches by severity (critical/important/moderate)
-- Track patch compliance by bulletin ID
-- Generate remediation plans grouped by bulletin or IP
+Provides universal patch gap analysis across all operating systems (Windows, Linux, macOS) with KB article tracking. Uses Tenable plugins:
+- **Plugin 66334** - Universal patch report (all OS + third-party software)
+- **Plugin 38153** - Windows KB-specific summary
+
+Helps security teams:
+- Identify missing patches across entire infrastructure
+- Track Microsoft KB articles with superseded KB relationships
+- Monitor third-party software updates (Chrome, VMware Tools, etc.)
+- Generate remediation plans grouped by IP or patch
 
 ### Why This Tool Is Important
 
-1. **Patch Management:** Windows patch compliance is critical for security
-2. **MS Bulletin Tracking:** IT teams need bulletin-level visibility (not just CVE)
-3. **Remediation Planning:** Grouping by bulletin helps batch deployments
-4. **Compliance Reporting:** Required for many security frameworks (PCI, NIST, CIS)
+1. **Universal Coverage:** Works on Windows, Linux, macOS, Unix - not just Windows
+2. **Third-Party Tracking:** Includes Chrome, Office, VMware, Nessus Agent patches
+3. **KB Relationships:** Shows which KBs are superseded by rollups
+4. **Compliance Reporting:** Required for PCI, NIST, CIS frameworks
 
 ### Implementation Plan
 
-**Step 1: Create Tool Function (45 min)**
+**Step 1: Create Tool Function (1h)**
 
-Location: `src/tenable_sc_mcp/tools/scanning.py` (new file)
+Location: `src/tenable_sc_mcp/tools/patch_management.py` (new file)
 
 ```python
+import re
+from html import unescape
+from typing import Any
+
 @mcp.tool()
-def tsc_list_missing_patches_windows(
+def tsc_list_missing_patches(
+    mode: str = "universal",  # "universal" or "windows"
     filters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    List missing Microsoft patches on Windows systems.
+    List missing patches across all operating systems.
     
-    Returns MS bulletin-based patch gap analysis with affected IPs,
-    severity ratings, and KB article references. Use this for patch
-    compliance reporting and remediation planning.
+    Uses Tenable plugins to detect missing patches:
+    - Plugin 66334 (universal): All OS + third-party software
+    - Plugin 38153 (windows): Windows KB-specific
     
-    Filters:
-        severity: Patch severity (critical/important/moderate/low)
-        release_date: Patch release date range (epoch or YYYY-MM-DD)
-        bulletin_id: Specific MS bulletin ID (e.g., "MS17-010")
-        repository: Repository name or ID
-        ip: Specific IP address
-        
-    Cache: 240s TTL (patches don't change frequently)
-    Token Budget: 2,000-4,000 tokens
+    Args:
+        mode: "universal" (plugin 66334) or "windows" (plugin 38153)
+        filters: Standard filters (ip, repository, etc.)
+    
+    Returns:
+        Patch gap analysis grouped by IP with KB articles
     
     Example:
-        >>> tsc_list_missing_patches_windows(filters={"severity": "critical"})
+        >>> tsc_list_missing_patches(mode="universal", filters={"ip": "10.1.20.10"})
         {
             "ok": True,
-            "total_bulletins": 15,
-            "bulletins": [
-                {
-                    "bulletin_id": "MS17-010",
-                    "severity": "Critical",
-                    "title": "Security Update for Windows SMB Server",
-                    "release_date": "2017-03-14",
-                    "affected_ips": 45,
-                    "kb_articles": ["KB4013389", "KB4012598"]
-                }
-            ]
+            "mode": "universal",
+            "total_affected_ips": 1,
+            "patches_by_ip": [...]
         }
     """
     client = _client()
     cache = _get_cache()
     
-    # Parse filters
+    # Select plugin based on mode
+    plugin_id = "66334" if mode == "universal" else "38153"
+    
+    # Parse filters and add plugin ID filter
     filter_dict = filters or {}
+    filter_dict["pluginID"] = plugin_id
     filter_list = build_filters(**filter_dict)
     
     # Generate cache key
     cache_key = generate_cache_key(
-        "analysis_missing_patches_windows",
+        f"missing_patches_{mode}",
         params=filter_dict
     )
     
@@ -114,9 +117,9 @@ def tsc_list_missing_patches_windows(
         if cached is not None:
             return cached
     
-    # Build analysis query
+    # Query using vulndetails to get plugin output
     query = {
-        "tool": "msupdate",
+        "tool": "vulndetails",
         "type": "vuln",
         "filters": filter_list,
     }
@@ -124,11 +127,25 @@ def tsc_list_missing_patches_windows(
     # Execute query
     response = client.analyze(query)
     
-    # Transform response to user-friendly format
+    # Parse plugin text for each IP
+    patches_by_ip = []
+    for result in response.get("results", []):
+        plugin_text = result.get("pluginText", "")
+        parsed = parse_patch_report(plugin_text, plugin_id)
+        
+        patches_by_ip.append({
+            "ip": result.get("ip"),
+            "hostname": result.get("dnsName"),
+            "os": result.get("operatingSystem"),
+            "repository": result.get("repository", {}).get("name"),
+            **parsed
+        })
+    
     result = {
         "ok": True,
-        "total_bulletins": len(response.get("results", [])),
-        "bulletins": _format_bulletin_results(response),
+        "mode": mode,
+        "total_affected_ips": len(patches_by_ip),
+        "patches_by_ip": patches_by_ip,
     }
     
     # Cache result
@@ -138,68 +155,114 @@ def tsc_list_missing_patches_windows(
     return result
 ```
 
-**Step 2: Add Helper Function (15 min)**
+**Step 2: Add Parsing Functions (1h)**
 
 ```python
-def _format_bulletin_results(response: dict[str, Any]) -> list[dict[str, Any]]:
-    """Transform raw API response to bulletin summary format."""
-    bulletins = []
-    for item in response.get("results", []):
-        bulletins.append({
-            "bulletin_id": item.get("msid"),
-            "severity": item.get("severity", {}).get("name"),
-            "title": item.get("name"),
-            "release_date": item.get("publishedDate"),
-            "affected_ips": item.get("ipCount", 0),
-            "kb_articles": item.get("kbArticles", []),
+def parse_patch_report(plugin_text: str, plugin_id: str) -> dict[str, Any]:
+    """Parse patch report from plugin text."""
+    # HTML unescape
+    text = unescape(plugin_text)
+    text = re.sub(r'</?plugin_output>', '', text)
+    
+    if plugin_id == "66334":
+        return parse_plugin_66334(text)
+    else:  # 38153
+        return parse_plugin_38153(text)
+
+def parse_plugin_66334(text: str) -> dict[str, Any]:
+    """Parse universal patch report (plugin 66334)."""
+    microsoft_kbs = []
+    third_party = []
+    
+    # Extract Microsoft KB patches
+    kb_pattern = r'- (KB\d+)(?: \((\d+) vulnerabilities\))?'
+    for match in re.finditer(kb_pattern, text):
+        kb_id = match.group(1)
+        vuln_count = int(match.group(2)) if match.group(2) else None
+        microsoft_kbs.append({
+            "kb_id": kb_id,
+            "vulnerability_count": vuln_count
         })
-    return bulletins
+    
+    # Extract third-party software
+    software_pattern = r'\[ (.+?) \]'
+    for match in re.finditer(software_pattern, text):
+        third_party.append({
+            "software": match.group(1)
+        })
+    
+    return {
+        "total_missing_patches": len(microsoft_kbs) + len(third_party),
+        "microsoft_kbs": microsoft_kbs,
+        "third_party": third_party
+    }
+
+def parse_plugin_38153(text: str) -> dict[str, Any]:
+    """Parse Windows KB summary (plugin 38153)."""
+    kb_list = []
+    
+    # Extract KB articles
+    kb_pattern = r'(KB\d+)'
+    for match in re.finditer(kb_pattern, text):
+        kb_id = match.group(1)
+        kb_list.append({
+            "kb_id": kb_id,
+            "url": f"https://support.microsoft.com/en-us/help/{kb_id}"
+        })
+    
+    # Extract legacy MS bulletins
+    ms_pattern = r'(MS\d{2}-\d+)'
+    for match in re.finditer(ms_pattern, text):
+        kb_list.append({
+            "bulletin_id": match.group(1)
+        })
+    
+    return {
+        "total_missing_kbs": len(kb_list),
+        "missing_kbs": kb_list
+    }
 ```
 
-**Step 3: Register Tool (5 min)**
+**Step 3: Register Tool (10 min)**
 
 Add to `src/tenable_sc_mcp/server.py`:
 ```python
-from tenable_sc_mcp.tools.scanning import tsc_list_missing_patches_windows
+from tenable_sc_mcp.tools.patch_management import register_tools as register_patch_tools
+register_patch_tools(mcp)
 ```
 
-**Step 4: Add Filter Support (30 min)**
+**Step 4: Testing (1h)**
 
-Filters are already centralized in `COMMON_FILTERS` dict (`convenience_tools.py:110`).
-The `build_filters()` function handles all 74 existing filters automatically.
-
-For bulletin-specific filters, verify these exist:
-- `severity` - Already exists (severity filter)
-- `release_date` - Check if exists, add if missing
-- `bulletin_id` - Add new filter for MS bulletin ID
-
-**Step 5: Testing (45 min)**
-
-Create `tests/test_missing_patches.py`:
+Create `tests/test_patch_management.py`:
 ```python
-def test_missing_patches_basic():
-    """Test basic missing patches query."""
-    result = tsc_list_missing_patches_windows()
+def test_missing_patches_universal():
+    """Test universal patch report (plugin 66334)."""
+    result = tsc_list_missing_patches(mode="universal")
     assert result["ok"] is True
-    assert "bulletins" in result
+    assert "patches_by_ip" in result
 
-def test_missing_patches_severity_filter():
-    """Test severity filter."""
-    result = tsc_list_missing_patches_windows(filters={"severity": "critical"})
+def test_missing_patches_windows():
+    """Test Windows KB report (plugin 38153)."""
+    result = tsc_list_missing_patches(mode="windows")
     assert result["ok"] is True
-    assert all(b["severity"] == "Critical" for b in result["bulletins"])
+    assert result["mode"] == "windows"
 
-def test_missing_patches_cached():
-    """Test cache hit on second call."""
-    result1 = tsc_list_missing_patches_windows()
-    result2 = tsc_list_missing_patches_windows()
-    assert result1 == result2
+def test_patch_parsing_66334():
+    """Test parsing plugin 66334 output."""
+    sample_text = """<plugin_output>
+    - KB5025279 (85 vulnerabilities)
+    [ Google Chrome < 113.0.5672.63 ]
+    </plugin_output>"""
+    
+    result = parse_plugin_66334(sample_text)
+    assert len(result["microsoft_kbs"]) == 1
+    assert len(result["third_party"]) == 1
 ```
 
-**Step 6: Documentation (15 min)**
+**Step 5: Documentation (30 min)**
 
-1. Add to `TEST_PROMPTS.md` - "Show me critical missing Windows patches"
-2. Update `TOOLS_ROADMAP.md` - Mark Tool 6 as ✅ Complete
+1. Add to `TEST_PROMPTS.md`: "Show me missing patches for IP 10.1.20.10"
+2. Update `TOOLS_ROADMAP.md`: Mark Tool 6 as ✅ Complete
 3. Add entry to `CHANGELOG.md` for next release
 
 ---
