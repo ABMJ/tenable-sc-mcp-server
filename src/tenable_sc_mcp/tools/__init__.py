@@ -63,6 +63,10 @@ def register_all_tools(mcp: "FastMCP") -> None:
     from .patch_management import register_tools as register_patch_management
     register_patch_management(mcp)
     
+    # Import and register scanning tools (v1.4.0+)
+    from .scanning import register_tools as register_scanning
+    register_scanning(mcp)
+    
     # Future tool modules will be registered here as they're implemented
 
 
