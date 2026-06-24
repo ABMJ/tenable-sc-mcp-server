@@ -31,6 +31,12 @@ Use these prompts to test the tools and verify functionality. **Always append ca
   - [Test 4: Windows KB Mode (Single IP)](#test-4-windows-kb-mode-single-ip)
   - [Test 5: Windows KB with Repository Filter](#test-5-windows-kb-with-repository-filter)
   - [Test 6: Cache HIT Behavior](#test-6-verify-cache-hit-behavior-repeat-test-1)
+- [Tool 7: Scan Status Monitoring (tsc_scan_status)](#tool-7-scan-status-monitoring-tsc_scan_status)
+  - [Test 1: List Running Scans](#test-1-list-running-scans)
+  - [Test 2: Check Completed Scans (Last 24h)](#test-2-check-completed-scans-last-24h)
+  - [Test 3: Scan Status for Specific Time Range](#test-3-scan-status-for-specific-time-range)
+  - [Test 4: Check for Import Issues](#test-4-check-for-import-issues)
+  - [Test 5: Failed Scans Investigation](#test-5-failed-scans-investigation)
 
 ### CPE Filter Tests (v1.2.1)
 - [CPE Filter Tests](#cpe-filter-tests)
@@ -662,6 +668,190 @@ I am repeating Test 1 (universal patches for IP 10.1.20.10) to verify cache HIT.
 **Performance Warning:**
 - Querying all patches without filters in environments with 1000+ IPs can consume 10,000-20,000+ tokens
 - Always scope queries with `ip`, `repository`, or `asset_criticality` filters
+
+---
+
+## Tool 7: Scan Status Monitoring (tsc_scan_status)
+
+**Purpose:** Real-time scan execution monitoring with progress tracking, import status alerts, and performance metrics.
+
+**Key Features:**
+- Dual status tracking (scan execution + result import)
+- Progress calculation (percent complete, IPs/hour, ETA)
+- Import status alerts (scan complete but data not available)
+- Time range filtering (24h, 7d, 30d)
+- Performance metrics (scan duration, scanning rate)
+
+**Use Cases:**
+- Monitor active scan progress
+- Identify import issues (completed scans with running imports)
+- Calculate scan completion time estimates
+- Troubleshoot failed scans
+- Track historical scan performance
+
+---
+
+### Test 1: List Running Scans
+```
+I am testing tsc_scan_status to list all running scans. Please format your response as:
+
+use tenable-sc to show me all running scans
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about active scans and progress]
+📦 RESULT:
+  - Active Scans: [count]
+  - Scans Listed: [scan names]
+  - Progress Summary: [e.g., "PCI Scan: 75%, Database Scan: 30%"]
+  - Estimated Completion: [e.g., "PCI: 15m, Database: 2h"]
+```
+
+**Expected Result:**
+- ✅ Returns list of running scans (or message if none active)
+- ✅ Shows progress percentage and IPs/hour for each
+- ✅ Includes timing (started, elapsed)
+- ✅ No import status alerts (scans still running)
+
+---
+
+### Test 2: Check Completed Scans (Last 24h)
+```
+I am testing tsc_scan_status to check scans completed in the last 24 hours. Please format your response as:
+
+use tenable-sc to show me scans that completed in the last 24 hours
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about completed scans and import status]
+📦 RESULT:
+  - Completed Scans: [count]
+  - Scans with Import Issues: [count with "Running" import status]
+  - Import Alerts: [list any scans with completed status but running import]
+  - Durations: [list scan durations]
+```
+
+**Expected Result:**
+- ✅ Returns scans completed in last 24h
+- ✅ Shows scan duration for each
+- ⚠️ May show import status alerts (critical for troubleshooting)
+- ✅ Cache TTL: 60s (real-time data)
+
+---
+
+### Test 3: Scan Status for Specific Time Range
+```
+I am testing tsc_scan_status with 7-day time range. Please format your response as:
+
+use tenable-sc to show me all scans from the last 7 days
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about historical scan activity]
+📦 RESULT:
+  - Total Scans (7d): [count]
+  - Active: [count], Completed: [count], Failed: [count]
+  - Import Issues: [count with "Running" or "Error" import status]
+  - Scan Performance: [average duration, average IPs/hour]
+```
+
+**Expected Result:**
+- ✅ Returns 7 days of scan history
+- ✅ Counts by status (running/completed/failed)
+- ✅ Identifies any import errors
+- ℹ️ May be large result set (100+ scans in busy environments)
+
+---
+
+### Test 4: Check for Import Issues
+```
+I am testing tsc_scan_status to identify scans with import problems. Please format your response as:
+
+use tenable-sc to show me completed scans and check for import issues
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about import health]
+📦 RESULT:
+  - Scans with Import Alerts: [count]
+  - Details:
+    * [Scan Name]: Status="Completed", Import="Running" (elapsed: Xh Ym)
+    * [Scan Name]: Status="Completed", Import="Error" (error: [message])
+  - Normal Imports: [count with "Finished" status]
+```
+
+**Expected Result:**
+- ✅ Shows import status for all completed scans
+- ⚠️ Alerts on scans where status="Completed" but importStatus="Running"
+- ⚠️ Alerts on importStatus="Error" with error details
+- ℹ️ This is CRITICAL for troubleshooting "why can't I see scan data?" issues
+
+---
+
+### Test 5: Failed Scans Investigation
+```
+I am testing tsc_scan_status to investigate failed scans. Please format your response as:
+
+use tenable-sc to show me any failed scans from the last 7 days with error details
+
+✅/❌ TEST STATUS: [PASS/FAIL]
+📊 CACHE: [HIT/MISS]
+🔢 TOKENS: [count] tokens used
+📝 SUMMARY: [one-liner about scan failures]
+📦 RESULT:
+  - Failed Scans: [count]
+  - Errors:
+    * [Scan Name]: Status="Error", Progress: [X%], Error: [error message]
+    * [Scan Name]: Status="Stopped", Progress: [X%], Reason: [if available]
+  - Pattern Analysis: [e.g., "All failures at 30% - network timeout?"]
+```
+
+**Expected Result:**
+- ✅ Returns scans with status="Error" or "Stopped"
+- ✅ Shows error details and progress at failure
+- ✅ Includes timing (when started, when failed)
+- ℹ️ Zero results is normal if no failed scans
+
+---
+
+### Tool 7 Notes
+
+**Critical Import Status Insight:**
+- Scan status and import status are SEPARATE
+- A scan can show "Completed" but import still "Running" → **data not available yet!**
+- This tool explicitly checks for this condition and alerts you
+- Common cause of "I don't see scan results" support tickets
+
+**Time Filtering Gotcha:**
+- API searches by `createdTime` (when scan result was created) by default
+- NOT `finishTime` (when scan completed)
+- Use `filters={"time_compare_field": "finishTime"}` to search by completion time
+
+**Progress Calculation:**
+- IPs/hour = completedIPs / elapsed_seconds * 3600
+- Estimated remaining = (totalIPs - completedIPs) / IPs_per_hour
+- Only shown for running scans (not completed/failed)
+
+**Cache Strategy:**
+- TTL: 60 seconds (real-time monitoring data)
+- Shorter than other tools due to dynamic nature
+- Specific scan queries (scan_id) are NOT cached
+
+**Performance:**
+- Token Budget: 2,000-4,000 tokens
+- Time Range Impact: 24h (~10 scans), 7d (~50 scans), 30d (~200+ scans)
+- Use filters to reduce payload size in busy environments
+
+**Best Practices:**
+1. Check import status when troubleshooting missing scan data
+2. Use time_range="24h" for operational monitoring
+3. Use time_range="7d" for weekly performance reviews
+4. Filter by status="running" for active scan dashboard
+5. Run queries twice to verify cache performance (60s TTL)
 
 ---
 

@@ -1,9 +1,9 @@
 # Tenable.sc MCP Server - Handoff Document
 
 **Last Updated:** 2026-06-24  
-**Project Status:** ✅ v1.3.1 Released (Tool 6 Complete)  
-**Next Session Priority:** Tool 7 - Scan Status Monitoring  
-**Current Version:** 1.3.1
+**Project Status:** ✅ Tool 7 Complete (Ready for v1.4.0 Release)  
+**Next Session Priority:** Tool 8 - Compliance Summary  
+**Current Version:** 1.3.1 (develop branch has Tool 7, not yet released)
 
 ---
 
@@ -11,234 +11,123 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **Current Version** | ✅ v1.3.1 | Tool 6 complete, mypy 100% clean (0 errors) |
-| **Completed Tools** | 8/27 (30%) | Core IP profiling + vulnerability lookup + patch management + 2 helper tools |
+| **Current Version** | ✅ v1.3.1 | Released to main (Tool 6 complete) |
+| **Develop Branch** | ✅ Tool 7 Complete | Ready to merge to main as v1.4.0 |
+| **Completed Tools** | 9/27 (33%) | Core tools + scan monitoring |
 | **Filter Count** | 74 filters | Universal filter framework (centralized in COMMON_FILTERS) |
-| **Next Tool** | Tool 7 | Scan Status Monitoring - scanResult API integration |
-| **Pending Tools** | Tools 7-27 | See TOOLS_ROADMAP.md for complete specifications |
+| **Next Tool** | Tool 8 | Compliance Summary - sumseverity API with compliance filters |
+| **Pending Tools** | Tools 8-27 | See TOOLS_ROADMAP.md for complete specifications |
 
-### v1.3.1 Highlights (Current Release)
+### Tool 7 Status (On Develop Branch)
 
-- ✅ **Tool 6**: `tsc_list_missing_patches` - Universal & Windows modes, 21/21 tests passed
-- ✅ **Type Safety**: Mypy 100% clean (31 errors → 0 errors) with zero behavioral changes
-- ✅ **Docker Deployment**: Verified v1.3.1 running with Tool 6 code (14,552 bytes patch_management.py)
-- ✅ **Documentation**: CHANGELOG.md (full history), USER_GUIDE.md Section 8, MCP registry entry
-- ✅ **GitHub PR**: PR #8 merged to develop (15 commits)
+- ✅ **Implementation**: `src/tenable_sc_mcp/tools/scanning.py` (377 lines, 13K)
+- ✅ **Tests**: Helper function tests passing, integration tests present
+- ✅ **Documentation**: USER_GUIDE.md Section 9, TEST_PROMPTS.md Tool 7, TOOLS_ROADMAP.md updated
+- ✅ **Merged**: Feature branch merged to develop (commit `b309539`)
+- ⏳ **Release**: Ready to merge develop → main as v1.4.0
 
 ---
 
+## 🎯 Next Priority: Tool 8 - Compliance Summary
 
-## 🎯 Next Priority: Tool 7 - Scan Status Monitoring
-
-## 🎯 Next Priority: Tool 7 - Scan Status Monitoring
-
-**Tool Name:** `tsc_scan_status`  
-**Estimated Time:** 2.5-3 hours  
-**Token Budget:** 2,000-4,000 tokens  
-**Cache TTL:** 60s (real-time data)  
-**Module:** `src/tenable_sc_mcp/tools/scanning.py` (new file)
+**Tool Name:** `tsc_compliance_summary`  
+**Estimated Time:** 3-4 hours  
+**Token Budget:** 700-1,500 tokens  
+**Cache TTL:** 180s (3 minutes)  
+**Module:** `src/tenable_sc_mcp/tools/compliance.py` (new file)
 
 ### What This Tool Does
 
-Provides real-time scan execution monitoring using Tenable.sc scanResult API. Tracks:
-- **Scan Status**: Running, Completed, Error, Stopped, Paused, Partial
-- **Import Status**: Finished, Running, Error (critical for data availability)
-- **Progress Tracking**: IPs scanned, plugins executed, percent complete
-- **Performance Metrics**: IPs/hour, estimated completion time
-- **Error Detection**: Scan failures, import issues, stuck scans
+Provides compliance audit summary using Tenable.sc's sumseverity analysis tool with `pluginType=compliance` filter. Translates severity levels to audit outcomes:
+- **High severity** → Failed audit tests
+- **Medium severity** → Manual verification needed
+- **Info severity** → Passed audit tests
 
-Helps operations teams:
-- Monitor active scan progress in real-time
-- Identify scans with import issues (completed but data not available)
-- Calculate scan performance metrics
-- Track historical scan results with filtering
+Aggregates compliance results across all audit files (CIS, PCI, HIPAA, custom policies) to give overall compliance posture.
 
 ### Why This Tool Is Important
 
-1. **Import Status Visibility:** Scan can complete but import still running - data not available yet
-2. **Progress Estimation:** Calculate remaining time based on IPs/hour scan rate
-3. **Error Detection:** Identify failed scans and import errors quickly
-4. **Performance Tracking:** Monitor scan efficiency and scanner load
+1. **Executive Dashboard:** Quick compliance percentage across infrastructure
+2. **Risk Prioritization:** Focus remediation on failed checks (High severity)
+3. **Audit Readiness:** Track manual verification items (Medium severity)
+4. **Trend Analysis:** Monitor compliance improvement over time
+5. **Asset Scoping:** Filter by ACR, IP, or criticality for targeted reporting
 
-### Key API Insights (from Official Docs)
+### Key API Insights
 
-1. **Time Filtering Confusion:**
-   - `startTime`/`endTime` params search against `createdTime`, NOT `finishTime`
-   - Must use `timeCompareField` param to search by finishTime
-   - Default: Last 30 days of created results
-
-2. **Progress Field Limitation:**
-   - `progress` field ONLY available on GET /{id}, NOT on list
-   - Must query each scan individually for detailed progress
-   - List view has: completedIPs, completedChecks, totalChecks only
-
-3. **Import vs Scan Status:**
-   - `status` = scan execution status
-   - `importStatus` = result import status
-   - Both must be tracked separately!
-
-4. **String Booleans:**
-   - `running`, `downloadAvailable` are strings: "true" or "false" (NOT booleans)
+1. **Analysis Tool:** Uses `sumseverity` with `pluginType=compliance` filter
+2. **Severity Mapping:**
+   - Critical/Low: Rarely used for compliance
+   - High: Failed audit tests (remediation required)
+   - Medium: Manual verification needed (human review)
+   - Info: Passed audit tests (compliant)
+3. **Query Structure:** Requires nested format:
+   ```json
+   {
+     "type": "vuln",
+     "query": {
+       "type": "vuln",
+       "tool": "sumseverity",
+       "filters": [...]
+     },
+     "sourceType": "cumulative"
+   }
+   ```
+4. **Response Format:** Returns severity counts in nested structure:
+   - `response.response.results[]` (double-nested!)
 
 ### Implementation Plan
 
-**Step 1: Create Tool Function (1.5h)**
+**Step 1: Create Core Function (1.5h)**
 
-Location: `src/tenable_sc_mcp/tools/scanning.py` (new file)
+Location: `src/tenable_sc_mcp/tools/compliance.py` (new file)
 
-```python
-from typing import Any
-import time
-from datetime import datetime
+Key features:
+- Extract core logic to `_get_compliance_summary_core()` for testability
+- Use `build_filters(client=_client(), **filter_dict)` for smart lookups
+- Mandatory `plugin_type=compliance` filter
+- Parse nested response structure
+- Calculate compliance percentage: `(passed / (passed + failed)) * 100`
 
-@mcp.tool()
-def tsc_scan_status(
-    scan_id: int | None = None,           # Specific scan result ID
-    status: str | None = None,            # running/completed/error/stopped/paused
-    time_range: str | None = "24h",       # 24h/7d/30d
-    include_progress: bool = False,       # Detailed progress (per-scan query)
-    filters: dict[str, Any] | None = None # Additional filters
-) -> dict[str, Any]:
-    """
-    Monitor scan execution status with progress tracking.
-    
-    Tracks scan status, import status, and performance metrics.
-    
-    Args:
-        scan_id: Specific scan result ID for detailed view
-        status: Filter by status (running/completed/error/stopped/paused)
-        time_range: Time range filter (24h/7d/30d)
-        include_progress: Get detailed progress (requires per-scan query)
-        filters: Additional filters (start_time, end_time, etc.)
-    
-    Returns:
-        Scan status with progress, timing, and import status
-    
-    Example:
-        >>> tsc_scan_status(status="running")
-        {
-            "ok": True,
-            "active_scans": 3,
-            "scan_results": [...]
-        }
-    """
-    client = _client()
-    cache = _get_cache()
-    
-    # Parse time range
-    start_epoch, end_epoch = parse_time_range(time_range)
-    
-    # Build query parameters
+**Step 2: Testing (1h)**
+
+Create simple integration tests:
+- Global compliance summary (no filters)
+- Compliance by asset criticality (ACR filter)
+- Empty result handling
+
+**Note:** Repository filter has API limitations (requires array with IDs) - document as known limitation.
+
+**Step 3: Documentation (0.5-1h)**
+
+- USER_GUIDE.md Section 10
+- TEST_PROMPTS.md with 5 test scenarios
+- TOOLS_ROADMAP.md progress update (10/27)
+
+### Known Challenges
+
+1. **Repository Filter:** API expects `[{id: 9}]` format, not string name
+   - Workaround: Use IP or asset_criticality filters instead
+   - Document as limitation for now
+
+2. **Audit File Identification:** Cannot determine which audit file was run
+   - Tool aggregates across ALL audit files
+   - No way to filter by specific audit policy
+
+3. **Response Nesting:** API returns `response.response.results` (double-nested)
+   - Need careful parsing to extract results
+
+### Reference Materials
+
+- TOOLS_ROADMAP.md: Full Tool 8 specification
+- DESIGN_PRINCIPLES.md: Filter patterns and caching strategy
+- Tool 6 (`patch_management.py`): Similar analysis tool pattern
     params = {
         "fields": "id,name,status,totalIPs,completedIPs,completedChecks,totalChecks,startTime,finishTime,scanDuration,importStatus,importStart,importFinish,importDuration,errorDetails,importErrorDetails,scan,repository,initiator",
         "startTime": str(start_epoch),
         "endTime": str(end_epoch)
     }
     
-    # Add status filter
-    if status:
-        if status == "running":
-            params["running"] = "true"
-        elif status == "completed":
-            params["completed"] = "true"
-    
-    # Apply custom filters
-    filter_dict = filters or {}
-    if "time_compare_field" in filter_dict:
-        params["timeCompareField"] = filter_dict["time_compare_field"]
-    
-    # Generate cache key
-    cache_key = generate_cache_key("scan_status", params=params)
-    
-    # Check cache
-    if cache and not scan_id:  # Don't cache specific scan queries
-        cached = cache.get(cache_key)
-        if cached:
-            return cached
-    
-    # Query API
-    if scan_id:
-        # Single scan with detailed progress
-        response = client.get(f"/rest/scanResult/{scan_id}", params={
-            "fields": params["fields"] + ",progress"
-        })
-        results = [response.get("response", {})]
-    else:
-        # List all matching scans
-        response = client.get("/rest/scanResult", params=params)
-        results = response.get("response", {}).get("usable", [])
-    
-    # Process results
-    scan_results = []
-    active_scans = 0
-    completed_scans = 0
-    failed_scans = 0
-    
-    for result in results:
-        status_val = result.get("status", "")
-        
-        # Count by status
-        if status_val == "Running":
-            active_scans += 1
-        elif status_val == "Completed":
-            completed_scans += 1
-        elif status_val in ["Error", "Stopped"]:
-            failed_scans += 1
-        
-        # Calculate progress
-        progress = calculate_progress(result)
-        
-        # Check import status
-        import_info = check_import_status(result)
-        
-        # Format timing
-        timing = format_timing(result)
-        
-        scan_results.append({
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "status": status_val,
-            "progress": progress,
-            "timing": timing,
-            "import_status": result.get("importStatus"),
-            "import_info": import_info,
-            "scan": result.get("scan", {}),
-            "repository": result.get("repository", {}),
-            "initiator": result.get("initiator", {})
-        })
-    
-    result_data = {
-        "ok": True,
-        "total_results": len(scan_results),
-        "active_scans": active_scans,
-        "completed_scans": completed_scans,
-        "failed_scans": failed_scans,
-        "scan_results": scan_results,
-        "filters_applied": {
-            "time_range": time_range,
-            "status": status or "all"
-        }
-    }
-    
-    # Cache result
-    if cache and not scan_id:
-        cache.set(cache_key, result_data, ttl_seconds=60)
-    
-    return result_data
-```
-
-**Step 2: Add Helper Functions (0.5h)**
-
-```python
-def parse_time_range(time_range: str) -> tuple[int, int]:
-    """Parse time range to epoch timestamps."""
-    now = int(time.time())
-    
-    if time_range == "24h":
-        return (now - 86400, now)
-    elif time_range == "7d":
-        return (now - 604800, now)
-    elif time_range == "30d":
         return (now - 2592000, now)
     else:
         # Default to 24h
