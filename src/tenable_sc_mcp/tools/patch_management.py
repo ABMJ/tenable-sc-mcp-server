@@ -318,10 +318,18 @@ def register_tools(mcp):
             }
         
         # Parse plugin text for each result
-        # tsc_analyze returns {"ok": True, "response": {"results": [...]}}
+        # tsc_analyze returns {"ok": True, "response": {...}}
+        # Response may be double-nested: {"response": {"response": {"results": [...]}}}
         patches_by_ip = []
         api_response = response.get("response", {})
-        for result in api_response.get("results", []):
+        
+        # Check for double-nested response (common in Tenable.sc API)
+        if isinstance(api_response, dict) and "response" in api_response:
+            results = api_response.get("response", {}).get("results", [])
+        else:
+            results = api_response.get("results", [])
+        
+        for result in results:
             plugin_text = result.get("pluginText", "")
             
             # Skip empty plugin text
