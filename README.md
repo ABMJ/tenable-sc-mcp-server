@@ -261,7 +261,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 ### Developer Docs
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
 - [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md) - Tool development patterns
-- [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) - Feature roadmap (v1.3.0, v1.4.0)
+- [TOOLS_ROADMAP.md](TOOLS_ROADMAP.md) - Feature roadmap and pending tools
 - [HANDOFF.md](HANDOFF.md) - LLM-friendly development handoff
 
 ### Project
