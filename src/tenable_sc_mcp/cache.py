@@ -268,7 +268,10 @@ class RedisCache(CacheBackend):
             value = self.client.get(self._make_key(key))
             if value is None:
                 return None
-            return json.loads(value.decode("utf-8"))
+            # Type guard: Redis returns bytes, handle both bytes and str
+            if isinstance(value, bytes):
+                return json.loads(value.decode("utf-8"))
+            return json.loads(value)  # Already a string
         except Exception:
             return None
 
@@ -439,17 +442,17 @@ DEFAULT_TTL_SECONDS = {
 }
 
 
-def _normalize_query_for_cache(params: dict[str, Any]) -> dict[str, Any]:
+def _normalize_query_for_cache(params: dict[str, Any] | Any) -> dict[str, Any] | Any:
     """Normalize query parameters for cache key generation.
     
     Removes pagination and volatile parameters that shouldn't affect caching.
     This allows queries with different pagination to share the same cache entry.
     
     Args:
-        params: Query parameters to normalize
+        params: Query parameters to normalize (typically dict)
         
     Returns:
-        Normalized parameters dict
+        Normalized parameters dict, or original value if not a dict
     """
     if not isinstance(params, dict):
         return params

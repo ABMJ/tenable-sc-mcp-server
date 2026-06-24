@@ -1,9 +1,9 @@
 # Tenable.sc MCP Server - Handoff Document
 
 **Last Updated:** 2026-06-24  
-**Project Status:** ✅ v1.3.0.1 Released  
-**Next Session Priority:** Tool 6 - Missing Patches (Windows)  
-**Current Version:** 1.3.0.1
+**Project Status:** ✅ v1.3.1 Released (Tool 6 Complete)  
+**Next Session Priority:** Tool 7 - Scan Status Monitoring  
+**Current Version:** 1.3.1
 
 ---
 
@@ -11,259 +11,413 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **Current Version** | ✅ v1.3.0.1 | OS filtering & plugin family validation fixed |
-| **Completed Tools** | 7/27 (26%) | Core IP profiling + vulnerability lookup + 2 helper tools |
+| **Current Version** | ✅ v1.3.1 | Tool 6 complete, mypy 100% clean (0 errors) |
+| **Completed Tools** | 8/27 (30%) | Core IP profiling + vulnerability lookup + patch management + 2 helper tools |
 | **Filter Count** | 74 filters | Universal filter framework (centralized in COMMON_FILTERS) |
-| **Next Tool** | Tool 6 | Missing Patches (Windows) - MS bulletin tracking |
-| **Pending Tools** | Tools 6-27 | See TOOLS_ROADMAP.md for complete specifications |
+| **Next Tool** | Tool 7 | Scan Status Monitoring - scanResult API integration |
+| **Pending Tools** | Tools 7-27 | See TOOLS_ROADMAP.md for complete specifications |
 
-### v1.3.0.1 Highlights (Current Release)
+### v1.3.1 Highlights (Current Release)
 
-- ✅ **OS Filtering**: Word-boundary matching, 74 filters, 4 OS aliases
-- ✅ **Plugin Family**: Smart name→ID resolution, 123 families
-- ✅ **Helper Tools**: `tsc_list_operating_systems`, `tsc_list_plugin_families`
-- ✅ **Testing**: 8/8 tests passed
-- ✅ **Documentation**: CHANGELOG.md, TEST_PROMPTS.md, filter reference updated
+- ✅ **Tool 6**: `tsc_list_missing_patches` - Universal & Windows modes, 21/21 tests passed
+- ✅ **Type Safety**: Mypy 100% clean (31 errors → 0 errors) with zero behavioral changes
+- ✅ **Docker Deployment**: Verified v1.3.1 running with Tool 6 code (14,552 bytes patch_management.py)
+- ✅ **Documentation**: CHANGELOG.md (full history), USER_GUIDE.md Section 8, MCP registry entry
+- ✅ **GitHub PR**: PR #8 merged to develop (15 commits)
 
 ---
 
 
-## 🎯 Next Priority: Tool 6 - Missing Patches
+## 🎯 Next Priority: Tool 7 - Scan Status Monitoring
 
-**Tool Name:** `tsc_list_missing_patches`  
-**Estimated Time:** 3-4 hours  
-**Token Budget:** 2,000-5,000 tokens  
-**Cache TTL:** 240s (4 minutes)  
-**Module:** `src/tenable_sc_mcp/tools/patch_management.py` (new file)
+## 🎯 Next Priority: Tool 7 - Scan Status Monitoring
+
+**Tool Name:** `tsc_scan_status`  
+**Estimated Time:** 2.5-3 hours  
+**Token Budget:** 2,000-4,000 tokens  
+**Cache TTL:** 60s (real-time data)  
+**Module:** `src/tenable_sc_mcp/tools/scanning.py` (new file)
 
 ### What This Tool Does
 
-Provides universal patch gap analysis across all operating systems (Windows, Linux, macOS) with KB article tracking. Uses Tenable plugins:
-- **Plugin 66334** - Universal patch report (all OS + third-party software)
-- **Plugin 38153** - Windows KB-specific summary
+Provides real-time scan execution monitoring using Tenable.sc scanResult API. Tracks:
+- **Scan Status**: Running, Completed, Error, Stopped, Paused, Partial
+- **Import Status**: Finished, Running, Error (critical for data availability)
+- **Progress Tracking**: IPs scanned, plugins executed, percent complete
+- **Performance Metrics**: IPs/hour, estimated completion time
+- **Error Detection**: Scan failures, import issues, stuck scans
 
-Helps security teams:
-- Identify missing patches across entire infrastructure
-- Track Microsoft KB articles with superseded KB relationships
-- Monitor third-party software updates (Chrome, VMware Tools, etc.)
-- Generate remediation plans grouped by IP or patch
+Helps operations teams:
+- Monitor active scan progress in real-time
+- Identify scans with import issues (completed but data not available)
+- Calculate scan performance metrics
+- Track historical scan results with filtering
 
 ### Why This Tool Is Important
 
-1. **Universal Coverage:** Works on Windows, Linux, macOS, Unix - not just Windows
-2. **Third-Party Tracking:** Includes Chrome, Office, VMware, Nessus Agent patches
-3. **KB Relationships:** Shows which KBs are superseded by rollups
-4. **Compliance Reporting:** Required for PCI, NIST, CIS frameworks
+1. **Import Status Visibility:** Scan can complete but import still running - data not available yet
+2. **Progress Estimation:** Calculate remaining time based on IPs/hour scan rate
+3. **Error Detection:** Identify failed scans and import errors quickly
+4. **Performance Tracking:** Monitor scan efficiency and scanner load
+
+### Key API Insights (from Official Docs)
+
+1. **Time Filtering Confusion:**
+   - `startTime`/`endTime` params search against `createdTime`, NOT `finishTime`
+   - Must use `timeCompareField` param to search by finishTime
+   - Default: Last 30 days of created results
+
+2. **Progress Field Limitation:**
+   - `progress` field ONLY available on GET /{id}, NOT on list
+   - Must query each scan individually for detailed progress
+   - List view has: completedIPs, completedChecks, totalChecks only
+
+3. **Import vs Scan Status:**
+   - `status` = scan execution status
+   - `importStatus` = result import status
+   - Both must be tracked separately!
+
+4. **String Booleans:**
+   - `running`, `downloadAvailable` are strings: "true" or "false" (NOT booleans)
 
 ### Implementation Plan
 
-**Step 1: Create Tool Function (1h)**
+**Step 1: Create Tool Function (1.5h)**
 
-Location: `src/tenable_sc_mcp/tools/patch_management.py` (new file)
+Location: `src/tenable_sc_mcp/tools/scanning.py` (new file)
 
 ```python
-import re
-from html import unescape
 from typing import Any
+import time
+from datetime import datetime
 
 @mcp.tool()
-def tsc_list_missing_patches(
-    mode: str = "universal",  # "universal" or "windows"
-    filters: dict[str, Any] | None = None,
+def tsc_scan_status(
+    scan_id: int | None = None,           # Specific scan result ID
+    status: str | None = None,            # running/completed/error/stopped/paused
+    time_range: str | None = "24h",       # 24h/7d/30d
+    include_progress: bool = False,       # Detailed progress (per-scan query)
+    filters: dict[str, Any] | None = None # Additional filters
 ) -> dict[str, Any]:
     """
-    List missing patches across all operating systems.
+    Monitor scan execution status with progress tracking.
     
-    Uses Tenable plugins to detect missing patches:
-    - Plugin 66334 (universal): All OS + third-party software
-    - Plugin 38153 (windows): Windows KB-specific
+    Tracks scan status, import status, and performance metrics.
     
     Args:
-        mode: "universal" (plugin 66334) or "windows" (plugin 38153)
-        filters: Standard filters (ip, repository, etc.)
+        scan_id: Specific scan result ID for detailed view
+        status: Filter by status (running/completed/error/stopped/paused)
+        time_range: Time range filter (24h/7d/30d)
+        include_progress: Get detailed progress (requires per-scan query)
+        filters: Additional filters (start_time, end_time, etc.)
     
     Returns:
-        Patch gap analysis grouped by IP with KB articles
+        Scan status with progress, timing, and import status
     
     Example:
-        >>> tsc_list_missing_patches(mode="universal", filters={"ip": "10.1.20.10"})
+        >>> tsc_scan_status(status="running")
         {
             "ok": True,
-            "mode": "universal",
-            "total_affected_ips": 1,
-            "patches_by_ip": [...]
+            "active_scans": 3,
+            "scan_results": [...]
         }
     """
     client = _client()
     cache = _get_cache()
     
-    # Select plugin based on mode
-    plugin_id = "66334" if mode == "universal" else "38153"
+    # Parse time range
+    start_epoch, end_epoch = parse_time_range(time_range)
     
-    # Parse filters and add plugin ID filter
-    filter_dict = filters or {}
-    filter_dict["pluginID"] = plugin_id
-    filter_list = build_filters(**filter_dict)
-    
-    # Generate cache key
-    cache_key = generate_cache_key(
-        f"missing_patches_{mode}",
-        params=filter_dict
-    )
-    
-    # Check cache
-    if cache:
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return cached
-    
-    # Query using vulndetails to get plugin output
-    query = {
-        "tool": "vulndetails",
-        "type": "vuln",
-        "filters": filter_list,
+    # Build query parameters
+    params = {
+        "fields": "id,name,status,totalIPs,completedIPs,completedChecks,totalChecks,startTime,finishTime,scanDuration,importStatus,importStart,importFinish,importDuration,errorDetails,importErrorDetails,scan,repository,initiator",
+        "startTime": str(start_epoch),
+        "endTime": str(end_epoch)
     }
     
-    # Execute query
-    response = client.analyze(query)
+    # Add status filter
+    if status:
+        if status == "running":
+            params["running"] = "true"
+        elif status == "completed":
+            params["completed"] = "true"
     
-    # Parse plugin text for each IP
-    patches_by_ip = []
-    for result in response.get("results", []):
-        plugin_text = result.get("pluginText", "")
-        parsed = parse_patch_report(plugin_text, plugin_id)
+    # Apply custom filters
+    filter_dict = filters or {}
+    if "time_compare_field" in filter_dict:
+        params["timeCompareField"] = filter_dict["time_compare_field"]
+    
+    # Generate cache key
+    cache_key = generate_cache_key("scan_status", params=params)
+    
+    # Check cache
+    if cache and not scan_id:  # Don't cache specific scan queries
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+    
+    # Query API
+    if scan_id:
+        # Single scan with detailed progress
+        response = client.get(f"/rest/scanResult/{scan_id}", params={
+            "fields": params["fields"] + ",progress"
+        })
+        results = [response.get("response", {})]
+    else:
+        # List all matching scans
+        response = client.get("/rest/scanResult", params=params)
+        results = response.get("response", {}).get("usable", [])
+    
+    # Process results
+    scan_results = []
+    active_scans = 0
+    completed_scans = 0
+    failed_scans = 0
+    
+    for result in results:
+        status_val = result.get("status", "")
         
-        patches_by_ip.append({
-            "ip": result.get("ip"),
-            "hostname": result.get("dnsName"),
-            "os": result.get("operatingSystem"),
-            "repository": result.get("repository", {}).get("name"),
-            **parsed
+        # Count by status
+        if status_val == "Running":
+            active_scans += 1
+        elif status_val == "Completed":
+            completed_scans += 1
+        elif status_val in ["Error", "Stopped"]:
+            failed_scans += 1
+        
+        # Calculate progress
+        progress = calculate_progress(result)
+        
+        # Check import status
+        import_info = check_import_status(result)
+        
+        # Format timing
+        timing = format_timing(result)
+        
+        scan_results.append({
+            "id": result.get("id"),
+            "name": result.get("name"),
+            "status": status_val,
+            "progress": progress,
+            "timing": timing,
+            "import_status": result.get("importStatus"),
+            "import_info": import_info,
+            "scan": result.get("scan", {}),
+            "repository": result.get("repository", {}),
+            "initiator": result.get("initiator", {})
         })
     
-    result = {
+    result_data = {
         "ok": True,
-        "mode": mode,
-        "total_affected_ips": len(patches_by_ip),
-        "patches_by_ip": patches_by_ip,
+        "total_results": len(scan_results),
+        "active_scans": active_scans,
+        "completed_scans": completed_scans,
+        "failed_scans": failed_scans,
+        "scan_results": scan_results,
+        "filters_applied": {
+            "time_range": time_range,
+            "status": status or "all"
+        }
     }
     
     # Cache result
-    if cache:
-        cache.set(cache_key, result, ttl_seconds=240)
+    if cache and not scan_id:
+        cache.set(cache_key, result_data, ttl_seconds=60)
     
-    return result
+    return result_data
 ```
 
-**Step 2: Add Parsing Functions (1h)**
+**Step 2: Add Helper Functions (0.5h)**
 
 ```python
-def parse_patch_report(plugin_text: str, plugin_id: str) -> dict[str, Any]:
-    """Parse patch report from plugin text."""
-    # HTML unescape
-    text = unescape(plugin_text)
-    text = re.sub(r'</?plugin_output>', '', text)
+def parse_time_range(time_range: str) -> tuple[int, int]:
+    """Parse time range to epoch timestamps."""
+    now = int(time.time())
     
-    if plugin_id == "66334":
-        return parse_plugin_66334(text)
-    else:  # 38153
-        return parse_plugin_38153(text)
+    if time_range == "24h":
+        return (now - 86400, now)
+    elif time_range == "7d":
+        return (now - 604800, now)
+    elif time_range == "30d":
+        return (now - 2592000, now)
+    else:
+        # Default to 24h
+        return (now - 86400, now)
 
-def parse_plugin_66334(text: str) -> dict[str, Any]:
-    """Parse universal patch report (plugin 66334)."""
-    microsoft_kbs = []
-    third_party = []
+def calculate_progress(result: dict) -> dict:
+    """Calculate scan progress metrics."""
+    completed = int(result.get("completedIPs", 0))
+    total = int(result.get("totalIPs", 1))
+    percent = (completed / total * 100) if total > 0 else 0
     
-    # Extract Microsoft KB patches
-    kb_pattern = r'- (KB\d+)(?: \((\d+) vulnerabilities\))?'
-    for match in re.finditer(kb_pattern, text):
-        kb_id = match.group(1)
-        vuln_count = int(match.group(2)) if match.group(2) else None
-        microsoft_kbs.append({
-            "kb_id": kb_id,
-            "vulnerability_count": vuln_count
-        })
+    # Time estimation
+    start = int(result.get("startTime", 0))
+    now = int(time.time())
+    elapsed = now - start if start > 0 else 0
     
-    # Extract third-party software
-    software_pattern = r'\[ (.+?) \]'
-    for match in re.finditer(software_pattern, text):
-        third_party.append({
-            "software": match.group(1)
-        })
+    ips_per_hour = (completed / elapsed * 3600) if elapsed > 0 else 0
+    remaining_ips = total - completed
+    estimated_seconds = (remaining_ips / ips_per_hour * 3600) if ips_per_hour > 0 else 0
     
     return {
-        "total_missing_patches": len(microsoft_kbs) + len(third_party),
-        "microsoft_kbs": microsoft_kbs,
-        "third_party": third_party
+        "ips_completed": completed,
+        "ips_total": total,
+        "percent": round(percent, 1),
+        "checks_completed": int(result.get("completedChecks", 0)),
+        "checks_total": int(result.get("totalChecks", 0)),
+        "ips_per_hour": round(ips_per_hour, 1) if ips_per_hour > 0 else None,
+        "estimated_remaining_seconds": int(estimated_seconds) if estimated_seconds > 0 else None
     }
 
-def parse_plugin_38153(text: str) -> dict[str, Any]:
-    """Parse Windows KB summary (plugin 38153)."""
-    kb_list = []
+def check_import_status(result: dict) -> dict:
+    """Check for import issues."""
+    scan_status = result.get("status", "")
+    import_status = result.get("importStatus", "")
     
-    # Extract KB articles
-    kb_pattern = r'(KB\d+)'
-    for match in re.finditer(kb_pattern, text):
-        kb_id = match.group(1)
-        kb_list.append({
-            "kb_id": kb_id,
-            "url": f"https://support.microsoft.com/en-us/help/{kb_id}"
-        })
+    # Key insight: scan can be completed but import still running
+    if scan_status == "Completed" and import_status == "Running":
+        import_start = int(result.get("importStart", 0))
+        elapsed = int(time.time()) - import_start if import_start > 0 else 0
+        
+        return {
+            "alert": True,
+            "message": "Scan completed but import still processing",
+            "import_elapsed_seconds": elapsed,
+            "import_elapsed_formatted": format_duration(elapsed)
+        }
+    elif import_status == "Error":
+        return {
+            "alert": True,
+            "message": "Import failed",
+            "error_details": result.get("importErrorDetails", "Unknown error")
+        }
     
-    # Extract legacy MS bulletins
-    ms_pattern = r'(MS\d{2}-\d+)'
-    for match in re.finditer(ms_pattern, text):
-        kb_list.append({
-            "bulletin_id": match.group(1)
-        })
+    return {"alert": False}
+
+def format_timing(result: dict) -> dict:
+    """Format timing information."""
+    start = int(result.get("startTime", 0))
+    finish = int(result.get("finishTime", -1))
+    duration = int(result.get("scanDuration", 0))
     
-    return {
-        "total_missing_kbs": len(kb_list),
-        "missing_kbs": kb_list
-    }
+    timing = {}
+    
+    if start > 0:
+        timing["started"] = datetime.fromtimestamp(start).isoformat()
+    
+    if finish > 0:
+        timing["finished"] = datetime.fromtimestamp(finish).isoformat()
+        timing["duration"] = format_duration(duration)
+    elif start > 0:
+        elapsed = int(time.time()) - start
+        timing["elapsed"] = format_duration(elapsed)
+    
+    return timing
+
+def format_duration(seconds: int) -> str:
+    """Format seconds to human-readable duration."""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    else:
+        return f"{minutes}m"
 ```
 
 **Step 3: Register Tool (10 min)**
 
 Add to `src/tenable_sc_mcp/server.py`:
 ```python
-from tenable_sc_mcp.tools.patch_management import register_tools as register_patch_tools
-register_patch_tools(mcp)
+from tenable_sc_mcp.tools.scanning import register_tools as register_scanning_tools
+register_scanning_tools(mcp)
 ```
 
-**Step 4: Testing (1h)**
+**Step 4: Testing (0.5h)**
 
-Create `tests/test_patch_management.py`:
+Create `tests/test_scanning.py`:
 ```python
-def test_missing_patches_universal():
-    """Test universal patch report (plugin 66334)."""
-    result = tsc_list_missing_patches(mode="universal")
+def test_scan_status_running():
+    """Test listing running scans."""
+    result = tsc_scan_status(status="running")
     assert result["ok"] is True
-    assert "patches_by_ip" in result
+    assert "scan_results" in result
 
-def test_missing_patches_windows():
-    """Test Windows KB report (plugin 38153)."""
-    result = tsc_list_missing_patches(mode="windows")
+def test_scan_status_time_range():
+    """Test time range filtering."""
+    result = tsc_scan_status(time_range="7d")
     assert result["ok"] is True
-    assert result["mode"] == "windows"
+    assert result["filters_applied"]["time_range"] == "7d"
 
-def test_patch_parsing_66334():
-    """Test parsing plugin 66334 output."""
-    sample_text = """<plugin_output>
-    - KB5025279 (85 vulnerabilities)
-    [ Google Chrome < 113.0.5672.63 ]
-    </plugin_output>"""
-    
-    result = parse_plugin_66334(sample_text)
-    assert len(result["microsoft_kbs"]) == 1
-    assert len(result["third_party"]) == 1
+def test_parse_time_range():
+    """Test time range parsing."""
+    start, end = parse_time_range("24h")
+    assert end - start == 86400
+
+def test_calculate_progress():
+    """Test progress calculation."""
+    result = {
+        "completedIPs": "50",
+        "totalIPs": "100",
+        "startTime": str(int(time.time()) - 3600)
+    }
+    progress = calculate_progress(result)
+    assert progress["percent"] == 50.0
+    assert progress["ips_per_hour"] > 0
 ```
 
 **Step 5: Documentation (30 min)**
 
-1. Add to `TEST_PROMPTS.md`: "Show me missing patches for IP 10.1.20.10"
-2. Update `TOOLS_ROADMAP.md`: Mark Tool 6 as ✅ Complete
-3. Add entry to `CHANGELOG.md` for next release
+1. Add to `USER_GUIDE.md`: New Section 9 - Scan Status Monitoring
+2. Add to `TEST_PROMPTS.md`: "Show me all running scans", "Did last night's scans complete?"
+3. Update `TOOLS_ROADMAP.md`: Mark Tool 7 as ✅ Complete
+4. Update `CHANGELOG.md`: Add v1.4.0 entry
+
+### Response Structure
+
+```json
+{
+    "ok": true,
+    "total_results": 15,
+    "active_scans": 3,
+    "completed_scans": 10,
+    "failed_scans": 2,
+    "scan_results": [
+        {
+            "id": "123",
+            "name": "Weekly PCI Scan",
+            "status": "Running",
+            "progress": {
+                "ips_completed": 450,
+                "ips_total": 500,
+                "percent": 90.0,
+                "checks_completed": 125000,
+                "checks_total": 135000,
+                "ips_per_hour": 200.0,
+                "estimated_remaining_seconds": 900
+            },
+            "timing": {
+                "started": "2026-06-24T10:00:00",
+                "elapsed": "2h 15m"
+            },
+            "import_status": "No Results",
+            "import_info": {"alert": false},
+            "scan": {"id": "45", "name": "PCI Quarterly"},
+            "repository": {"id": "9", "name": "Production"},
+            "initiator": {"username": "scheduler"}
+        }
+    ]
+}
+```
+
+### Use Cases Covered
+
+1. ✅ "Show me all running scans"
+2. ✅ "Did last night's scans complete?"
+3. ✅ "Why can't I see scan data?" (import status check)
+4. ✅ "How long until PCI scan finishes?"
+5. ✅ "Which scans failed this week?"
+6. ✅ "What's the scanning rate?" (IPs/hour)
 
 ---
 
@@ -468,13 +622,13 @@ develop → release/vX.Y.Z → main (tag) → back-merge to develop
 
 1. **Read This Document** - Understand current state and next priority
 2. **Read DESIGN_PRINCIPLES.md** - Mandatory architecture patterns
-3. **Read TOOLS_ROADMAP.md Lines 134-173** - Tool 6 complete specification
-4. **Create Feature Branch** - `git checkout -b feature/tool-6-missing-patches`
-5. **Implement Tool 6** - Follow the implementation plan above (2-3 hours)
+3. **Review Tool 7 Spec Above** - Complete implementation plan with API insights
+4. **Create Feature Branch** - `git checkout -b feature/tool-7-scan-status`
+5. **Implement Tool 7** - Follow the implementation plan above (2.5-3 hours)
 6. **Test Thoroughly** - Run quality checks and pytest
-7. **Update Documentation** - TEST_PROMPTS.md, TOOLS_ROADMAP.md, CHANGELOG.md
+7. **Update Documentation** - USER_GUIDE.md, TEST_PROMPTS.md, TOOLS_ROADMAP.md, CHANGELOG.md
 8. **Commit and Push** - Follow git workflow
 
 ---
 
-**For next session:** Start with Tool 6 implementation following the plan above. All architecture patterns are established, filters are centralized, and the codebase is ready for new tools.
+**For next session:** Start with Tool 7 implementation following the plan above. All architecture patterns are established, Tool 6 is complete and deployed, mypy is 100% clean, and the codebase is ready for new tools.

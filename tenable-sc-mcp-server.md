@@ -45,6 +45,8 @@ tools_exposed:
     description: "Discover valid OS names for filtering"
   - name: "tsc_list_plugin_families"
     description: "List all plugin families with name→ID mapping"
+  - name: "tsc_list_missing_patches"
+    description: "Patch gap analysis across all OS (universal mode) or Windows KB-specific"
   - name: "tsc_resource_docs"
     description: "Returns docs metadata for Tenable.sc resource"
 resources_exposed:
@@ -63,6 +65,7 @@ The Tenable.sc MCP Server provides AI assistants with direct access to Tenable S
 
 This MCP server enables AI-powered security workflows by providing:
 - **Comprehensive vulnerability queries** - Search CVEs across your infrastructure, list vulnerabilities by IP/severity, and get detailed remediation guidance
+- **Patch management** - Identify missing patches and security updates for all OS types (Windows, Linux, Solaris) plus third-party software
 - **Asset profiling and discovery** - Profile individual IPs with complete security context, discover assets by criticality, and map asset group membership
 - **Intelligent caching** - Built-in Redis/in-memory caching reduces API load and enables 1000x faster repeated queries
 - **Generic resource access** - Direct CRUD operations on all Tenable.sc resources (scans, policies, credentials, users, reports)
@@ -72,7 +75,7 @@ This MCP server enables AI-powered security workflows by providing:
 
 The server acts as a stateless proxy between MCP clients and Tenable.sc's REST API. It authenticates using your Tenable.sc API keys and enforces all RBAC permissions from your Security Center instance. The architecture includes:
 - Multi-tier caching (in-memory + Redis) with smart TTLs based on data volatility
-- 17 core MCP tools including convenience tools for common security workflows
+- 18 core MCP tools including convenience tools for common security workflows (IP profiling, CVE search, patch management)
 - 3 self-documenting resources with filter format references for complex queries
 - Docker Compose deployment with Redis included for production use
 - Support for both stdio (Claude Desktop) and HTTP (remote clients) transports
