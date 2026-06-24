@@ -301,8 +301,10 @@ def register_tools(mcp):
             }
         
         # Parse plugin text for each result
+        # tsc_analyze returns {"ok": True, "response": {"results": [...]}}
         patches_by_ip = []
-        for result in response.get("results", []):
+        api_response = response.get("response", {})
+        for result in api_response.get("results", []):
             plugin_text = result.get("pluginText", "")
             
             # Skip empty plugin text
