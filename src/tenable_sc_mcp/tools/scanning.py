@@ -297,14 +297,19 @@ def register_tools(mcp: Server) -> None:
         # Query API
         if scan_id:
             # Single scan with detailed progress
-            response = client.get(
+            response = client.request(
+                "GET",
                 f"/rest/scanResult/{scan_id}",
                 params={"fields": params["fields"] + ",progress"}
             )
             results = [response.get("response", {})]
         else:
             # List all matching scans
-            response = client.get("/rest/scanResult", params=params)
+            response = client.request(
+                "GET",
+                "/rest/scanResult",
+                params=params
+            )
             results = response.get("response", {}).get("usable", [])
         
         # Process results
