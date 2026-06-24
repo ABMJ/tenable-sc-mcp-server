@@ -854,7 +854,7 @@ src/tenable_sc_mcp/tools/
 ---
 
 **Next Steps:**
-1. Complete v1.4.0 (Multi-Client API Keys) - See MULTI_CLIENT_API_KEYS.md
-2. OR start Tool 6 (Missing Patches) - Independent of v1.4.0
-3. Continue with Week 1 remaining tools (Tool 7)
+1. Start Tool 6 (Missing Patches) - See HANDOFF.md for implementation plan
+2. Continue with Week 1 remaining tools (Tool 7)
+3. Proceed to Week 2 essential queries (Tools 8-17)
 4. Begin Week 2 essential queries

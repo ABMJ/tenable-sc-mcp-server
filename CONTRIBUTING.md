@@ -155,10 +155,10 @@ git commit -m "feat(tools): Add new capability"
 # Create PR to develop
 gh pr create --base develop
 
-# Release workflow
-git checkout -b release/v1.4.0
+# Release workflow example
+git checkout -b release/vX.Y.Z
 # ... bump version, test ...
-gh pr create --base main --title "Release v1.4.0"
+gh pr create --base main --title "Release vX.Y.Z"
 ```
 
 ---
