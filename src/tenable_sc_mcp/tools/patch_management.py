@@ -258,7 +258,7 @@ def register_tools(mcp):
         
         # Parse filters and add plugin ID filter
         filter_dict = filters or {}
-        filter_dict["pluginID"] = plugin_id
+        filter_dict["plugin_id"] = plugin_id
         
         # Build filters using centralized helper
         try:

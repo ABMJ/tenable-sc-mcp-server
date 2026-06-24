@@ -517,47 +517,51 @@ I am testing tsc_list_missing_patches in universal mode for IP 10.1.20.10. Pleas
 
 ### Test 2: Universal Patches with Repository Filter
 ```
-I am testing tsc_list_missing_patches in universal mode filtered by repository "Default". Please format your response as:
+I am testing tsc_list_missing_patches in universal mode filtered by repository "Default" for IP 10.1.20.10. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner about cache and token performance]
-📦 RESULT: Repository: [name], Affected IPs: [count], Top missing patches: [list top 3 KBs or software]
+📦 RESULT: Repository: [name], Affected IPs: [count], Total patches for 10.1.20.10: [count] ([X] Microsoft KBs, [Y] third-party)
 ```
 
 **Expected Output:**
 - Only IPs from specified repository
-- Patch data grouped by IP
+- Patch data for single IP
 - Repository name confirmed in results
-- Reduced result set compared to unfiltered query
+- Single IP scope for token efficiency
+
+**Note:** Use `filters={"ip": "10.1.20.10", "repository": "Default"}` to scope to Default repository
 
 ---
 
 ### Test 3: Universal Patches (High-Criticality Assets Only)
 ```
-I am testing tsc_list_missing_patches in universal mode with asset_criticality filter "8-10". Please format your response as:
+I am testing tsc_list_missing_patches in universal mode with asset_criticality filter "8-10" for IP 10.1.20.10. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner about cache and token performance]
-📦 RESULT: Critical assets with patches: [count] IPs. Worst offender: [ip] with [count] total patches.
+📦 RESULT: IP: [ip], ACR Score: [score], Total patches: [count] ([X] Microsoft KBs, [Y] third-party)
 ```
 
 **Expected Output:**
 - Only high-criticality assets (ACR 8-10)
-- Patch data for business-critical systems
+- Patch data for critical system
 - Filter confirmation in response
 - Useful for prioritizing remediation efforts
 
 **Filter Format:** Must use range format `"8-10"` (NOT `">8"`)
 
+**Note:** Use `filters={"ip": "10.1.20.10", "asset_criticality": "8-10"}` for single critical asset
+
 ---
 
 ### Test 4: Windows KB Mode (Single IP)
 ```
-I am testing tsc_list_missing_patches in windows mode for IP 192.168.5.20 to get Windows KB articles. Please format your response as:
+I am testing tsc_list_missing_patches in windows mode for IP 10.1.20.10 to get Windows KB articles. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
@@ -575,36 +579,38 @@ I am testing tsc_list_missing_patches in windows mode for IP 192.168.5.20 to get
 
 **Token Efficiency:** ~500-1,000 tokens for single IP
 
-**Note:** Use `filters={"ip": "192.168.5.20"}` to scope to a single Windows IP.
+**Note:** Use `filters={"ip": "10.1.20.10"}` to scope to a single Windows IP.
 
 ---
 
 ### Test 5: Windows KB with Repository Filter
 ```
-I am testing tsc_list_missing_patches in windows mode filtered by repository "Production" to focus on Windows servers. Please format your response as:
+I am testing tsc_list_missing_patches in windows mode filtered by repository "Default" for IP 10.1.20.10 to focus on Windows patches. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [HIT/MISS]
 🔢 TOKENS: [count] tokens used
 📝 SUMMARY: [one-liner about cache and token performance]
-📦 RESULT: Production Windows systems: [count], Most common missing KB: [KB ID], Affected systems: [count]
+📦 RESULT: IP: [ip], Repository: [name], Missing KBs: [count], Most critical KB: [KB ID with highest vuln count]
 ```
 
 **Expected Output:**
 - Only Windows systems in specified repository
-- KB article tracking for production servers
+- KB article tracking for Default repository
 - Repository scoping confirmed
 - Useful for compliance audits and remediation planning
+
+**Note:** Use `filters={"ip": "10.1.20.10", "repository": "Default"}` to scope to Default repository
 
 ---
 
 ### Test 6: Verify Cache HIT Behavior (Repeat Test 1)
 ```
-I am repeating Test 1 (universal patches, no filters) to verify cache HIT. Please format your response as:
+I am repeating Test 1 (universal patches for IP 10.1.20.10) to verify cache HIT. Please format your response as:
 
 ✅/❌ TEST STATUS: [PASS/FAIL]
 📊 CACHE: [expected HIT]
-🔢 TOKENS: [count] tokens used (should be ~50-200 vs ~3,000-5,000 on MISS)
+🔢 TOKENS: [count] tokens used (should be ~50-200 vs ~500-1,500 on MISS)
 📝 SUMMARY: Cache HIT reduced token usage by [X]%
 📦 RESULT: Data matches Test 1 results exactly
 ```
