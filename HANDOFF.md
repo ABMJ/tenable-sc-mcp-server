@@ -1,8 +1,8 @@
 # Tenable.sc MCP Server - Handoff Document
 
-**Last Updated:** 2026-06-20 21:00  
+**Last Updated:** 2026-06-24  
 **Project Status:** ✅ v1.3.0.1 Released  
-**Next Session Priority:** v1.4.0 - Multi-Client API Key Support  
+**Next Session Priority:** Tool 6 - Missing Patches (Windows)  
 **Current Version:** 1.3.0.1
 
 ---
@@ -12,12 +12,12 @@
 | Component | Status | Notes |
 |-----------|--------|-------|
 | **Current Version** | ✅ v1.3.0.1 | OS filtering & plugin family validation fixed |
-| **Completed Tools** | 7/27 (26%) | Core tools + 2 helper tools |
-| **Filter Count** | 74 filters | Universal filter framework |
-| **Next Release** | v1.4.0 | Multi-client API key support |
-| **Pending Tools** | Tools 6-27 | See TOOLS_ROADMAP.md |
+| **Completed Tools** | 7/27 (26%) | Core IP profiling + vulnerability lookup + 2 helper tools |
+| **Filter Count** | 74 filters | Universal filter framework (centralized in COMMON_FILTERS) |
+| **Next Tool** | Tool 6 | Missing Patches (Windows) - MS bulletin tracking |
+| **Pending Tools** | Tools 6-27 | See TOOLS_ROADMAP.md for complete specifications |
 
-### v1.3.0.1 Highlights (Completed)
+### v1.3.0.1 Highlights (Current Release)
 
 - ✅ **OS Filtering**: Word-boundary matching, 74 filters, 4 OS aliases
 - ✅ **Plugin Family**: Smart name→ID resolution, 123 families
@@ -27,177 +27,199 @@
 
 ---
 
-## 🚀 Next Priority: v1.4.0 - Multi-Client API Key Support
+## 🎯 Next Priority: Tool 6 - Missing Patches (Windows)
 
-**CRITICAL:** Read **[MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md)** before starting implementation!
+**Tool Name:** `tsc_list_missing_patches_windows`  
+**Estimated Time:** 2-3 hours  
+**Token Budget:** 2,000-4,000 tokens  
+**Cache TTL:** 240s (4 minutes)  
+**Module:** `src/tenable_sc_mcp/tools/scanning.py`
 
-**What:** Transform MCP server from single-tenant to multi-tenant architecture  
-**Estimated Time:** 4-5 hours  
-**Breaking Changes:** None (backward compatible with .env mode)  
-**Status:** Ready to implement
+### What This Tool Does
 
-### Quick Summary
+Provides MS bulletin-based patch gap analysis for Windows systems. Helps security teams:
+- Identify missing Microsoft patches across Windows endpoints
+- Prioritize patches by severity (critical/important/moderate)
+- Track patch compliance by bulletin ID
+- Generate remediation plans grouped by bulletin or IP
 
-**Current Problem:**
-- MCP server loads ONE set of API keys from `.env` at startup
-- ALL clients share the SAME credentials
-- No per-client RBAC enforcement
-- Cannot support multiple users with different permission levels
+### Why This Tool Is Important
 
-**Solution:**
-- Add FastMCP `Context` parameter to all 15+ tools for session tracking
-- Store per-session `TenableScClient` instances with separate credentials
-- Add `initialize_credentials` tool for clients to provide API keys
-- Implement per-client cache isolation to prevent data leakage
-- Support BOTH legacy `.env` mode and new per-client mode (backward compatible)
+1. **Patch Management:** Windows patch compliance is critical for security
+2. **MS Bulletin Tracking:** IT teams need bulletin-level visibility (not just CVE)
+3. **Remediation Planning:** Grouping by bulletin helps batch deployments
+4. **Compliance Reporting:** Required for many security frameworks (PCI, NIST, CIS)
 
-**Impact:**
-- ✅ Proper multi-user support with RBAC enforcement
-- ✅ Each client sees only data they're authorized to access
-- ✅ Maintains backward compatibility with existing deployments
-- ✅ Foundation for future session management and audit logging
+### Implementation Plan
 
-### Implementation Phases
+**Step 1: Create Tool Function (45 min)**
 
-**Phase 1 (2h):** Core Session Management
-- Add session storage: `_CLIENTS`, `_CACHE_PER_CLIENT` dicts
-- Implement `_client_for_session(session_id)` (replaces singleton `_client()`)
-- Implement `_register_client(session_id, config)` for registration
-- Implement `_cleanup_session(session_id)` for disconnect handling
-- Add `initialize_credentials` tool
-- Thread-safe with `Lock()`
-
-**Phase 2 (1.5h):** Update All Tools
-- Add `from mcp.server.fastmcp import Context` import
-- Add `ctx: Context` as first parameter to all 15+ tools:
-  - Core API: `tsc_request`, `tsc_analyze`, `tsc_resource_action`
-  - CRUD: `tsc_list`, `tsc_get`, `tsc_create`, `tsc_update`, `tsc_delete`
-  - Docs: `tsc_catalog`, `tsc_resource_docs`
-  - File ops: `tsc_download`, `tsc_upload_file`
-  - Convenience: `tsc_profile_ip_efficient`, `tsc_list_ips`, etc.
-- Replace `_client()` → `_client_for_session(ctx.session_id)`
-- Replace `_get_cache()` → `_get_cache_for_tool(ctx)`
-
-**Phase 3 (1h):** Testing & Validation
-- Unit tests: session storage, cleanup, cache isolation
-- Integration tests: multiple clients with different credentials
-- Backward compatibility: `.env` fallback works
-- Concurrent requests from multiple clients
-
-**Phase 4 (1h):** Documentation
-- Update README.md with multi-client usage examples
-- Update tool docstrings
-- Write migration guide
-
-### Key Code Changes
-
-**File:** `src/tenable_sc_mcp/server.py`
+Location: `src/tenable_sc_mcp/tools/scanning.py` (new file)
 
 ```python
-from mcp.server.fastmcp import Context
-from threading import Lock
-
-# Replace singleton with session storage
-_CLIENTS: dict[str, TenableScClient] = {}
-_CLIENTS_LOCK = Lock()
-_CACHE_PER_CLIENT: dict[str, Cache] = {}
-
-def _client_for_session(session_id: str) -> TenableScClient:
-    """Get or create client for this session."""
-    with _CLIENTS_LOCK:
-        if session_id in _CLIENTS:
-            return _CLIENTS[session_id]
-        
-        # Fallback to .env for backward compatibility
-        try:
-            config = TenableScConfig.from_env()
-            _CLIENTS[session_id] = TenableScClient(config=config)
-            return _CLIENTS[session_id]
-        except TenableScConfigError:
-            raise TenableScConfigError(
-                f"No credentials for session {session_id}. "
-                "Call initialize_credentials first."
-            )
-
 @mcp.tool()
-def initialize_credentials(
-    ctx: Context,
-    base_url: str,
-    access_key: str,
-    secret_key: str,
-    verify_ssl: bool = True,
+def tsc_list_missing_patches_windows(
+    filters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Initialize Tenable.sc credentials for this session."""
-    config = TenableScConfig(
-        base_url=base_url,
-        access_key=access_key,
-        secret_key=secret_key,
-        verify_ssl=verify_ssl,
-    )
-    _register_client(ctx.session_id, config)
+    """
+    List missing Microsoft patches on Windows systems.
     
-    # Verify credentials work
-    client = _client_for_session(ctx.session_id)
-    client.request("GET", "/rest/system")
+    Returns MS bulletin-based patch gap analysis with affected IPs,
+    severity ratings, and KB article references. Use this for patch
+    compliance reporting and remediation planning.
     
-    return {
-        "ok": True,
-        "session_id": ctx.session_id,
-        "base_url": base_url
-    }
-```
-
-**Tool Pattern (apply to all tools):**
-
-```python
-# Before:
-@mcp.tool()
-def tsc_request(method: str, path: str, ...) -> dict[str, Any]:
+    Filters:
+        severity: Patch severity (critical/important/moderate/low)
+        release_date: Patch release date range (epoch or YYYY-MM-DD)
+        bulletin_id: Specific MS bulletin ID (e.g., "MS17-010")
+        repository: Repository name or ID
+        ip: Specific IP address
+        
+    Cache: 240s TTL (patches don't change frequently)
+    Token Budget: 2,000-4,000 tokens
+    
+    Example:
+        >>> tsc_list_missing_patches_windows(filters={"severity": "critical"})
+        {
+            "ok": True,
+            "total_bulletins": 15,
+            "bulletins": [
+                {
+                    "bulletin_id": "MS17-010",
+                    "severity": "Critical",
+                    "title": "Security Update for Windows SMB Server",
+                    "release_date": "2017-03-14",
+                    "affected_ips": 45,
+                    "kb_articles": ["KB4013389", "KB4012598"]
+                }
+            ]
+        }
+    """
     client = _client()
     cache = _get_cache()
-    ...
-
-# After:
-@mcp.tool()
-def tsc_request(ctx: Context, method: str, path: str, ...) -> dict[str, Any]:
-    client = _client_for_session(ctx.session_id)
-    cache = _get_cache_for_tool(ctx)
-    ...
+    
+    # Parse filters
+    filter_dict = filters or {}
+    filter_list = build_filters(**filter_dict)
+    
+    # Generate cache key
+    cache_key = generate_cache_key(
+        "analysis_missing_patches_windows",
+        params=filter_dict
+    )
+    
+    # Check cache
+    if cache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+    
+    # Build analysis query
+    query = {
+        "tool": "msupdate",
+        "type": "vuln",
+        "filters": filter_list,
+    }
+    
+    # Execute query
+    response = client.analyze(query)
+    
+    # Transform response to user-friendly format
+    result = {
+        "ok": True,
+        "total_bulletins": len(response.get("results", [])),
+        "bulletins": _format_bulletin_results(response),
+    }
+    
+    # Cache result
+    if cache:
+        cache.set(cache_key, result, ttl_seconds=240)
+    
+    return result
 ```
 
-### Deliverables
+**Step 2: Add Helper Function (15 min)**
 
-- [ ] Session management infrastructure (`_CLIENTS`, `_CACHE_PER_CLIENT`, `_CLIENTS_LOCK`)
-- [ ] `_client_for_session(session_id)` function
-- [ ] `_register_client(session_id, config)` function
-- [ ] `_cleanup_session(session_id)` function
-- [ ] `initialize_credentials` tool
-- [ ] All 15+ tools updated with `ctx: Context` parameter
-- [ ] Per-client cache isolation
-- [ ] Backward compatibility with `.env` mode
-- [ ] Unit tests for session management
-- [ ] Integration tests for multi-client scenarios
-- [ ] Documentation updates (README.md, migration guide)
-- [ ] Version bumped to 1.4.0
-- [ ] Release published
+```python
+def _format_bulletin_results(response: dict[str, Any]) -> list[dict[str, Any]]:
+    """Transform raw API response to bulletin summary format."""
+    bulletins = []
+    for item in response.get("results", []):
+        bulletins.append({
+            "bulletin_id": item.get("msid"),
+            "severity": item.get("severity", {}).get("name"),
+            "title": item.get("name"),
+            "release_date": item.get("publishedDate"),
+            "affected_ips": item.get("ipCount", 0),
+            "kb_articles": item.get("kbArticles", []),
+        })
+    return bulletins
+```
 
-**Start Here:** [MULTI_CLIENT_API_KEYS.md](MULTI_CLIENT_API_KEYS.md) - Complete implementation guide
+**Step 3: Register Tool (5 min)**
+
+Add to `src/tenable_sc_mcp/server.py`:
+```python
+from tenable_sc_mcp.tools.scanning import tsc_list_missing_patches_windows
+```
+
+**Step 4: Add Filter Support (30 min)**
+
+Filters are already centralized in `COMMON_FILTERS` dict (`convenience_tools.py:110`).
+The `build_filters()` function handles all 74 existing filters automatically.
+
+For bulletin-specific filters, verify these exist:
+- `severity` - Already exists (severity filter)
+- `release_date` - Check if exists, add if missing
+- `bulletin_id` - Add new filter for MS bulletin ID
+
+**Step 5: Testing (45 min)**
+
+Create `tests/test_missing_patches.py`:
+```python
+def test_missing_patches_basic():
+    """Test basic missing patches query."""
+    result = tsc_list_missing_patches_windows()
+    assert result["ok"] is True
+    assert "bulletins" in result
+
+def test_missing_patches_severity_filter():
+    """Test severity filter."""
+    result = tsc_list_missing_patches_windows(filters={"severity": "critical"})
+    assert result["ok"] is True
+    assert all(b["severity"] == "Critical" for b in result["bulletins"])
+
+def test_missing_patches_cached():
+    """Test cache hit on second call."""
+    result1 = tsc_list_missing_patches_windows()
+    result2 = tsc_list_missing_patches_windows()
+    assert result1 == result2
+```
+
+**Step 6: Documentation (15 min)**
+
+1. Add to `TEST_PROMPTS.md` - "Show me critical missing Windows patches"
+2. Update `TOOLS_ROADMAP.md` - Mark Tool 6 as ✅ Complete
+3. Add entry to `CHANGELOG.md` for next release
 
 ---
 
 ## 📚 Key Documentation Files
 
+**MUST READ BEFORE CODING:**
+- `DESIGN_PRINCIPLES.md` - **CRITICAL**: Centralized filter management, smart lookup patterns, caching strategy
+- `TOOLS_ROADMAP.md` - Complete specifications for Tools 6-27
+- `FILTER_FORMAT_REFERENCE.md` - All 74 filters with examples
+
 **User Documentation:**
 - `README.md` - Quick start and feature overview
 - `TEST_PROMPTS.md` - Comprehensive test prompts for all tools
+- `USER_GUIDE.md` - Detailed guide for completed tools (1-7)
 - `CHANGELOG.md` - Version history and release notes
 
 **Developer Documentation:**
-- `TOOLS_ROADMAP.md` - Future feature planning (Tools 6-27)
 - `HANDOFF.md` - Session handoff notes (this file)
-- `DESIGN_PRINCIPLES.md` - Architecture patterns and decisions
-- `FILTER_FORMAT_REFERENCE.md` - Complete filter syntax guide
-- `MULTI_CLIENT_API_KEYS.md` - v1.4.0 implementation guide
+- `AGENTS.md` - Development environment setup, git workflow, common mistakes
 
 **MCP Resources (exposed to LLM):**
 - `tenable-sc://filters/reference` - Interactive filter documentation
@@ -206,58 +228,155 @@ def tsc_request(ctx: Context, method: str, path: str, ...) -> dict[str, Any]:
 
 ---
 
-## 🔧 Quick Development Setup
+## 🔧 Development Environment
 
+**Current Setup:**
 ```bash
-# Clone repository
-git clone https://github.com/ABMJ/tenable-sc-mcp-server.git
-cd tenable-sc-mcp-server
+Branch: develop
+Version: 1.3.0.1
+Python: 3.12
+Package Manager: uv (lockfile) + pip (runtime)
+Container: Docker + docker-compose
+```
 
-# Install dependencies
-uv sync
+**Quick Start:**
+```bash
+# Activate venv
+source .venv/bin/activate
 
-# Configure credentials
-cp .env.example .env
-# Edit .env with your Tenable.sc credentials
+# Install in editable mode
+pip install -e .[dev]
 
-# Build Docker container
-docker build -t tenable-sc-mcp:latest .
+# Run quality checks
+ruff check src tests
+mypy src
+pytest -q
 
-# Run container
-docker run -d --name tenable-sc-mcp \
-  --env-file .env \
-  -p 8080:8080 \
-  tenable-sc-mcp:latest
+# Docker rebuild (ALWAYS use --no-cache for code changes)
+docker build --no-cache -t tenable-sc-mcp:latest .
+docker-compose up -d
 
-# Run tests (after v1.4.0 implementation)
-pytest tests/ -v
+# Check logs
+docker compose logs tenable-sc-mcp -f
 ```
 
 ---
 
-## 🎯 Development Workflow
+## 🎯 Critical Development Patterns
 
-1. **Create feature branch:** `git checkout -b feature/multi-client-support`
-2. **Implement changes:** Follow MULTI_CLIENT_API_KEYS.md guide
-3. **Test thoroughly:** Unit tests + integration tests
-4. **Update docs:** README.md, tool docstrings, migration guide
-5. **Merge to develop:** `git checkout develop && git merge feature/multi-client-support`
-6. **Create release branch:** `git checkout -b release/1.4.0`
-7. **Version bump:** Update `pyproject.toml` and `__init__.py`
-8. **Merge to main:** Create PR, review, merge
-9. **Tag release:** `git tag v1.4.0 && git push origin v1.4.0`
-10. **Publish GitHub release:** Draft release notes from CHANGELOG.md
+**Read DESIGN_PRINCIPLES.md BEFORE making changes!**
+
+### 1. Centralized Filter Management
+
+**Single source of truth:** `src/tenable_sc_mcp/convenience_tools.py:110`
+
+```python
+COMMON_FILTERS = {
+    "severity": {
+        "api_key": "severity",
+        "type": "severity",
+        "description": "Vulnerability severity (0-4 or info/low/medium/high/critical)",
+    },
+    # ... 73 more filters
+}
+```
+
+**NEVER add filter parameters to tool signatures!**
+```python
+# ❌ WRONG - Don't add explicit filter params
+def tsc_tool(severity: str = None, exploit: bool = None):
+    pass
+
+# ✅ CORRECT - Use filters dict only
+def tsc_tool(filters: dict[str, Any] | None = None):
+    filter_dict = filters or {}
+    filter_list = build_filters(**filter_dict)  # Unpack dict
+```
+
+### 2. Smart Lookup Pattern
+
+For human-friendly parameters (names instead of IDs):
+```python
+# User provides name, tool resolves to ID
+repository_id = resolve_repository_name(repository_name)
+```
+
+### 3. Caching Strategy
+
+```python
+# Generate cache key (excludes pagination)
+cache_key = generate_cache_key("tool_name", params=filter_dict)
+
+# Check cache
+cached = cache.get(cache_key)
+if cached:
+    return cached
+
+# Execute query
+result = client.analyze(query)
+
+# Cache with appropriate TTL
+cache.set(cache_key, result, ttl_seconds=240)
+```
+
+TTL Guidelines:
+- Real-time data (scan status): 60s
+- Semi-dynamic (vulnerabilities): 180s
+- Slow-changing (patches, asset info): 240-300s
+- Static (plugin families, OS list): 86400s (24h)
+
+### 4. Scoring Filters - Range Format
+
+**CRITICAL:** Scoring filters use RANGE format, NOT operators!
+
+```python
+# ✅ CORRECT
+filters = {
+    "asset_criticality": "7-10",    # Range format
+    "vpr_score": "8-10",
+    "cvss_v3_base_score": "7.0-10.0"
+}
+
+# ❌ WRONG - Backend doesn't support operators
+filters = {
+    "asset_criticality": ">7",      # Will fail
+    "vpr_score": ">=8"              # Will fail
+}
+```
 
 ---
 
-## 🚨 Critical Notes for v1.4.0
+## 🚀 Git Workflow
 
-1. **Backward Compatibility:** `.env` mode MUST continue working for existing deployments
-2. **Cache Isolation:** Per-client caches prevent data leakage between sessions
-3. **Thread Safety:** Use `Lock()` for all session storage operations
-4. **Error Handling:** Clear error messages when credentials not initialized
-5. **Testing:** Test both `.env` fallback mode AND per-client credential mode
-6. **Documentation:** Migration guide for existing users
+**ALWAYS branch from develop:**
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/tool-6-missing-patches
+```
+
+**Before committing:**
+```bash
+ruff check src tests && mypy src && pytest -q
+```
+
+**Commit format:**
+```
+feat(tools): Add tsc_list_missing_patches_windows
+
+- MS bulletin-based patch gap analysis
+- Severity and date range filtering
+- Grouped by bulletin with affected IP counts
+- 240s cache TTL
+- Token budget: 2,000-4,000
+
+Implements Tool 6 from TOOLS_ROADMAP.md
+```
+
+**Release flow:**
+```
+develop → release/vX.Y.Z → main (tag) → back-merge to develop
+```
 
 ---
 
@@ -268,8 +387,31 @@ pytest tests/ -v
 - **Token Efficiency:** 83-90% reduction vs raw API
 - **Cache Strategy:** Per-tool TTLs (60s-24h depending on data volatility)
 - **Test Coverage:** 8 test cases for v1.3.0.1 (all passing)
-- **GitHub Stars:** 1 (as of v1.3.0.1 release)
 
 ---
 
-**For next session:** Read MULTI_CLIENT_API_KEYS.md and begin Phase 1 implementation
+## 🚨 Common Mistakes (From AGENTS.md)
+
+1. **Branching from main** → Use `develop`
+2. **Operators in scoring filters** → Use range format `"7-10"`
+3. **Explicit filter params in tools** → Use `filters: dict` only
+4. **Docker rebuild without `--no-cache`** → Code won't update
+5. **Editing filter logic in tools** → Add to `COMMON_FILTERS` dict instead
+6. **Forgetting to unpack filters dict** → Use `build_filters(**filter_dict)`
+
+---
+
+## 🎯 Next Steps for New Session
+
+1. **Read This Document** - Understand current state and next priority
+2. **Read DESIGN_PRINCIPLES.md** - Mandatory architecture patterns
+3. **Read TOOLS_ROADMAP.md Lines 134-173** - Tool 6 complete specification
+4. **Create Feature Branch** - `git checkout -b feature/tool-6-missing-patches`
+5. **Implement Tool 6** - Follow the implementation plan above (2-3 hours)
+6. **Test Thoroughly** - Run quality checks and pytest
+7. **Update Documentation** - TEST_PROMPTS.md, TOOLS_ROADMAP.md, CHANGELOG.md
+8. **Commit and Push** - Follow git workflow
+
+---
+
+**For next session:** Start with Tool 6 implementation following the plan above. All architecture patterns are established, filters are centralized, and the codebase is ready for new tools.
