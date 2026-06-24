@@ -6,7 +6,6 @@ Tests parsing functions for plugins 66334 and 38153, and integration with tsc_li
 
 from html import escape
 
-import pytest
 
 from tenable_sc_mcp.tools.patch_management import (
     parse_plugin_66334,

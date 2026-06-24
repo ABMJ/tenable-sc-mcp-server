@@ -1,8 +1,8 @@
 # Tenable.sc MCP Server - User Guide
 
-**Version**: v1.3.0.1  
-**Last Updated**: 2026-06-20  
-**Status**: 7 Production-Ready Tools
+**Version**: v1.3.1  
+**Last Updated**: 2026-06-24  
+**Status**: 8 Production-Ready Tools
 
 ---
 
@@ -20,6 +20,7 @@
 5. [tsc_list_vulns_by_cve](#5-tsc_list_vulns_by_cve---cve-search-across-infrastructure) - CVE Search Across Infrastructure
 6. [tsc_list_operating_systems](#6-tsc_list_operating_systems---os-name-discovery) - OS Name Discovery
 7. [tsc_list_plugin_families](#7-tsc_list_plugin_families---plugin-family-discovery) - Plugin Family Discovery
+8. [tsc_list_missing_patches](#8-tsc_list_missing_patches---patch-gap-analysis) - Patch Gap Analysis
 
 ### Reference
 - [Universal Filter Framework](#universal-filter-framework)
@@ -39,6 +40,7 @@ The Tenable.sc MCP Server provides AI-powered tools for security vulnerability m
 - **Asset Discovery**: Find and enumerate IPs by repository, asset group, or criticality
 - **Risk Assessment**: Get vulnerability counts and details filtered by severity, VPR, or EPSS scores
 - **Compliance**: Track patching status and credential-based scanning coverage
+- **Patch Management**: Identify missing patches and security updates across all operating systems
 
 ### Key Features
 
@@ -81,6 +83,7 @@ Claude: Searching for CVE-2021-44228 across infrastructure...
 | **Check CVE exposure** | "Do we have CVE-2021-44228?" |
 | **Vulnerability details** | "Show vulnerabilities for 192.168.1.100" |
 | **Asset discovery** | "List all Windows hosts in Default repository" |
+| **Patch gap analysis** | "What patches are missing on 10.1.20.10?" |
 
 ---
 
@@ -872,6 +875,263 @@ ips = tsc_list_ips(
     }
 )
 ```
+
+---
+
+## 8. `tsc_list_missing_patches` - Patch Gap Analysis
+
+**Status**: ✅ Production Ready | **Token Savings**: 60-70% | **Cache**: 240s (4m)  
+**Module**: `tools/patch_management.py`
+
+### What This Tool Does
+
+Lists missing patches and security updates across all operating systems by analyzing Tenable plugin output. Supports two modes:
+- **Universal Mode** (Plugin 66334): All OS types + third-party software (Chrome, Office, VMware, etc.)
+- **Windows Mode** (Plugin 38153): Windows KB articles and legacy MS bulletins
+
+### When to Use This Tool
+
+- **Patch Compliance**: "What patches are missing on our production servers?"
+- **Vulnerability Remediation**: "Which Microsoft KBs will fix these vulnerabilities?"
+- **Incident Response**: "Is this server missing critical patches?"
+- **Asset Audit**: "Show me all IPs with missing patches in Default repository"
+- **Risk Prioritization**: "Which critical assets have the most missing patches?"
+
+### How to Use It
+
+#### Basic Single-IP Query (Universal Mode)
+```
+You: What patches are missing on 10.1.20.10?
+
+Claude: Analyzing missing patches for 10.1.20.10 using universal mode...
+[Returns: 41 patches - 37 Microsoft KBs + 4 third-party updates]
+```
+
+#### Repository-Wide Analysis
+```
+You: List missing patches across Default repository
+
+Claude: Analyzing all IPs in Default repository...
+[Returns: Up to 50 IPs with patch counts and details]
+```
+
+#### Windows KB-Specific Query
+```
+You: Show missing Windows updates for 192.168.5.20
+
+Claude: Analyzing Windows patches for 192.168.5.20...
+[Returns: Missing KB articles with vulnerability counts and URLs]
+```
+
+#### Filter by Asset Criticality
+```
+You: Show missing patches for critical assets (ACR 8-10)
+
+Claude: Finding high-risk IPs with missing patches...
+[Returns: Critical assets sorted by patch count]
+```
+
+### What You Get Back
+
+#### Universal Mode Response
+```json
+{
+  "ok": true,
+  "mode": "universal",
+  "total_affected_ips": 1,
+  "patches_by_ip": [
+    {
+      "ip": "10.1.20.10",
+      "hostname": "win7-office2010.labnet.local",
+      "os": "Microsoft Windows 7 Professional Service Pack 1",
+      "repository": "Default",
+      "total_missing_patches": 41,
+      "microsoft_kbs": [
+        {
+          "kb_id": "KB5025279",
+          "vulnerability_count": 85
+        },
+        {
+          "kb_id": "KB5026361",
+          "vulnerability_count": 12
+        }
+      ],
+      "third_party": [
+        {
+          "software": "Google Chrome < 113.0.5672.63"
+        },
+        {
+          "software": "VMware Tools 10.x / 11.x < 12.2.0"
+        }
+      ]
+    }
+  ],
+  "cache_status": "HIT"
+}
+```
+
+#### Windows Mode Response
+```json
+{
+  "ok": true,
+  "mode": "windows",
+  "total_affected_ips": 1,
+  "patches_by_ip": [
+    {
+      "ip": "192.168.5.20",
+      "hostname": "bg520-1.demo.io",
+      "os": "Windows 10",
+      "repository": "Default",
+      "total_missing_kbs": 23,
+      "missing_kbs": [
+        {
+          "kb_id": "KB4025252",
+          "url": "https://support.microsoft.com/kb/4025252"
+        },
+        {
+          "bulletin_id": "MS16-087",
+          "type": "legacy_ms_bulletin"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Parameters
+
+| Parameter | Type | Description | Required |
+|-----------|------|-------------|----------|
+| `mode` | string | `"universal"` (default) or `"windows"` | No |
+| `filters` | dict | Filter parameters (see below) | No |
+
+### Supported Filters
+
+All 74+ universal filters are supported. Common examples:
+
+#### Asset Filters
+```python
+filters = {
+    "ip": "10.1.20.10",              # Specific IP
+    "repository": "Default",          # Repository name (auto-resolves to ID)
+    "asset_criticality": "8-10",      # High-risk assets only
+    "dns_name": "webserver01"         # Hostname filter
+}
+```
+
+#### Vulnerability Filters
+```python
+filters = {
+    "severity": "critical",           # critical/high/medium/low/info
+    "operating_system": "Windows 10", # OS filter
+    "first_seen": "1704067200",       # Unix timestamp
+    "last_seen": "1735689600"         # Unix timestamp
+}
+```
+
+### Key Features
+
+- **Two Detection Modes**: Universal (all OS) or Windows-specific
+- **Smart Parsing**: Extracts KB IDs, third-party software, vulnerability counts
+- **Repository Name Resolution**: Auto-converts "Default" → ID 9
+- **Token Efficient**: 700-20,000 tokens depending on result size
+- **Fast Caching**: 240s (4 minute) cache for quick repeated queries
+- **Pagination**: Returns up to 50 results per query
+
+### Pro Tips
+
+1. **Single-IP queries recommended**: In 1000+ IP environments, scope queries to specific IPs/repositories to avoid token explosion
+2. **Use filters to narrow scope**: Apply `asset_criticality` or `repository` filters to focus on high-risk assets
+3. **Check scan policy**: Tool requires plugin output to be stored (scan policy setting)
+4. **Repository name resolution**: Use repository name directly ("Default"), no need to look up ID
+5. **Empty results validation**: Tool distinguishes "no patches found" vs "IP/repo doesn't exist"
+
+### Example Workflows
+
+#### Workflow 1: Single Server Audit
+```python
+# Step 1: Profile the server
+profile = tsc_profile_ip_efficient("10.1.20.10")
+
+# Step 2: Get missing patches
+patches = tsc_list_missing_patches(
+    mode="universal",
+    filters={"ip": "10.1.20.10"}
+)
+
+# Step 3: Get full vulnerability details
+vulns = tsc_list_vulns_by_ip_full(
+    "10.1.20.10",
+    filters={"severity": "critical"}
+)
+```
+
+#### Workflow 2: Repository-Wide Compliance
+```python
+# Step 1: Find all IPs in repository
+ips = tsc_list_ips(repository="Default")
+
+# Step 2: Get missing patches for repository
+patches = tsc_list_missing_patches(
+    mode="universal",
+    filters={"repository": "Default"}
+)
+
+# Step 3: Filter to critical assets only
+critical_patches = tsc_list_missing_patches(
+    mode="universal",
+    filters={
+        "repository": "Default",
+        "asset_criticality": "8-10"
+    }
+)
+```
+
+#### Workflow 3: Windows Patch Management
+```python
+# Step 1: Find all Windows 10 hosts
+win10_ips = tsc_list_ips(
+    repository="Default",
+    filters={"operating_system": "Windows 10"}
+)
+
+# Step 2: Get missing Windows updates
+patches = tsc_list_missing_patches(
+    mode="windows",
+    filters={
+        "repository": "Default",
+        "operating_system": "Windows 10"
+    }
+)
+```
+
+### Known Limitations
+
+1. **Pagination**: Returns max 50 results per query
+   - Workaround: Use IP or repository filters to scope queries
+2. **Plugin Output Required**: Tool requires `pluginText` field to be stored
+   - If scan policy has "Store plugin output" disabled, returns 0 results
+3. **Repository Name Resolution**: Repository must exist in system
+   - Tool provides list of available repositories when name not found
+
+### Performance Benchmarks
+
+| Query Type | Token Usage | Cache | Response Time |
+|------------|-------------|-------|---------------|
+| Single IP | 700-1,200 | 240s | <1s cached, 2s fresh |
+| Repository (50 IPs) | 15,000-20,000 | 240s | <1s cached, 3-5s fresh |
+| High ACR (10-30 IPs) | 5,000-10,000 | 240s | <1s cached, 2-4s fresh |
+
+### Troubleshooting
+
+**Problem**: Tool returns 0 results for known vulnerable IP  
+**Solution**: Check scan policy has "Store plugin output" enabled
+
+**Problem**: Repository not found error  
+**Solution**: Use `tsc_list_domains()` or check error message for available repositories
+
+**Problem**: Token usage too high (>50,000 tokens)  
+**Solution**: Add `ip` or `repository` filter to scope query, avoid wide-open queries in large environments
 
 ---
 

@@ -505,7 +505,10 @@ def _find_ip_membership(ip: str) -> dict[str, Any]:
             "ok": False,
             "error": f"Failed to lookup IP membership: {exc}"
         }
-    
+
+
+def register_os_tools(mcp):
+    """Register operating system listing tools with the MCP server."""
     
     @mcp.tool()
     def tsc_list_operating_systems(
@@ -644,4 +647,4 @@ def _find_ip_membership(ip: str) -> dict[str, Any]:
 
 
 # Export for testing
-__all__ = ["register_tools"]
+__all__ = ["register_tools", "register_os_tools"]

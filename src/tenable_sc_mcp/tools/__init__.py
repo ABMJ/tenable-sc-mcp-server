@@ -51,8 +51,9 @@ def register_all_tools(mcp: "FastMCP") -> None:
     register_vulnerability_lookup(mcp)
     
     # Import and register asset discovery tools
-    from .asset_discovery import register_tools as register_asset_discovery
+    from .asset_discovery import register_tools as register_asset_discovery, register_os_tools
     register_asset_discovery(mcp)
+    register_os_tools(mcp)
     
     # Import and register admin tools (v1.3.0+)
     from .admin import register_all_admin_tools

@@ -367,7 +367,7 @@ def register_tools(mcp):
             if filter_dict.get("ip"):
                 note = f"No data returned for IP {filter_dict['ip']}. This could mean: (1) IP doesn't exist in Tenable.sc, (2) IP wasn't scanned, (3) Plugin {plugin_id} didn't run, or (4) No patches are missing."
             elif filter_dict.get("repository"):
-                note = f"No data returned for repository filter. Repository may not exist, may be empty, or may have no systems with missing patches."
+                note = "No data returned for repository filter. Repository may not exist, may be empty, or may have no systems with missing patches."
             else:
                 note = "No results returned. Filters may be too restrictive or no systems have missing patches."
         elif len(patches_by_ip) == 0 and len(results) > 0:
