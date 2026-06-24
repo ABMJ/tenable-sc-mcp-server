@@ -285,10 +285,15 @@ def register_tools(mcp):
                 return cached
         
         # Query using vulndetails to get plugin output
+        # Must match Tenable.sc analysis format with nested query object
         query = {
-            "tool": "vulndetails",
             "type": "vuln",
-            "filters": filter_list,
+            "query": {
+                "tool": "vulndetails",
+                "type": "vuln",
+                "filters": filter_list,
+            },
+            "sourceType": "cumulative"
         }
         
         try:
