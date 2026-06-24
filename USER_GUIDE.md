@@ -1135,6 +1135,205 @@ patches = tsc_list_missing_patches(
 
 ---
 
+## 9. `tsc_scan_status` - Scan Status Monitoring
+
+**Purpose:** Real-time scan execution monitoring with progress tracking, import status alerts, and performance metrics.
+
+**Key Features:**
+- Dual status tracking (scan execution + result import)
+- Progress calculation (percent complete, IPs/hour, ETA)
+- Import status alerts (scan complete but data not available)
+- Time range filtering (24h, 7d, 30d)
+- Performance metrics (scan duration, scanning rate)
+
+### Basic Usage
+
+**List all running scans:**
+```python
+result = tsc_scan_status(status="running")
+
+# Returns:
+{
+    "ok": True,
+    "active_scans": 2,
+    "completed_scans": 0,
+    "failed_scans": 0,
+    "scan_results": [
+        {
+            "id": "123",
+            "name": "Weekly PCI Scan",
+            "status": "Running",
+            "progress": {
+                "ips_completed": 450,
+                "ips_total": 500,
+                "percent": 90.0,
+                "ips_per_hour": 200.0,
+                "estimated_remaining_seconds": 900
+            },
+            "timing": {
+                "started": "2026-06-24T10:00:00",
+                "elapsed": "2h 15m"
+            },
+            "import_status": "No Results",
+            "import_info": {"alert": False}
+        }
+    ]
+}
+```
+
+**Check completed scans (last 24h):**
+```python
+result = tsc_scan_status(status="completed", time_range="24h")
+```
+
+**Check for import issues:**
+```python
+# Returns scans where scan completed but import still running or failed
+result = tsc_scan_status(status="completed")
+
+# Check import_info.alert = True for problems
+for scan in result["scan_results"]:
+    if scan["import_info"]["alert"]:
+        print(f"⚠️  {scan['name']}: {scan['note']}")
+```
+
+### Common Scenarios
+
+#### 1. Monitor Active Scan Progress
+```python
+result = tsc_scan_status(status="running")
+
+for scan in result["scan_results"]:
+    progress = scan["progress"]
+    timing = scan["timing"]
+    
+    print(f"{scan['name']}:")
+    print(f"  Progress: {progress['percent']}%")
+    print(f"  IPs: {progress['ips_completed']}/{progress['ips_total']}")
+    print(f"  Rate: {progress['ips_per_hour']} IPs/hour")
+    print(f"  Elapsed: {timing['elapsed']}")
+    
+    if progress['estimated_remaining_seconds']:
+        eta_minutes = progress['estimated_remaining_seconds'] // 60
+        print(f"  ETA: ~{eta_minutes} minutes")
+```
+
+#### 2. Troubleshoot Missing Scan Data
+```python
+# Check if scan completed but data not available yet
+result = tsc_scan_status(status="completed", time_range="24h")
+
+for scan in result["scan_results"]:
+    if scan["import_status"] == "Running":
+        print(f"⚠️  {scan['name']}: Scan completed but import still processing")
+        print(f"    Import elapsed: {scan['import_info']['import_elapsed_formatted']}")
+    elif scan["import_status"] == "Error":
+        print(f"❌ {scan['name']}: Import failed!")
+        print(f"    Error: {scan['import_info']['error_details']}")
+```
+
+#### 3. Historical Scan Analysis
+```python
+# Get 7 days of scan history
+result = tsc_scan_status(time_range="7d")
+
+print(f"Total scans (7d): {result['total_results']}")
+print(f"Active: {result['active_scans']}")
+print(f"Completed: {result['completed_scans']}")
+print(f"Failed: {result['failed_scans']}")
+
+# Calculate average scan duration
+durations = []
+for scan in result["scan_results"]:
+    if scan["status"] == "Completed" and "duration" in scan["timing"]:
+        # Parse duration (e.g., "2h 15m")
+        duration_str = scan["timing"]["duration"]
+        # ... calculate average
+```
+
+#### 4. Investigate Failed Scans
+```python
+# Note: Use status="error" or check for "Error"/"Stopped" in results
+result = tsc_scan_status(time_range="7d")
+
+for scan in result["scan_results"]:
+    if scan["status"] in ["Error", "Stopped"]:
+        print(f"❌ {scan['name']}")
+        print(f"   Status: {scan['status']}")
+        print(f"   Progress at failure: {scan['progress']['percent']}%")
+        # errorDetails field may contain failure reason
+```
+
+### Advanced Usage
+
+**Custom time range (by finish time):**
+```python
+result = tsc_scan_status(
+    filters={
+        "start_time": "2026-06-20",
+        "end_time": "2026-06-24",
+        "time_compare_field": "finishTime"  # Search by finish time, not created
+    }
+)
+```
+
+**Get detailed progress for specific scan:**
+```python
+result = tsc_scan_status(scan_id=123, include_progress=True)
+# Returns detailed progress with per-scanner breakdown
+```
+
+### Critical API Insights
+
+#### Import Status Tracking
+**Problem:** Scan shows "Completed" but you can't see results in Tenable.sc.
+
+**Solution:** Check `importStatus` field separately from scan status:
+- `status: "Completed"` + `importStatus: "Running"` = Data not available yet
+- `status: "Completed"` + `importStatus: "Finished"` = Data available
+- `status: "Completed"` + `importStatus: "Error"` = Import failed, data lost
+
+This tool explicitly alerts you when scan is complete but import still running.
+
+#### Time Filtering Gotcha
+**Default:** API searches by `createdTime` (when scan result was created), NOT `finishTime`.
+
+**To search by completion time:**
+```python
+filters = {"time_compare_field": "finishTime"}
+```
+
+#### Progress Calculation
+- **IPs/hour** = completedIPs / elapsed_seconds * 3600
+- **Estimated remaining** = (totalIPs - completedIPs) / IPs_per_hour
+- Only shown for running scans (not completed/failed)
+
+### Common Issues
+
+**Problem:** "No scans found" with status="running"  
+**Solution:** No scans currently active. Try `time_range="24h"` without status filter to see recent scans.
+
+**Problem:** Scan completed 2 hours ago but still no data  
+**Solution:** Check `importStatus` field. If "Running", import is still processing. If "Error", check `importErrorDetails`.
+
+**Problem:** Token usage high for 30d queries  
+**Solution:** Use shorter time ranges (24h/7d) or filter by status to reduce result set.
+
+### Performance
+
+- **Token Budget:** 700-1,900 tokens per query (varies with result count)
+- **Cache TTL:** 60 seconds (real-time data)
+- **Use Cases:** Operational monitoring, troubleshooting, performance tracking
+
+**Best Practices:**
+1. Use `status="running"` for active scan dashboard
+2. Use `time_range="24h"` for daily operations
+3. Check `import_info.alert` to troubleshoot missing data
+4. Use shorter time ranges to reduce token usage
+5. Run queries twice to verify cache performance (60s TTL)
+
+---
+
 ## Universal Filter Framework
 
 All tools support 74+ filters via the `filters` dict parameter. Filters are consistent across all tools.
