@@ -47,6 +47,8 @@ tools_exposed:
     description: "List all plugin families with name→ID mapping"
   - name: "tsc_list_missing_patches"
     description: "Patch gap analysis across all OS (universal mode) or Windows KB-specific"
+  - name: "tsc_scan_status"
+    description: "Real-time scan execution monitoring with progress tracking and import alerts"
   - name: "tsc_resource_docs"
     description: "Returns docs metadata for Tenable.sc resource"
 resources_exposed:
@@ -75,7 +77,7 @@ This MCP server enables AI-powered security workflows by providing:
 
 The server acts as a stateless proxy between MCP clients and Tenable.sc's REST API. It authenticates using your Tenable.sc API keys and enforces all RBAC permissions from your Security Center instance. The architecture includes:
 - Multi-tier caching (in-memory + Redis) with smart TTLs based on data volatility
-- 18 core MCP tools including convenience tools for common security workflows (IP profiling, CVE search, patch management)
+- 19 core MCP tools including convenience tools for common security workflows (IP profiling, CVE search, patch management, scan monitoring)
 - 3 self-documenting resources with filter format references for complex queries
 - Docker Compose deployment with Redis included for production use
 - Support for both stdio (Claude Desktop) and HTTP (remote clients) transports
